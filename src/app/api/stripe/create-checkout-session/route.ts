@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateCompany } from "@/lib/company";
 import { getStripe, getAppUrl } from "@/lib/stripe";
+import { createPilotCheckoutSession } from "@/lib/stripe/pilot-checkout";
 import { resolvePriceIdForPlan, type CheckoutPlanId } from "@/lib/plans";
 
 const VALID_PLANS: CheckoutPlanId[] = ["starter", "business", "consultant", "pilot"];
@@ -34,7 +35,6 @@ export async function POST(request: Request) {
 
     const stripe = getStripe();
     const appUrl = getAppUrl();
-    const priceIds = resolvePriceIdForPlan(plan);
 
     let customerId = company.stripe_customer_id ?? undefined;
 
@@ -55,11 +55,49 @@ export async function POST(request: Request) {
         .eq("id", company.id);
     }
 
+    // Pilot: 499 € Setup + 99 €/Monat mit Trial (eigene Checkout-Logik)
+    if (plan === "pilot") {
+      if (company.pilot_setup_paid_at) {
+        return NextResponse.json(
+          {
+            error:
+              "Das Pilotpaket wurde bereits gebucht. Wählen Sie nach der Pilotphase ein Abo unter Preise.",
+          },
+          { status: 409 }
+        );
+      }
+
+      const session = await createPilotCheckoutSession({
+        stripe,
+        customerId,
+        companyId: company.id,
+        userId: user.id,
+        appUrl,
+        phaseDays:
+          body.phaseDays !== undefined
+            ? Number(body.phaseDays)
+            : body.trialDays !== undefined
+              ? Number(body.trialDays)
+              : undefined,
+      });
+
+      if (!session.url) {
+        return NextResponse.json(
+          { error: "Checkout-URL konnte nicht erstellt werden" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ url: session.url });
+    }
+
+    const priceIds = resolvePriceIdForPlan(plan);
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
       line_items: priceIds.map((price) => ({ price, quantity: 1 })),
-      success_url: `${appUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${appUrl}/success`,
       cancel_url: `${appUrl}/pricing?canceled=true`,
       metadata: {
         company_id: company.id,

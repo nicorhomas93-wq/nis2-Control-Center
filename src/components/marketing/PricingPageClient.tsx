@@ -13,9 +13,11 @@ import { createClient } from "@/lib/supabase/client";
 import {
   SUBSCRIPTION_PLANS,
   PILOT_PLAN,
+  PILOT_PLAN_PHASE_DAYS_LABEL,
   getPaymentLinkForPlan,
   type CheckoutPlanId,
 } from "@/lib/plans";
+import { PilotStartButton } from "@/components/billing/PilotStartButton";
 
 export function PricingPageClient() {
   const searchParams = useSearchParams();
@@ -34,6 +36,11 @@ export function PricingPageClient() {
 
   async function handleCheckout(plan: CheckoutPlanId) {
     setError(null);
+
+    // Pilot immer über API (Setup + Abo + Trial) — kein Payment Link
+    if (plan === "pilot") {
+      return;
+    }
 
     const paymentLink = getPaymentLinkForPlan(plan);
     if (paymentLink) {
@@ -159,14 +166,15 @@ export function PricingPageClient() {
           <CardHeader>
             <CardTitle>{PILOT_PLAN.name}</CardTitle>
             <CardDescription>
-              Persönliches Onboarding mit Business-Funktionen während der Pilotphase.
+              Einmalige Pilotphase mit Onboarding — danach wählen Sie Ihr monatliches Abo.
             </CardDescription>
             <p className="pt-2">
-              <span className="text-3xl font-bold text-slate-900">{PILOT_PLAN.monthly} €</span>
-              <span className="text-slate-500">/Monat</span>
-              <span className="ml-2 text-sm text-slate-500">
-                + {PILOT_PLAN.setup} € Einmal-Setup
-              </span>
+              <span className="text-3xl font-bold text-slate-900">{PILOT_PLAN.setup} €</span>
+              <span className="text-slate-500"> einmalig</span>
+            </p>
+            <p className="text-sm text-slate-600">
+              {PILOT_PLAN_PHASE_DAYS_LABEL} voller Zugang. Danach Abo wählen: Basis ab 49 €, Business
+              ab 199 € oder Consultant ab 699 €/Monat.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -178,20 +186,7 @@ export function PricingPageClient() {
                 </li>
               ))}
             </ul>
-            <Button
-              className="w-full sm:w-auto"
-              disabled={loadingPlan !== null}
-              onClick={() => handleCheckout("pilot")}
-            >
-              {loadingPlan === "pilot" ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Wird geöffnet…
-                </>
-              ) : (
-                PILOT_PLAN.cta
-              )}
-            </Button>
+            <PilotStartButton />
           </CardContent>
         </Card>
 

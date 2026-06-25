@@ -102,6 +102,11 @@ export function calculateLeadScore(lead: LeadScoreInput): LeadScoreResult {
     reasons.push("+30 Pilotanfrage (aktives Interesse)");
   }
 
+  if (lead.source === "nis2_check") {
+    score += 40;
+    reasons.push("+40 NIS2-Check abgeschlossen");
+  }
+
   if (lead.industry && industryMatches(lead.industry)) {
     score += 20;
     reasons.push("+20 relevante Branche");

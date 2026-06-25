@@ -75,8 +75,13 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (user && isAuthRoute) {
+      const redirect = request.nextUrl.searchParams.get("redirect");
       const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
+      url.pathname =
+        redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+          ? redirect
+          : "/dashboard";
+      url.search = "";
       return NextResponse.redirect(url);
     }
 

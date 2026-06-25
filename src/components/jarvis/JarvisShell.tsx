@@ -9,6 +9,7 @@ import {
   Inbox,
   LayoutDashboard,
   Mail,
+  Megaphone,
   Settings,
   TrendingUp,
   Users,
@@ -24,6 +25,7 @@ const jarvisTabs = [
   { href: "/jarvis/drafts", label: "E-Mail-Entwürfe", icon: Mail },
   { href: "/jarvis/follow-ups", label: "Follow-ups", icon: ClipboardList },
   { href: "/jarvis/pipeline", label: "Verkaufs-Pipeline", icon: Workflow },
+  { href: "/jarvis/acquisition", label: "Acquisition", icon: Megaphone },
   { href: "/jarvis/traffic", label: "Traffic", icon: TrendingUp },
   { href: "/jarvis/settings", label: "Einstellungen", icon: Settings },
 ];

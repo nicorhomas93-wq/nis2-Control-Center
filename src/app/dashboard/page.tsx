@@ -14,6 +14,7 @@ import { ArrowRight, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { FunnelWelcomeBanner } from "@/components/funnel/FunnelWelcomeBanner";
 import { redirect } from "next/navigation";
 
 function buildRecentActivity(
@@ -46,7 +47,13 @@ function buildRecentActivity(
     .slice(0, 5);
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ funnel?: string }>;
+}) {
+  const params = await searchParams;
+  const showFunnelWelcome = params.funnel === "1";
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -94,6 +101,15 @@ export default async function DashboardPage() {
       </div>
 
       <BillingStatusBanner company={company} />
+
+      {showFunnelWelcome && company && (
+        <FunnelWelcomeBanner
+          complianceScore={score}
+          openMeasures={openMeasures}
+          documentCount={docs.length}
+          auditPercent={auditScore.percent}
+        />
+      )}
 
       {!profileComplete && !missingTable && (
         <Card className="mb-8 border-brand-200 bg-brand-50">

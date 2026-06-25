@@ -138,7 +138,7 @@ export function AssessmentCheck({ companyId, currentStatus }: AssessmentCheckPro
                 Bauen Sie Schritt für Schritt Ihre NIS2-Dokumentation auf — von Pflichtdokumenten
                 bis zum fertigen Audit-Ordner.
               </p>
-              <Link href="/pricing" className="mt-6 inline-block">
+              <Link href="/upgrade" className="mt-6 inline-block">
                 <Button size="lg">
                   Jetzt NIS2-System starten
                   <ArrowRight className="h-4 w-4" />

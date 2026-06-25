@@ -22,7 +22,7 @@ export function MarketingHeader() {
           <Link href="/login" className="hidden sm:block">
             <Button variant="ghost" size="sm">Anmelden</Button>
           </Link>
-          <Link href="/register">
+          <Link href="/check">
             <Button size="sm">NIS2-Check starten</Button>
           </Link>
         </div>

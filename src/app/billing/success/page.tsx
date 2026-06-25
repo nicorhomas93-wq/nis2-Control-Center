@@ -29,13 +29,13 @@ export default async function BillingSuccessPage({
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
             <CheckCircle2 className="h-8 w-8 text-emerald-600" />
           </div>
-          <CardTitle className="text-2xl">Zahlung erfolgreich</CardTitle>
+          <CardTitle className="text-2xl">Setup abgeschlossen</CardTitle>
           <CardDescription>
-            Ihr Abo wird aktiviert. Die Bestätigung kann einige Sekunden dauern.
+            Ihr Zugang wird aktiviert. Sie werden gleich zu Ihrem Dashboard weitergeleitet.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <Link href="/dashboard">
+          <Link href="/dashboard?funnel=1">
             <Button className="w-full">
               Zum Dashboard
               <ArrowRight className="h-4 w-4" />

@@ -17,6 +17,7 @@ import {
 import { MarketingHeader } from "@/components/layout/MarketingHeader";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { Button } from "@/components/ui/Button";
+import { trackCtaClick } from "@/lib/acquisition/client";
 
 const problemItems = [
   {
@@ -127,7 +128,7 @@ const audiences = [
 
 function PrimaryCta({ className = "" }: { className?: string }) {
   return (
-    <Link href="/register">
+    <Link href="/check" onClick={() => trackCtaClick("landing_primary")}>
       <Button size="lg" className={className}>
         Kostenlosen NIS2-Check starten
         <ArrowRight className="h-4 w-4" />
@@ -255,7 +256,7 @@ export function LandingPageClient() {
             Situation.
           </p>
           <div className="mt-10 flex justify-center">
-            <Link href="/register">
+            <Link href="/check">
               <Button size="lg" className="bg-brand-500 hover:bg-brand-400">
                 Kostenlosen NIS2-Check starten
                 <ArrowRight className="h-4 w-4" />
@@ -369,7 +370,7 @@ export function LandingPageClient() {
             Jeder Tag ohne Stand ist ein Tag, an dem Sie nicht handlungsfähig sind.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/register">
+            <Link href="/check">
               <Button size="lg" className="bg-brand-500 hover:bg-brand-400">
                 Kostenlosen NIS2-Check starten
                 <ArrowRight className="h-4 w-4" />

@@ -46,9 +46,12 @@ export interface Company {
   stripe_customer_id?: string | null;
   stripe_subscription_id?: string | null;
   subscription_status?: string | null;
+  access_enabled?: boolean;
   current_period_end?: string | null;
   trial_ends_at?: string | null;
   billing_email?: string | null;
+  pilot_setup_paid_at?: string | null;
+  pilot_phase_completed_at?: string | null;
   created_at: string;
   updated_at: string;
 }
