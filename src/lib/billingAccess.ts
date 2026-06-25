@@ -99,3 +99,10 @@ export function hasPaidSubscription(company: Company | null | undefined): boolea
 export function needsUpgradeForJarvis(company: Company | null | undefined): boolean {
   return !canUseFeature(company, "jarvis.sales");
 }
+
+export function isComplimentaryPilot(company: Company | null | undefined): boolean {
+  if (!company) return false;
+  const plan = company.plan ?? "free";
+  const status = company.subscription_status ?? "inactive";
+  return plan === "pilot" && !["active", "trialing", "past_due"].includes(status);
+}

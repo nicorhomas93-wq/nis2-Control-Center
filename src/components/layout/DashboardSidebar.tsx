@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Bot,
@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { canAccessJarvis } from "@/lib/jarvis/access";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -39,6 +40,18 @@ export function DashboardSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showJarvis, setShowJarvis] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      setShowJarvis(canAccessJarvis(data.user?.email));
+    });
+  }, []);
+
+  const visibleNavItems = navItems.filter(
+    (item) => item.href !== "/jarvis" || showJarvis
+  );
 
   async function handleLogout() {
     const supabase = createClient();
@@ -60,7 +73,7 @@ export function DashboardSidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {visibleNavItems.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
