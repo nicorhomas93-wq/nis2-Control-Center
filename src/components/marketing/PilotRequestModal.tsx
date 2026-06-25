@@ -28,32 +28,48 @@ export function PilotRequestModal({ open, onClose, defaultMessage }: PilotReques
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />
-      <div className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">Pilotzugang anfragen</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Wir melden uns mit den nächsten Schritten für Ihren Pilotzugang.
-            </p>
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pilot-request-title"
+    >
+      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
+        <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />
+        <div className="relative z-10 flex w-full max-w-[95vw] max-h-[90vh] flex-col overflow-hidden rounded-xl bg-white shadow-xl sm:max-w-xl">
+          <div className="shrink-0 border-b border-slate-100 px-4 py-4 md:px-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 pr-2">
+                <h2 id="pilot-request-title" className="text-lg font-bold text-slate-900">
+                  Pilotzugang anfragen
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Wir melden uns mit den nächsten Schritten für Ihren Pilotzugang.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="shrink-0 rounded p-1 text-slate-400 hover:text-slate-600"
+                aria-label="Schließen"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-slate-400 hover:text-slate-600"
-            aria-label="Schließen"
-          >
-            <X className="h-5 w-5" />
-          </button>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 md:px-6 md:py-5">
+            <PilotRequestForm
+              defaultMessage={defaultMessage}
+              layout="modal"
+              onSuccess={({ emailSent }) => {
+                if (emailSent) {
+                  setTimeout(onClose, 4000);
+                }
+              }}
+            />
+          </div>
         </div>
-        <PilotRequestForm
-          defaultMessage={defaultMessage}
-          onSuccess={({ emailSent }) => {
-            if (emailSent) {
-              setTimeout(onClose, 4000);
-            }
-          }}
-        />
       </div>
     </div>
   );

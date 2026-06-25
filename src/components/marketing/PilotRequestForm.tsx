@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Textarea } from "@/components/ui/Textarea";
 import { Loader2, CheckCircle2, Mail } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function buildMailtoHref(form: {
   name: string;
@@ -37,9 +38,24 @@ function buildMailtoHref(form: {
 interface PilotRequestFormProps {
   onSuccess?: (result: { emailSent: boolean }) => void;
   defaultMessage?: string;
+  layout?: "default" | "modal";
 }
 
-export function PilotRequestForm({ onSuccess, defaultMessage = "" }: PilotRequestFormProps) {
+function FormField({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return <div className={cn("w-full min-w-0", className)}>{children}</div>;
+}
+
+export function PilotRequestForm({
+  onSuccess,
+  defaultMessage = "",
+  layout = "default",
+}: PilotRequestFormProps) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +68,9 @@ export function PilotRequestForm({ onSuccess, defaultMessage = "" }: PilotReques
     industry: "",
     message: defaultMessage,
   });
+
+  const isModal = layout === "modal";
+  const fieldSpacing = isModal ? "mb-3" : undefined;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,7 +108,7 @@ export function PilotRequestForm({ onSuccess, defaultMessage = "" }: PilotReques
 
   if (success) {
     return (
-      <div className="flex flex-col items-center gap-3 py-8 text-center">
+      <div className="flex flex-col items-center gap-3 py-6 text-center sm:py-8">
         <CheckCircle2 className="h-10 w-10 text-emerald-500" />
         <p className="font-medium text-slate-900">Vielen Dank für Ihre Anfrage!</p>
         {!warning && (
@@ -101,13 +120,13 @@ export function PilotRequestForm({ onSuccess, defaultMessage = "" }: PilotReques
           </div>
         )}
         {warning && (
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            <a href={buildMailtoHref(form)} className="inline-flex">
-              <Button type="button" variant="outline">
+          <div className="mt-4 flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+            <a href={buildMailtoHref(form)} className="inline-flex w-full sm:w-auto">
+              <Button type="button" variant="outline" className="w-full">
                 <Mail className="h-4 w-4" /> Manuell per E-Mail senden
               </Button>
             </a>
-            <Button variant="ghost" onClick={() => setSuccess(false)}>
+            <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setSuccess(false)}>
               Schließen
             </Button>
           </div>
@@ -116,10 +135,10 @@ export function PilotRequestForm({ onSuccess, defaultMessage = "" }: PilotReques
     );
   }
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
+  const fields = (
+    <>
+      <div className={cn(isModal ? "space-y-0" : "grid gap-4 sm:grid-cols-2")}>
+        <FormField className={fieldSpacing}>
           <Label htmlFor="pilot-name">Name *</Label>
           <Input
             id="pilot-name"
@@ -127,8 +146,8 @@ export function PilotRequestForm({ onSuccess, defaultMessage = "" }: PilotReques
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
           />
-        </div>
-        <div>
+        </FormField>
+        <FormField className={fieldSpacing}>
           <Label htmlFor="pilot-company">Unternehmen *</Label>
           <Input
             id="pilot-company"
@@ -136,10 +155,11 @@ export function PilotRequestForm({ onSuccess, defaultMessage = "" }: PilotReques
             value={form.company}
             onChange={(e) => setForm({ ...form, company: e.target.value })}
           />
-        </div>
+        </FormField>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
+
+      <div className={cn(isModal ? "space-y-0" : "grid gap-4 sm:grid-cols-2")}>
+        <FormField className={fieldSpacing}>
           <Label htmlFor="pilot-email">E-Mail *</Label>
           <Input
             id="pilot-email"
@@ -148,37 +168,44 @@ export function PilotRequestForm({ onSuccess, defaultMessage = "" }: PilotReques
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
           />
-        </div>
-        <div>
+        </FormField>
+        <FormField className={fieldSpacing}>
           <Label htmlFor="pilot-phone">Telefon (optional)</Label>
           <Input
             id="pilot-phone"
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
           />
-        </div>
+        </FormField>
       </div>
-      <div>
+
+      <FormField className={fieldSpacing}>
         <Label htmlFor="pilot-industry">Branche</Label>
         <Input
           id="pilot-industry"
           value={form.industry}
           onChange={(e) => setForm({ ...form, industry: e.target.value })}
         />
-      </div>
-      <div>
+      </FormField>
+
+      <FormField className={isModal ? "mb-3" : undefined}>
         <Label htmlFor="pilot-message">Nachricht</Label>
         <Textarea
           id="pilot-message"
-          rows={6}
-          className="min-h-[140px] w-full"
+          rows={isModal ? 4 : 6}
+          className={cn("w-full", isModal ? "min-h-[100px] md:min-h-[120px]" : "min-h-[140px]")}
           value={form.message}
           onChange={(e) => setForm({ ...form, message: e.target.value })}
           placeholder="Kurz beschreiben, was Sie mit dem Pilot erreichen möchten…"
         />
-      </div>
+      </FormField>
+    </>
+  );
+
+  const submitSection = (
+    <>
       {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
       )}
       <Button type="submit" disabled={loading} className="w-full">
         {loading ? (
@@ -189,6 +216,24 @@ export function PilotRequestForm({ onSuccess, defaultMessage = "" }: PilotReques
           "Pilotzugang anfragen"
         )}
       </Button>
+    </>
+  );
+
+  if (isModal) {
+    return (
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-col">
+        <div className="min-h-0">{fields}</div>
+        <div className="sticky bottom-0 z-10 -mx-4 mt-2 border-t border-slate-100 bg-white px-4 pb-1 pt-3 md:-mx-6 md:px-6">
+          {submitSection}
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {fields}
+      {submitSection}
     </form>
   );
 }
