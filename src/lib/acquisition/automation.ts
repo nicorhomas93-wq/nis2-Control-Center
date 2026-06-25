@@ -2,10 +2,11 @@ import "server-only";
 import type { AcquisitionEventType, UtmParams } from "@/lib/acquisition/types";
 import { calculateAcquisitionScore } from "@/lib/acquisition/lead-scoring";
 import {
-  EMAIL_SEQUENCE_DAYS,
-  renderSequenceEmail,
-  scheduleEmailAt,
-} from "@/lib/acquisition/email-sequences";
+  fireTrigger,
+  handleUpgradePageLeave,
+  markLeadConverted,
+  scheduleStandardNurtureSequence,
+} from "@/lib/acquisition/follow-up/engine";
 import { syncAcquisitionLeadToJarvis } from "@/lib/acquisition/sync-to-jarvis";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logJarvisEvent } from "@/lib/jarvis/jarvis-events";
@@ -83,6 +84,7 @@ export async function trackAcquisitionEvent(options: {
   const checkCompleted = eventList.some((e) => e.event_type === "check_completed");
   const ctaClicks = eventList.filter((e) => e.event_type === "cta_click").length;
   const emailCaptured = eventList.some((e) => e.event_type === "email_captured");
+  const upgraded = eventList.some((e) => e.event_type === "upgrade_click" || e.event_type === "converted");
 
   const scoreResult = calculateAcquisitionScore({
     checkCompleted,
@@ -91,34 +93,64 @@ export async function trackAcquisitionEvent(options: {
     emailCaptured,
   });
 
+  await admin
+    .from("acquisition_visitors")
+    .update({
+      lead_score: scoreResult.score,
+      last_seen_at: new Date().toISOString(),
+    })
+    .eq("visitor_id", options.visitorId);
+
+  if (options.eventType === "converted") {
+    await markLeadConverted(options.visitorId);
+    return;
+  }
+
+  if (options.eventType === "upgrade_click") {
+    return;
+  }
+
+  if (options.eventType === "result_page_leave" && !upgraded) {
+    await fireTrigger("B", options.visitorId, { pagePath: options.pagePath });
+  }
+
+  if (options.eventType === "upgrade_page_leave" && !upgraded) {
+    await handleUpgradePageLeave(options.visitorId);
+  }
+
+  if (
+    options.eventType === "page_view" &&
+    checkCompleted &&
+    visitCount >= 2 &&
+    !upgraded &&
+    !eventList.some((e) => e.event_type === "site_return")
+  ) {
+    await admin.from("acquisition_events").insert({
+      visitor_id: options.visitorId,
+      event_type: "site_return",
+      page_path: options.pagePath ?? null,
+      metadata: { visitCount },
+    });
+    await fireTrigger("D", options.visitorId, { visitCount });
+  }
+
   const shouldRetarget =
     options.eventType === "page_leave" &&
     RETARGETING_PATHS.some((p) => options.pagePath?.startsWith(p)) &&
     scoreResult.score >= RETARGETING_MIN_SCORE &&
     !checkCompleted;
 
-  await admin
-    .from("acquisition_visitors")
-    .update({
-      lead_score: scoreResult.score,
-      retargeting_eligible: shouldRetarget || undefined,
-      last_seen_at: new Date().toISOString(),
-    })
-    .eq("visitor_id", options.visitorId);
-
   if (shouldRetarget) {
+    await admin
+      .from("acquisition_visitors")
+      .update({ retargeting_eligible: true })
+      .eq("visitor_id", options.visitorId);
+
     await admin.from("acquisition_events").insert({
       visitor_id: options.visitorId,
       event_type: "retargeting_triggered",
       page_path: options.pagePath ?? null,
       metadata: { score: scoreResult.score },
-    });
-
-    await logJarvisEvent(admin, {
-      event_type: "acquisition_retargeting",
-      entity_type: "visitor",
-      summary: `Retargeting ausgelöst: ${options.visitorId}`,
-      details: { pagePath: options.pagePath, score: scoreResult.score },
     });
   }
 }
@@ -191,11 +223,11 @@ export async function processCheckCompleted(options: {
       utm_medium: options.utm?.utm_medium ?? null,
       utm_campaign: options.utm?.utm_campaign ?? null,
       status: options.email ? "nurturing" : "new",
+      lifecycle_status: options.email ? "nurturing" : "check_complete",
+      sequence_id: "standard_nurture",
       strong_offer_eligible: scoreResult.strongOfferEligible,
+      strong_cta: scoreResult.strongOfferEligible,
       email_sequence_step: 0,
-      next_email_at: options.email
-        ? scheduleEmailAt(new Date(), 0).toISOString()
-        : null,
     })
     .select()
     .single();
@@ -210,8 +242,15 @@ export async function processCheckCompleted(options: {
     .update({ lead_score: scoreResult.score })
     .eq("visitor_id", options.visitorId);
 
+  await fireTrigger("A", options.visitorId);
+
   if (options.email) {
-    await scheduleNurtureSequence(lead.id, options.email, options.funnelResult);
+    await scheduleStandardNurtureSequence(
+      admin,
+      lead.id,
+      options.funnelResult,
+      options.email
+    );
     await syncAcquisitionLeadToJarvis(admin, lead.id);
   }
 
@@ -271,64 +310,15 @@ export async function captureLeadEmail(
 
   if (!lead) return;
 
-  await admin
-    .from("acquisition_leads")
-    .update({
-      email,
-      status: "nurturing",
-      next_email_at: scheduleEmailAt(new Date(), 0).toISOString(),
-    })
-    .eq("id", leadId);
+  await admin.from("acquisition_leads").update({ email }).eq("id", leadId);
 
   const funnelResult = lead.funnel_result as FunnelCheckResult | null;
   if (funnelResult) {
-    await scheduleNurtureSequence(leadId, email, funnelResult);
+    await fireTrigger("C", visitorId);
+    await scheduleStandardNurtureSequence(admin, leadId, funnelResult, email);
   }
 
   await syncAcquisitionLeadToJarvis(admin, leadId);
-}
-
-async function scheduleNurtureSequence(
-  acquisitionLeadId: string,
-  email: string,
-  funnelResult: FunnelCheckResult
-): Promise<void> {
-  const admin = createAdminClient();
-  if (!admin) return;
-
-  const vars = {
-    result_summary: funnelResult.problemFrame,
-    offer_line: funnelResult.score >= 60
-      ? "Aufgrund Ihres Ergebnisses empfehlen wir den Pilot-Start mit 30 Tagen Nutzung."
-      : "Starten Sie mit dem passenden Plan für Ihr Unternehmen.",
-  };
-
-  const baseDate = new Date();
-
-  for (const day of EMAIL_SEQUENCE_DAYS) {
-    const { subject, body } = renderSequenceEmail(day, vars);
-    const scheduledAt = scheduleEmailAt(baseDate, day);
-
-    const { data: existing } = await admin
-      .from("acquisition_email_queue")
-      .select("id")
-      .eq("acquisition_lead_id", acquisitionLeadId)
-      .eq("sequence_day", day)
-      .maybeSingle();
-
-    if (!existing) {
-      await admin.from("acquisition_email_queue").insert({
-        acquisition_lead_id: acquisitionLeadId,
-        sequence_day: day,
-        subject,
-        body,
-        scheduled_at: scheduledAt.toISOString(),
-        status: "pending",
-      });
-    }
-  }
-
-  void email;
 }
 
 export async function processEmailQueue(): Promise<{
@@ -344,7 +334,7 @@ export async function processEmailQueue(): Promise<{
 
   const { data: pending } = await admin
     .from("acquisition_email_queue")
-    .select("*, acquisition_leads(email)")
+    .select("*, acquisition_leads(email, lifecycle_status, converted_at)")
     .eq("status", "pending")
     .lte("scheduled_at", now)
     .limit(20);
@@ -354,7 +344,22 @@ export async function processEmailQueue(): Promise<{
   let skipped = 0;
 
   for (const item of pending ?? []) {
-    const leadEmail = (item.acquisition_leads as { email: string | null } | null)?.email;
+    const leadRow = item.acquisition_leads as {
+      email: string | null;
+      lifecycle_status?: string;
+      converted_at?: string | null;
+    } | null;
+
+    if (leadRow?.converted_at || leadRow?.lifecycle_status === "converted") {
+      await admin
+        .from("acquisition_email_queue")
+        .update({ status: "paused" })
+        .eq("id", item.id);
+      skipped++;
+      continue;
+    }
+
+    const leadEmail = leadRow?.email;
     if (!leadEmail) {
       skipped++;
       continue;
@@ -371,6 +376,14 @@ export async function processEmailQueue(): Promise<{
         .from("acquisition_email_queue")
         .update({ status: "sent", sent_at: now })
         .eq("id", item.id);
+
+      await admin
+        .from("acquisition_leads")
+        .update({
+          email_sequence_step: item.sequence_day ?? 0,
+        })
+        .eq("id", item.acquisition_lead_id);
+
       sent++;
     } else {
       await admin

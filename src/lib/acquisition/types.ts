@@ -1,14 +1,19 @@
 export type AcquisitionEventType =
   | "page_view"
   | "page_leave"
+  | "result_page_leave"
+  | "upgrade_page_leave"
   | "cta_click"
   | "check_started"
   | "check_completed"
   | "email_captured"
+  | "email_link_click"
   | "upgrade_click"
-  | "retargeting_triggered";
+  | "site_return"
+  | "retargeting_triggered"
+  | "converted";
 
-export type AcquisitionLeadStatus = "new" | "nurturing" | "converted" | "lost";
+export type AcquisitionLeadStatus = "new" | "nurturing" | "converted" | "lost" | "high_intent";
 
 export type TrafficChannel = "organic" | "tool" | "retargeting" | "linkedin" | "paid";
 
@@ -49,6 +54,9 @@ export interface AcquisitionLead {
   jarvis_lead_id: string | null;
   email_sequence_step: number;
   next_email_at: string | null;
+  lifecycle_status?: string;
+  sequence_id?: string;
+  strong_cta?: boolean;
   created_at: string;
 }
 

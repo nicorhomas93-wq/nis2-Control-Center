@@ -2,7 +2,13 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { getOrCreateVisitorId, parseUtmFromUrl, trackAcquisition } from "@/lib/acquisition/client";
+import {
+  getOrCreateVisitorId,
+  parseUtmFromUrl,
+  trackAcquisition,
+  trackResultPageLeave,
+  trackUpgradePageLeave,
+} from "@/lib/acquisition/client";
 
 const TRACKED_PREFIXES = ["/", "/check", "/result", "/upgrade", "/demo", "/pricing", "/success"];
 
@@ -27,7 +33,13 @@ export function AcquisitionTracker() {
     void trackAcquisition("page_view", { pagePath: pathname });
 
     const onLeave = () => {
-      void trackAcquisition("page_leave", { pagePath: pathname });
+      if (pathname.startsWith("/result")) {
+        trackResultPageLeave();
+      } else if (pathname.startsWith("/upgrade")) {
+        trackUpgradePageLeave();
+      } else {
+        void trackAcquisition("page_leave", { pagePath: pathname });
+      }
     };
 
     const onVisibility = () => {

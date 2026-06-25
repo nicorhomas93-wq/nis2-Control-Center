@@ -54,7 +54,10 @@ export async function trackAcquisition(
         metadata: options?.metadata,
         utm,
       }),
-      keepalive: eventType === "page_leave",
+      keepalive:
+        eventType === "page_leave" ||
+        eventType === "result_page_leave" ||
+        eventType === "upgrade_page_leave",
     });
   } catch {
     // Tracking darf UX nicht blockieren
@@ -89,4 +92,28 @@ export async function captureEmail(email: string, acquisitionLeadId?: string): P
 
 export function trackCtaClick(ctaId: string): void {
   void trackAcquisition("cta_click", { metadata: { ctaId } });
+}
+
+export function trackResultPageLeave(): void {
+  void trackAcquisition("result_page_leave", { pagePath: "/result" });
+}
+
+export function trackUpgradePageLeave(): void {
+  void trackAcquisition("upgrade_page_leave", { pagePath: "/upgrade" });
+}
+
+export async function fetchFollowUpState(): Promise<{
+  strongCta: boolean;
+  lifecycleStatus: string | null;
+}> {
+  const visitorId = getOrCreateVisitorId();
+  if (!visitorId) return { strongCta: false, lifecycleStatus: null };
+
+  try {
+    const res = await fetch(`/api/acquisition/follow-up/state?visitorId=${encodeURIComponent(visitorId)}`);
+    if (!res.ok) return { strongCta: false, lifecycleStatus: null };
+    return res.json();
+  } catch {
+    return { strongCta: false, lifecycleStatus: null };
+  }
 }

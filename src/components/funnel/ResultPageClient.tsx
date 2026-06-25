@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { createClient } from "@/lib/supabase/client";
 import { loadFunnelResult } from "@/lib/funnel/storage";
 import { getResultPageCtas, getStrongOfferCta } from "@/lib/acquisition/conversion-engine";
-import { captureEmail, trackAcquisition, trackCtaClick } from "@/lib/acquisition/client";
+import { captureEmail, fetchFollowUpState, trackAcquisition, trackCtaClick } from "@/lib/acquisition/client";
 import type { FunnelCheckResult } from "@/lib/funnel/types";
 
 const riskItems = [
@@ -32,6 +32,7 @@ export function ResultPageClient() {
   const [emailSent, setEmailSent] = useState(false);
   const [acquisitionScore, setAcquisitionScore] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [strongCtaFromServer, setStrongCtaFromServer] = useState(false);
 
   useEffect(() => {
     const data = loadFunnelResult();
@@ -46,6 +47,10 @@ export function ResultPageClient() {
     supabase.auth.getUser().then(({ data: auth }) => {
       if (auth.user) setIsLoggedIn(true);
     });
+
+    void fetchFollowUpState().then((state) => {
+      if (state.strongCta) setStrongCtaFromServer(true);
+    });
   }, [router]);
 
   if (!result) {
@@ -56,8 +61,9 @@ export function ResultPageClient() {
     );
   }
 
-  const ctas = getResultPageCtas(acquisitionScore);
-  const strongOffer = getStrongOfferCta(acquisitionScore);
+  const effectiveScore = strongCtaFromServer ? Math.max(acquisitionScore, 60) : acquisitionScore;
+  const ctas = getResultPageCtas(effectiveScore);
+  const strongOffer = getStrongOfferCta(effectiveScore);
   const primaryHref = isLoggedIn
     ? ctas.primary.href.replace(/^\/register\?redirect=/, "")
     : ctas.primary.href;
@@ -101,7 +107,7 @@ export function ResultPageClient() {
         </p>
       </div>
 
-      {acquisitionScore >= 60 && (
+      {effectiveScore >= 60 && (
         <div className="mt-6 rounded-xl border border-brand-200 bg-brand-50 p-4">
           <p className="text-sm font-semibold text-brand-900">{strongOffer.headline}</p>
           <p className="mt-1 text-xs text-brand-800">{strongOffer.subline}</p>

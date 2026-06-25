@@ -37,6 +37,7 @@ const ORDER = [
   "add_pilot_phase_completed.sql",
   "add_access_enabled.sql",
   "add_acquisition_system.sql",
+  "add_follow_up_lifecycle.sql",
 ];
 
 const url = process.env.DATABASE_URL;
