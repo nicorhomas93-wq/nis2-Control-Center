@@ -47,6 +47,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     price: 199,
     interval: "month",
     stripePriceEnv: "STRIPE_PRICE_BUSINESS",
+    stripePaymentLinkEnv: "NEXT_PUBLIC_STRIPE_PAYMENT_LINK_BUSINESS",
     highlighted: true,
     features: [
       "alle Dokumenttypen",
