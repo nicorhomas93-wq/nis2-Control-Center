@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AlertTriangle, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -11,7 +13,6 @@ import {
   getNis2StatusLabel,
 } from "@/lib/nis2/betroffenheit";
 import type { AssessmentResult, Nis2Status } from "@/lib/types";
-import { CheckCircle2, Loader2 } from "lucide-react";
 
 interface AssessmentCheckProps {
   companyId: string;
@@ -106,6 +107,46 @@ export function AssessmentCheck({ companyId, currentStatus }: AssessmentCheckPro
                   </li>
                 ))}
               </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="border-amber-200 bg-amber-50">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+                <CardTitle className="text-amber-900">Was das für Sie bedeutet</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-amber-950">
+              <p>
+                Ein Ergebnis allein schützt Sie nicht. Ohne Dokumentation, Maßnahmen und
+                Nachweise sind Sie bei einem Vorfall oder einer Prüfung nicht handlungsfähig.
+              </p>
+              <p className="font-medium">
+                Bei erheblichen Sicherheitsvorfällen gilt eine Meldefrist von 72 Stunden.
+                Haben Sie die Unterlagen dafür?
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-brand-200 bg-gradient-to-br from-brand-50 to-white">
+            <CardContent className="pt-6 text-center">
+              <h3 className="text-xl font-bold text-slate-900">
+                Jetzt vom Ergebnis zum Nachweis
+              </h3>
+              <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
+                Bauen Sie Schritt für Schritt Ihre NIS2-Dokumentation auf — von Pflichtdokumenten
+                bis zum fertigen Audit-Ordner.
+              </p>
+              <Link href="/pricing" className="mt-6 inline-block">
+                <Button size="lg">
+                  Jetzt NIS2-System starten
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              <p className="mt-3 text-xs text-slate-500">
+                Pläne ab 49 €/Monat · Jederzeit kündbar
+              </p>
             </CardContent>
           </Card>
         </>

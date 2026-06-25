@@ -2,11 +2,7 @@ import Link from "next/link";
 import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
-interface MarketingHeaderProps {
-  onPilotRequest?: () => void;
-}
-
-export function MarketingHeader({ onPilotRequest }: MarketingHeaderProps) {
+export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -26,13 +22,8 @@ export function MarketingHeader({ onPilotRequest }: MarketingHeaderProps) {
           <Link href="/login" className="hidden sm:block">
             <Button variant="ghost" size="sm">Anmelden</Button>
           </Link>
-          {onPilotRequest ? (
-            <Button size="sm" variant="outline" onClick={onPilotRequest} className="hidden sm:inline-flex">
-              Pilot anfragen
-            </Button>
-          ) : null}
           <Link href="/register">
-            <Button size="sm">Kostenlos starten</Button>
+            <Button size="sm">NIS2-Check starten</Button>
           </Link>
         </div>
       </div>
