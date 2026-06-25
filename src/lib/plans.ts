@@ -6,6 +6,7 @@ export interface SubscriptionPlan {
   price: number;
   interval: "month";
   stripePriceEnv: string;
+  stripePaymentLinkEnv?: string;
   features: string[];
   highlighted?: boolean;
   cta: string;
@@ -26,10 +27,11 @@ export interface PilotPlan {
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: "starter",
-    name: "Starter",
+    name: "Basis",
     price: 49,
     interval: "month",
     stripePriceEnv: "STRIPE_PRICE_STARTER",
+    stripePaymentLinkEnv: "NEXT_PUBLIC_STRIPE_PAYMENT_LINK_STARTER",
     features: [
       "Unternehmensprofil",
       "Betroffenheitscheck",
@@ -37,7 +39,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       "PDF-Export",
       "Basis-Auditübersicht",
     ],
-    cta: "Starter buchen",
+    cta: "Basis buchen",
   },
   {
     id: "business",
@@ -134,8 +136,21 @@ export function planFromPriceId(priceId: string): PlanId | null {
   return null;
 }
 
+export function getStripePaymentLink(envKey: string): string | null {
+  const url = process.env[envKey]?.trim();
+  return url?.startsWith("https://buy.stripe.com/") ? url : null;
+}
+
+export function getPaymentLinkForPlan(plan: CheckoutPlanId): string | null {
+  if (plan === "pilot") return null;
+  const config = SUBSCRIPTION_PLANS.find((p) => p.id === plan);
+  if (!config?.stripePaymentLinkEnv) return null;
+  return getStripePaymentLink(config.stripePaymentLinkEnv);
+}
+
 export function getPlanLabel(plan: string | null | undefined): string {
   if (!plan || plan === "free") return "Free";
+  if (plan === "starter") return "Basis";
   const sub = SUBSCRIPTION_PLANS.find((p) => p.id === plan);
   if (sub) return sub.name;
   if (plan === "pilot") return PILOT_PLAN.name;

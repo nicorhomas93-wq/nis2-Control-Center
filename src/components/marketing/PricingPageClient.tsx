@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   SUBSCRIPTION_PLANS,
   PILOT_PLAN,
+  getPaymentLinkForPlan,
   type CheckoutPlanId,
 } from "@/lib/plans";
 
@@ -33,6 +34,13 @@ export function PricingPageClient() {
 
   async function handleCheckout(plan: CheckoutPlanId) {
     setError(null);
+
+    const paymentLink = getPaymentLinkForPlan(plan);
+    if (paymentLink) {
+      setLoadingPlan(plan);
+      window.location.href = paymentLink;
+      return;
+    }
 
     if (!isLoggedIn) {
       window.location.href = `/login?redirect=${encodeURIComponent("/pricing")}`;
