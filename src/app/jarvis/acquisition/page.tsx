@@ -1,7 +1,6 @@
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { JarvisShell } from "@/components/jarvis/JarvisShell";
 import { AcquisitionDashboard } from "@/components/jarvis/acquisition/AcquisitionDashboard";
-import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { JarvisBillingHint } from "@/components/billing/JarvisBillingHint";
 import { createClient } from "@/lib/supabase/server";
 import { getAcquisitionOverview } from "@/lib/acquisition/overview";
@@ -30,7 +29,6 @@ export default async function JarvisAcquisitionPage() {
   return (
     <DashboardShell>
       <JarvisShell>
-        <SupabaseSetupBanner />
         <JarvisBillingHint />
         <AcquisitionDashboard overview={overview} />
       </JarvisShell>
