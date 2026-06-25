@@ -18,12 +18,31 @@ const PROTECTED_PREFIXES = [
 ];
 
 export async function updateSession(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+
+  if (path === "/betroffenheit" || path.startsWith("/betroffenheit/")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/assessment";
+    return NextResponse.redirect(url);
+  }
+
+  if (path === "/export" || path.startsWith("/export/")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/audit";
+    return NextResponse.redirect(url);
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -38,41 +57,31 @@ export async function updateSession(request: NextRequest) {
           );
         },
       },
+    });
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const isAuthRoute = path.startsWith("/login") || path.startsWith("/register");
+    const isProtectedRoute = PROTECTED_PREFIXES.some((p) => path.startsWith(p));
+
+    if (!user && isProtectedRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("redirect", path);
+      return NextResponse.redirect(url);
     }
-  );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    if (user && isAuthRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
 
-  const path = request.nextUrl.pathname;
-  const isAuthRoute = path.startsWith("/login") || path.startsWith("/register");
-  const isProtectedRoute = PROTECTED_PREFIXES.some((p) => path.startsWith(p));
-
-  if (path === "/betroffenheit" || path.startsWith("/betroffenheit/")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/assessment";
-    return NextResponse.redirect(url);
+    return supabaseResponse;
+  } catch (error) {
+    console.error("Middleware auth error:", error);
+    return NextResponse.next({ request });
   }
-
-  if (path === "/export" || path.startsWith("/export/")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/audit";
-    return NextResponse.redirect(url);
-  }
-
-  if (!user && isProtectedRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", path);
-    return NextResponse.redirect(url);
-  }
-
-  if (user && isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
-  }
-
-  return supabaseResponse;
 }
