@@ -7,6 +7,7 @@ import {
   LINKEDIN_OUTREACH_WORKFLOW,
   TRAFFIC_FLOW,
 } from "@/lib/acquisition";
+import { PaidAdsPlaybook } from "@/components/jarvis/acquisition/PaidAdsPlaybook";
 import { Badge } from "@/components/ui/Badge";
 import { Target, Users, Mail, RefreshCw, TrendingUp, Zap } from "lucide-react";
 
@@ -43,6 +44,8 @@ export function AcquisitionDashboard({ overview }: { overview: Overview }) {
           </div>
         ))}
       </div>
+
+      <PaidAdsPlaybook />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-slate-200 bg-white p-5">
