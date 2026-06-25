@@ -1,7 +1,12 @@
 import "server-only";
 import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { planFromPriceId } from "@/lib/plans";
+import { getStripe } from "@/lib/stripe";
+import { planFromPaymentLinkReference, planFromPriceId } from "@/lib/plans";
+import {
+  findCompanyIdByEmail,
+  findCompanyIdByStripeCustomer,
+} from "@/lib/stripe/company-resolve";
 
 async function eventAlreadyProcessed(stripeEventId: string): Promise<boolean> {
   const admin = createAdminClient();
@@ -67,6 +72,50 @@ function invoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
   return typeof sub === "string" ? sub : sub.id;
 }
 
+async function resolvePlanFromCheckoutSession(
+  session: Stripe.Checkout.Session
+): Promise<string | null> {
+  const metadataPlan = session.metadata?.plan;
+  if (metadataPlan) return metadataPlan;
+
+  const paymentLinkPlan = planFromPaymentLinkReference(
+    typeof session.payment_link === "string"
+      ? session.payment_link
+      : session.payment_link?.id ?? session.url ?? undefined
+  );
+  if (paymentLinkPlan) return paymentLinkPlan;
+
+  try {
+    const stripe = getStripe();
+    const full = await stripe.checkout.sessions.retrieve(session.id, {
+      expand: ["line_items.data.price"],
+    });
+    const priceId = full.line_items?.data?.[0]?.price;
+    const id = typeof priceId === "string" ? priceId : priceId?.id;
+    if (id) {
+      const plan = planFromPriceId(id);
+      if (plan) return plan;
+    }
+    return planFromPaymentLinkReference(full.url ?? undefined);
+  } catch {
+    return planFromPaymentLinkReference(session.url ?? undefined);
+  }
+}
+
+async function resolveCompanyIdForCheckout(
+  session: Stripe.Checkout.Session,
+  customerId: string | null | undefined
+): Promise<string | null> {
+  const metadataCompanyId = session.metadata?.company_id as string | undefined;
+  if (metadataCompanyId) return metadataCompanyId;
+
+  const byCustomer = await findCompanyIdByStripeCustomer(customerId);
+  if (byCustomer) return byCustomer;
+
+  const email = session.customer_details?.email ?? session.customer_email;
+  return findCompanyIdByEmail(email);
+}
+
 export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<void> {
   if (await eventAlreadyProcessed(event.id)) {
     return;
@@ -78,8 +127,6 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        companyId = (session.metadata?.company_id as string) ?? null;
-        const plan = session.metadata?.plan as string | undefined;
         const customerId =
           typeof session.customer === "string" ? session.customer : session.customer?.id;
         const subscriptionId =
@@ -87,14 +134,23 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
             ? session.subscription
             : session.subscription?.id;
 
+        companyId = await resolveCompanyIdForCheckout(session, customerId);
+        const plan = await resolvePlanFromCheckoutSession(session);
+        const billingEmail = session.customer_details?.email ?? session.customer_email ?? undefined;
+
         if (companyId) {
           await updateCompany(companyId, {
             stripe_customer_id: customerId ?? undefined,
             stripe_subscription_id: subscriptionId ?? undefined,
             subscription_status: "active",
-            plan: plan ?? undefined,
-            billing_email: session.customer_details?.email ?? undefined,
+            ...(plan ? { plan } : {}),
+            ...(billingEmail ? { billing_email: billingEmail } : {}),
           });
+        } else {
+          console.warn(
+            "checkout.session.completed: Keine Company gefunden für E-Mail",
+            billingEmail ?? "unbekannt"
+          );
         }
         break;
       }
@@ -103,20 +159,12 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
         const subscription = event.data.object as Stripe.Subscription;
         companyId = (subscription.metadata?.company_id as string) ?? null;
 
-        if (!companyId && subscription.customer) {
-          const admin = createAdminClient();
-          if (admin) {
-            const customerId =
-              typeof subscription.customer === "string"
-                ? subscription.customer
-                : subscription.customer.id;
-            const { data } = await admin
-              .from("companies")
-              .select("id")
-              .eq("stripe_customer_id", customerId)
-              .maybeSingle();
-            companyId = data?.id ?? null;
-          }
+        if (!companyId) {
+          const customerId =
+            typeof subscription.customer === "string"
+              ? subscription.customer
+              : subscription.customer?.id;
+          companyId = await findCompanyIdByStripeCustomer(customerId);
         }
 
         if (companyId) {
@@ -139,20 +187,12 @@ export async function handleStripeWebhookEvent(event: Stripe.Event): Promise<voi
         const subscription = event.data.object as Stripe.Subscription;
         companyId = (subscription.metadata?.company_id as string) ?? null;
 
-        if (!companyId && subscription.customer) {
-          const admin = createAdminClient();
-          if (admin) {
-            const customerId =
-              typeof subscription.customer === "string"
-                ? subscription.customer
-                : subscription.customer.id;
-            const { data } = await admin
-              .from("companies")
-              .select("id")
-              .eq("stripe_customer_id", customerId)
-              .maybeSingle();
-            companyId = data?.id ?? null;
-          }
+        if (!companyId) {
+          const customerId =
+            typeof subscription.customer === "string"
+              ? subscription.customer
+              : subscription.customer?.id;
+          companyId = await findCompanyIdByStripeCustomer(customerId);
         }
 
         if (companyId) {

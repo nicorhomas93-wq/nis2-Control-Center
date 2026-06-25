@@ -150,6 +150,22 @@ export function getPaymentLinkForPlan(plan: CheckoutPlanId): string | null {
   return getStripePaymentLink(config.stripePaymentLinkEnv);
 }
 
+export function planFromPaymentLinkReference(reference: string | null | undefined): PlanId | null {
+  if (!reference) return null;
+  const ref = reference.toLowerCase();
+
+  for (const plan of SUBSCRIPTION_PLANS) {
+    const envKey = plan.stripePaymentLinkEnv;
+    if (!envKey) continue;
+    const url = getStripePaymentLink(envKey);
+    if (!url) continue;
+    const slug = url.split("/").pop()?.toLowerCase();
+    if (slug && ref.includes(slug)) return plan.id;
+  }
+
+  return null;
+}
+
 export function getPlanLabel(plan: string | null | undefined): string {
   if (!plan || plan === "free") return "Free";
   if (plan === "starter") return "Basis";
