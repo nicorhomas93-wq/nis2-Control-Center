@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import type { Company } from "@/lib/types";
 import { getPlanLabel, getSubscriptionStatusLabel } from "@/lib/plans";
 import { hasPaidSubscription, isComplimentaryPilot } from "@/lib/billingAccess";
+import { getStripePortalLoginUrl } from "@/lib/stripe-public";
 
 interface BillingStatusBannerProps {
   company: Company | null;
@@ -17,6 +18,7 @@ export function BillingStatusBanner({ company }: BillingStatusBannerProps) {
   const planLabel = getPlanLabel(company?.plan);
   const isPaid = hasPaidSubscription(company);
   const isFreePilot = isComplimentaryPilot(company);
+  const portalLoginUrl = getStripePortalLoginUrl();
 
   const statusLabel = isFreePilot
     ? "Pilot aktiv (kostenlos)"
@@ -48,6 +50,13 @@ export function BillingStatusBanner({ company }: BillingStatusBannerProps) {
               Abo verwalten
             </Button>
           </Link>
+        ) : portalLoginUrl && !isFreePilot ? (
+          <a href={portalLoginUrl} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" size="sm">
+              <CreditCard className="h-4 w-4" />
+              Stripe Portal
+            </Button>
+          </a>
         ) : isFreePilot ? null : (
           <Link href="/pricing">
             <Button size="sm">Plan auswählen</Button>

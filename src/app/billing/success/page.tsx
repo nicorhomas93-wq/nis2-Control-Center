@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getStripePortalLoginUrl } from "@/lib/stripe-public";
 
 export default async function BillingSuccessPage({
   searchParams,
@@ -19,6 +20,7 @@ export default async function BillingSuccessPage({
 
   const params = await searchParams;
   const sessionId = params.session_id;
+  const portalLoginUrl = getStripePortalLoginUrl();
 
   return (
     <DashboardShell>
@@ -45,6 +47,13 @@ export default async function BillingSuccessPage({
               Billing öffnen
             </Button>
           </Link>
+          {portalLoginUrl && (
+            <a href={portalLoginUrl} target="_blank" rel="noopener noreferrer" className="block">
+              <Button variant="ghost" className="w-full">
+                Stripe Kundenportal öffnen
+              </Button>
+            </a>
+          )}
           {process.env.NODE_ENV === "development" && sessionId && (
             <p className="mt-2 text-center font-mono text-xs text-slate-400">
               session_id: {sessionId}
