@@ -4,6 +4,7 @@ import { BillingSection } from "@/components/billing/BillingSection";
 import { StripeTestModeBanner } from "@/components/billing/StripeTestModeBanner";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateCompany, getOrCreateProfile } from "@/lib/company";
+import { isPlatformOwner } from "@/lib/jarvis/access";
 import { APP_VERSION } from "@/lib/app-config";
 import { isOpenAIConfigured } from "@/lib/ai/generate";
 import { Badge } from "@/components/ui/Badge";
@@ -19,7 +20,11 @@ function StatusBadge({ ok, labelOk, labelError }: { ok: boolean; labelOk: string
   );
 }
 
-function resolveAppMode(company: { is_demo?: boolean; plan?: string | null } | null): string {
+function resolveAppMode(
+  company: { is_demo?: boolean; plan?: string | null } | null,
+  platformOwner: boolean
+): string {
+  if (platformOwner) return "Owner";
   if (company?.is_demo) return "Demo";
   if (company?.plan === "pilot" || !company?.plan) return "Pilot";
   if (company?.plan === "production" || company?.plan === "produktiv") return "Produktiv";
@@ -33,6 +38,7 @@ export default async function SettingsPage() {
 
   const { company, missingTable } = await getOrCreateCompany(user.id);
   const profile = await getOrCreateProfile(user.id, user.email);
+  const platformOwner = isPlatformOwner(user.email, profile?.role);
 
   const openAiActive = isOpenAIConfigured();
   const supabaseConfigured = Boolean(
@@ -89,14 +95,16 @@ export default async function SettingsPage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-slate-600">Modus</span>
               <StatusBadge
-                ok={resolveAppMode(company) !== "Demo"}
-                labelOk={resolveAppMode(company)}
+                ok={resolveAppMode(company, platformOwner) !== "Demo"}
+                labelOk={resolveAppMode(company, platformOwner)}
                 labelError="Demo"
               />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-slate-600">Plan</span>
-              <span className="font-medium text-slate-900">{company?.plan ?? profile?.plan ?? "pilot"}</span>
+              <span className="font-medium text-slate-900">
+                {platformOwner ? "Owner (Vollzugang)" : company?.plan ?? profile?.plan ?? "—"}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -107,7 +115,7 @@ export default async function SettingsPage() {
             <CardDescription>Plan, Status und Stripe-Kundenportal</CardDescription>
           </CardHeader>
           <CardContent>
-            <BillingSection company={company} />
+            <BillingSection company={company} platformOwner={platformOwner} />
           </CardContent>
         </Card>
 

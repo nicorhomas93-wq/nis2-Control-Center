@@ -3,7 +3,8 @@ import { DashboardActions } from "@/components/dashboard/DashboardActions";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { BillingStatusBanner } from "@/components/billing/BillingStatusBanner";
 import { createClient } from "@/lib/supabase/server";
-import { getOrCreateCompany, isCompanyProfileComplete } from "@/lib/company";
+import { getOrCreateCompany, isCompanyProfileComplete, getOrCreateProfile } from "@/lib/company";
+import { isPlatformOwner } from "@/lib/jarvis/access";
 import { calculateAuditFolderScore } from "@/lib/audit/audit-folders";
 import { calculateComplianceScore } from "@/lib/nis2/compliance-score";
 import { getNis2StatusColor, getNis2StatusLabel } from "@/lib/nis2/betroffenheit";
@@ -59,6 +60,8 @@ export default async function DashboardPage({
   if (!user) redirect("/login");
 
   const { company, missingTable } = await getOrCreateCompany(user.id);
+  const profile = await getOrCreateProfile(user.id, user.email);
+  const platformOwner = isPlatformOwner(user.email, profile?.role);
 
   let docs: Document[] = [];
   let meas: Measure[] = [];
@@ -100,7 +103,7 @@ export default async function DashboardPage({
         </p>
       </div>
 
-      <BillingStatusBanner company={company} />
+      <BillingStatusBanner company={company} platformOwner={platformOwner} />
 
       {showFunnelWelcome && company && (
         <FunnelWelcomeBanner

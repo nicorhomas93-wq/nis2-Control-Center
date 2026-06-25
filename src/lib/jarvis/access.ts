@@ -11,7 +11,11 @@ function parseAdminEmails(): string[] {
   return [PILOT_NOTIFICATION_EMAIL.toLowerCase()];
 }
 
-export function canAccessJarvis(
+/**
+ * Plattform-Owner/Admin (TKND) — kein Kundenabo, kein Pilot-Plan.
+ * Zugang über JARVIS_ADMIN_EMAILS oder Rolle admin/owner.
+ */
+export function isPlatformOwner(
   email: string | null | undefined,
   role?: string | null
 ): boolean {
@@ -20,6 +24,9 @@ export function canAccessJarvis(
   if (role === "admin" || role === "owner") return true;
   return parseAdminEmails().includes(normalized);
 }
+
+/** @alias isPlatformOwner */
+export const canAccessJarvis = isPlatformOwner;
 
 export function isPilotPlanWithoutPayment(company: {
   plan?: string | null;

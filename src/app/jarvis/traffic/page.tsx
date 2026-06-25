@@ -3,7 +3,6 @@ import { JarvisShell } from "@/components/jarvis/JarvisShell";
 import { TrafficShell } from "@/components/jarvis/traffic/TrafficShell";
 import { TrafficDashboard } from "@/components/jarvis/traffic/TrafficDashboard";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
-import { JarvisBillingHint } from "@/components/billing/JarvisBillingHint";
 import { createClient } from "@/lib/supabase/server";
 import { getTrafficOverview, type TrafficOverview } from "@/lib/jarvis/traffic/overview";
 import { isMissingTableError } from "@/lib/supabase/db-error";
@@ -48,7 +47,6 @@ export default async function TrafficPage() {
     <DashboardShell>
       {missingTable && <SupabaseSetupBanner />}
       <JarvisShell>
-        <JarvisBillingHint />
         <TrafficShell>
           <TrafficDashboard overview={overview} showSeed={showSeed} />
         </TrafficShell>

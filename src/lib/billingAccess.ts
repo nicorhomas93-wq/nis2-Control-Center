@@ -8,8 +8,6 @@ export type BillingFeature =
   | "risks"
   | "measures"
   | "incidents"
-  | "jarvis.sales"
-  | "jarvis.traffic"
   | "multi_tenant";
 
 const FEATURE_MATRIX: Record<string, BillingFeature[]> = {
@@ -21,7 +19,6 @@ const FEATURE_MATRIX: Record<string, BillingFeature[]> = {
     "risks",
     "measures",
     "incidents",
-    "jarvis.sales",
   ],
   consultant: [
     "documents.all",
@@ -29,8 +26,6 @@ const FEATURE_MATRIX: Record<string, BillingFeature[]> = {
     "risks",
     "measures",
     "incidents",
-    "jarvis.sales",
-    "jarvis.traffic",
     "multi_tenant",
   ],
   pilot: [
@@ -39,8 +34,6 @@ const FEATURE_MATRIX: Record<string, BillingFeature[]> = {
     "risks",
     "measures",
     "incidents",
-    "jarvis.sales",
-    "jarvis.traffic",
   ],
 };
 
@@ -62,11 +55,19 @@ export function hasActiveAbo(company: Company | null | undefined): boolean {
   return PAID_ABO_PLANS.includes(plan as (typeof PAID_ABO_PLANS)[number]);
 }
 
-export function hasPaidSubscription(company: Company | null | undefined): boolean {
+export function hasPaidSubscription(
+  company: Company | null | undefined,
+  platformOwner = false
+): boolean {
+  if (platformOwner) return true;
   return hasActiveAbo(company) || isInPilotPhase(company) || isComplimentaryPilot(company);
 }
 
-function effectivePlan(company: Company | null | undefined): string {
+function effectivePlan(
+  company: Company | null | undefined,
+  platformOwner = false
+): string {
+  if (platformOwner) return "consultant";
   if (!company) return "free";
 
   if (hasActiveAbo(company)) {
@@ -86,17 +87,16 @@ function effectivePlan(company: Company | null | undefined): string {
 
 export function canUseFeature(
   company: Company | null | undefined,
-  feature: BillingFeature
+  feature: BillingFeature,
+  platformOwner = false
 ): boolean {
+  if (platformOwner) return true;
   const plan = effectivePlan(company);
   const allowed = FEATURE_MATRIX[plan] ?? FEATURE_MATRIX.free;
   return allowed.includes(feature);
 }
 
 export function getUpgradeHint(feature: BillingFeature): string | null {
-  if (feature.startsWith("jarvis.")) {
-    return "Jarvis Sales und Traffic Jarvis sind im Business-, Pilot- oder Consultant-Plan enthalten.";
-  }
   if (feature === "multi_tenant") {
     return "Für diese Funktion ist der Consultant-Plan erforderlich.";
   }
@@ -112,18 +112,22 @@ export function getUpgradeHint(feature: BillingFeature): string | null {
   return "Für diese Funktion ist ein kostenpflichtiger Plan erforderlich.";
 }
 
-export function needsUpgradeForJarvis(company: Company | null | undefined): boolean {
-  return !canUseFeature(company, "jarvis.sales");
-}
-
-export function isComplimentaryPilot(company: Company | null | undefined): boolean {
+export function isComplimentaryPilot(
+  company: Company | null | undefined,
+  platformOwner = false
+): boolean {
+  if (platformOwner) return false;
   if (!company) return false;
   const plan = company.plan ?? "free";
   return plan === "pilot" && !company.pilot_setup_paid_at && !company.access_enabled;
 }
 
 /** Pilotphase (499 € einmalig) — nur via Webhook gesetzt, kein Abo-access_enabled. */
-export function isInPilotPhase(company: Company | null | undefined): boolean {
+export function isInPilotPhase(
+  company: Company | null | undefined,
+  platformOwner = false
+): boolean {
+  if (platformOwner) return false;
   if (!company || company.plan !== "pilot" || !company.pilot_setup_paid_at) return false;
   if (hasActiveAbo(company)) return false;
 
@@ -133,7 +137,11 @@ export function isInPilotPhase(company: Company | null | undefined): boolean {
   return end.getTime() > Date.now();
 }
 
-export function needsToChooseAbo(company: Company | null | undefined): boolean {
+export function needsToChooseAbo(
+  company: Company | null | undefined,
+  platformOwner = false
+): boolean {
+  if (platformOwner) return false;
   if (!company || !company.pilot_setup_paid_at) return false;
   if (hasActiveAbo(company)) return false;
   if (isInPilotPhase(company)) return false;
@@ -144,7 +152,11 @@ export function hasUsedPilotPackage(company: Company | null | undefined): boolea
   return Boolean(company?.pilot_setup_paid_at);
 }
 
-export function getCompanyPlanLabel(company: Company | null | undefined): string {
+export function getCompanyPlanLabel(
+  company: Company | null | undefined,
+  platformOwner = false
+): string {
+  if (platformOwner) return "Owner (Vollzugang)";
   if (!company) return "Free";
   if (isComplimentaryPilot(company)) return "Pilot (kostenlos)";
   if (isInPilotPhase(company)) return "Pilotphase (einmalig)";
@@ -154,7 +166,11 @@ export function getCompanyPlanLabel(company: Company | null | undefined): string
   return getPlanLabel(company.plan);
 }
 
-export function getCompanyStatusLabel(company: Company | null | undefined): string {
+export function getCompanyStatusLabel(
+  company: Company | null | undefined,
+  platformOwner = false
+): string {
+  if (platformOwner) return "Interner Vollzugang";
   if (!company) return "Inaktiv";
   if (isComplimentaryPilot(company)) return "Pilot aktiv (kostenlos)";
   if (isInPilotPhase(company)) return "Pilotphase aktiv";

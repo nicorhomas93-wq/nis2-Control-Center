@@ -18,21 +18,22 @@ import { getStripePortalLoginUrl } from "@/lib/stripe-public";
 
 interface BillingStatusBannerProps {
   company: Company | null;
+  platformOwner?: boolean;
 }
 
-export function BillingStatusBanner({ company }: BillingStatusBannerProps) {
+export function BillingStatusBanner({ company, platformOwner = false }: BillingStatusBannerProps) {
   const status = company?.subscription_status ?? "inactive";
-  const planLabel = getCompanyPlanLabel(company);
-  const isPaid = hasPaidSubscription(company);
-  const isFreePilot = isComplimentaryPilot(company);
+  const planLabel = getCompanyPlanLabel(company, platformOwner);
+  const isPaid = hasPaidSubscription(company, platformOwner);
+  const isFreePilot = isComplimentaryPilot(company, platformOwner);
   const portalLoginUrl = getStripePortalLoginUrl();
 
-  const statusLabel = getCompanyStatusLabel(company);
+  const statusLabel = getCompanyStatusLabel(company, platformOwner);
 
-  const needsAbo = needsToChooseAbo(company);
-  const inPilot = isInPilotPhase(company);
+  const needsAbo = needsToChooseAbo(company, platformOwner);
+  const inPilot = isInPilotPhase(company, platformOwner);
 
-  const statusBadgeClass = isFreePilot || hasActiveAbo(company) || inPilot
+  const statusBadgeClass = platformOwner || isFreePilot || hasActiveAbo(company) || inPilot
     ? "bg-emerald-100 text-emerald-800"
     : needsAbo
       ? "bg-amber-100 text-amber-800"
@@ -53,7 +54,7 @@ export function BillingStatusBanner({ company }: BillingStatusBannerProps) {
         )}
       </div>
       <div className="flex flex-wrap gap-2">
-        {needsAbo ? (
+        {platformOwner ? null : needsAbo ? (
           <Link href="/pricing">
             <Button size="sm">Jetzt Abo wählen</Button>
           </Link>

@@ -2,7 +2,6 @@ import { DashboardShell } from "@/components/layout/DashboardShell";
 import { JarvisShell } from "@/components/jarvis/JarvisShell";
 import { JarvisOverviewClient } from "@/components/jarvis/JarvisOverviewClient";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
-import { JarvisBillingHint } from "@/components/billing/JarvisBillingHint";
 import { createClient } from "@/lib/supabase/server";
 import { getJarvisOverview, type JarvisOverview } from "@/lib/jarvis/overview";
 import { isMissingTableError } from "@/lib/supabase/db-error";
@@ -44,7 +43,6 @@ export default async function JarvisPage() {
     <DashboardShell>
       {missingTable && <SupabaseSetupBanner />}
       <JarvisShell>
-        <JarvisBillingHint />
         <JarvisOverviewClient
           stats={overview.stats}
           recentEvents={overview.recentEvents}

@@ -18,16 +18,17 @@ import { formatDate } from "@/lib/utils";
 
 interface BillingSectionProps {
   company: Company | null;
+  platformOwner?: boolean;
 }
 
-export function BillingSection({ company }: BillingSectionProps) {
+export function BillingSection({ company, platformOwner = false }: BillingSectionProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const portalLoginUrl = getStripePortalLoginUrl();
-  const isFreePilot = isComplimentaryPilot(company);
-  const inPilot = isInPilotPhase(company);
-  const needsAbo = needsToChooseAbo(company);
+  const isFreePilot = isComplimentaryPilot(company, platformOwner);
+  const inPilot = isInPilotPhase(company, platformOwner);
+  const needsAbo = needsToChooseAbo(company, platformOwner);
   const hasAbo = hasActiveAbo(company);
 
   const canOpenPortal =
@@ -67,14 +68,20 @@ export function BillingSection({ company }: BillingSectionProps) {
     <div className="space-y-4 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-slate-600">Aktueller Plan</span>
-        <span className="font-medium text-slate-900">{getCompanyPlanLabel(company)}</span>
+        <span className="font-medium text-slate-900">{getCompanyPlanLabel(company, platformOwner)}</span>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-slate-600">Status</span>
-        <span className="font-medium text-slate-900">{getCompanyStatusLabel(company)}</span>
+        <span className="font-medium text-slate-900">{getCompanyStatusLabel(company, platformOwner)}</span>
       </div>
 
-      {inPilot && company?.trial_ends_at && (
+      {platformOwner && (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900">
+          Als Plattform-Owner haben Sie <strong>Vollzugang</strong> — kein Pilot- oder Kundenabo nötig.
+        </p>
+      )}
+
+      {!platformOwner && inPilot && company?.trial_ends_at && (
         <>
           <p className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-brand-900">
             Sie sind in der <strong>einmaligen Pilotphase</strong>. Danach wählen Sie ein
@@ -89,14 +96,14 @@ export function BillingSection({ company }: BillingSectionProps) {
         </>
       )}
 
-      {needsAbo && (
+      {!platformOwner && needsAbo && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
           Ihre Pilotphase ist abgeschlossen. Bitte wählen Sie jetzt ein{" "}
           <strong>monatliches Abo</strong>, um weiterzuarbeiten.
         </p>
       )}
 
-      {company?.pilot_setup_paid_at && (
+      {!platformOwner && company?.pilot_setup_paid_at && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-slate-600">Pilot gebucht am</span>
           <span className="font-medium text-emerald-700">
@@ -118,8 +125,9 @@ export function BillingSection({ company }: BillingSectionProps) {
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">{error}</p>
       )}
 
+      {!platformOwner && (
       <div className="flex flex-wrap gap-3 pt-2">
-        {needsAbo && (
+        {!platformOwner && needsAbo && (
           <Link href="/pricing">
             <Button>Jetzt Abo wählen</Button>
           </Link>
@@ -150,6 +158,7 @@ export function BillingSection({ company }: BillingSectionProps) {
           </Link>
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,18 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { canAccessJarvis } from "@/lib/jarvis/access";
 
+async function resolveJarvisAccess(
+  supabase: ReturnType<typeof createServerClient>,
+  user: { id: string; email?: string | null }
+): Promise<boolean> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  return canAccessJarvis(user.email, profile?.role);
+}
+
 const PROTECTED_PREFIXES = [
   "/dashboard",
   "/company",
@@ -85,10 +97,14 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    if (user && path.startsWith("/jarvis") && !canAccessJarvis(user.email)) {
+    if (user && path.startsWith("/jarvis") && !(await resolveJarvisAccess(supabase, user))) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);
+    }
+
+    if (user && path.startsWith("/api/jarvis") && !(await resolveJarvisAccess(supabase, user))) {
+      return NextResponse.json({ error: "Nicht autorisiert" }, { status: 403 });
     }
 
     return supabaseResponse;

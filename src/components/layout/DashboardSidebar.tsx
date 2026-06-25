@@ -44,8 +44,17 @@ export function DashboardSidebar() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      setShowJarvis(canAccessJarvis(data.user?.email));
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user?.email) {
+        setShowJarvis(false);
+        return;
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .maybeSingle();
+      setShowJarvis(canAccessJarvis(data.user.email, profile?.role));
     });
   }, []);
 
