@@ -30,6 +30,8 @@ const PROTECTED_PREFIXES = [
   "/billing",
 ];
 
+const AUTH_ENTRY_PATHS = ["/", "/login", "/register"];
+
 export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
@@ -87,6 +89,17 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (user && isAuthRoute) {
+      const redirect = request.nextUrl.searchParams.get("redirect");
+      const url = request.nextUrl.clone();
+      url.pathname =
+        redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+          ? redirect
+          : "/dashboard";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+
+    if (user && AUTH_ENTRY_PATHS.includes(path)) {
       const redirect = request.nextUrl.searchParams.get("redirect");
       const url = request.nextUrl.clone();
       url.pathname =

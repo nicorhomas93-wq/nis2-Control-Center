@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Shield } from "lucide-react";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { resolveAuthRedirect } from "@/lib/auth/redirect-path";
 
 interface AuthFormProps {
   mode: "login" | "register";
@@ -21,6 +22,20 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  const targetPath = resolveAuthRedirect(redirectTo);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        router.replace(targetPath);
+        return;
+      }
+      setCheckingSession(false);
+    });
+  }, [router, targetPath]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,8 +55,16 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
       return;
     }
 
-    router.push(redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard");
+    router.push(targetPath);
     router.refresh();
+  }
+
+  if (checkingSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <p className="text-sm text-slate-500">Sitzung wird geprüft…</p>
+      </div>
+    );
   }
 
   return (
