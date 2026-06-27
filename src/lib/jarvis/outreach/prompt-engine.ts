@@ -1,16 +1,27 @@
 import OpenAI from "openai";
 import type { LeadAnalysisResult } from "@/lib/jarvis/outreach/website-analyzer";
 
-const OUTREACH_SYSTEM = `Du schreibst kurze B2B-Erstnachrichten für TKND NIS2 Control Center (NIS2-Compliance-Software).
+const OUTREACH_SYSTEM = `Du schreibst B2B-Erstnachrichten für TKND NIS2 Control Center (NIS2-Compliance-Software).
+
+Ziel: Antwort erzwingen durch klare Problembewusstheit — ohne Spam, ohne Verkaufsdruck.
 
 Regeln:
-- Maximal 5–6 Sätze, Deutsch
-- Locker, direkt, persönlich — kein Marketing-Blabla
-- Kein „wir sind die besten“, keine Buzzwords
-- Struktur: Bezug zur Firma → konkretes Risiko/Problem → 1 Satz Ansatz → einfache Frage
-- Ziel: Gespräch anstoßen, nicht verkaufen
-- Keine Betreffzeile, nur Nachrichtentext
-- Anrede mit Rolle wenn vorhanden (z. B. „Hallo Herr/Frau …“ oder „Hallo …“)`;
+- Maximal 4–5 Sätze, Deutsch
+- KEIN Marketing-Blabla, KEIN „wir helfen gerne“, KEINE Buzzwords
+- Klar, direkt, leicht dominant — ruhig aber bestimmt
+- Fokus: Risiko + Realität, keine Füllwörter
+- Vermeide: „könnte“, „würde“, „eventuell“, „vielleicht“, „möglicherweise“
+- Nutze stattdessen: „fehlt“, „passiert“, „führt“, „kommt“, „steht an“
+
+Struktur (genau):
+1. Konkreter Bezug zur Firma (Name, Branche oder Beobachtung)
+2. Klares Risiko — sachlich, ohne Panik
+3. Ansatz in 1 Satz: NIS2-Dokumentation + Audit-Ordner strukturiert abbilden, ohne großes Beratungsprojekt
+4. Direkte Frage am Ende — zwingt zur Antwort (ja/nein oder Status)
+
+Ton: erfahrener Ansprechpartner, nicht Verkäufer.
+Keine Betreffzeile. Nur Nachrichtentext.
+Anrede: „Hallo [Name],“ oder „Hallo,“ wenn kein Name.`;
 
 export interface OutreachPromptInput {
   company_name: string;
@@ -36,14 +47,13 @@ async function generateWithOpenAI(input: OutreachPromptInput): Promise<string | 
 Branche: ${input.industry ?? "unbekannt"}
 Rolle: ${input.contact_role ?? "Entscheider"}
 Ansprechpartner: ${input.contact_name ?? "—"}
-NIS2-Einschätzung: ${input.analysis.nis2_likelihood} (Score ${input.analysis.nis2_relevance_score ?? "?"}/10)
-IT-Reife: ${input.analysis.it_maturity}
+NIS2-Score: ${input.analysis.nis2_relevance_score ?? "?"}/10
 Was fällt auf: ${input.analysis.observation}
 
-Analyse-Stichpunkte:
+Analyse:
 ${bullets}
 
-Schreibe eine sendbare Erstnachricht.`;
+Schreibe NUR die sendbare Nachricht — kein Kommentar, keine Erklärung.`;
 
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -53,8 +63,8 @@ Schreibe eine sendbare Erstnachricht.`;
         { role: "system", content: OUTREACH_SYSTEM },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.7,
-      max_tokens: 400,
+      temperature: 0.55,
+      max_tokens: 320,
     });
     return completion.choices[0]?.message?.content?.trim() ?? null;
   } catch {
@@ -63,23 +73,39 @@ Schreibe eine sendbare Erstnachricht.`;
 }
 
 function generateFallbackMessage(input: OutreachPromptInput): string {
-  const role = input.contact_role ?? "Entscheider";
+  const greeting = input.contact_name ? `Hallo ${input.contact_name},` : "Hallo,";
   const industry = input.industry ?? "Ihrer Branche";
-  const observation = input.analysis.observation;
-  const greeting = input.contact_name ? `Hallo ${input.contact_name},` : `Hallo,`;
-
-  const nis2Hint =
-    input.analysis.nis2_likelihood === "yes"
-      ? "NIS2-Thema dürfte bei Ihnen nicht mehr nur „irgendwann“ sein"
-      : "NIS2 kommt bei vielen Firmen plötzlich über Kunden, Partner oder Audits";
+  const observation = input.analysis.observation.replace(/\.$/, "");
+  const risk = buildRiskLine(industry, input.analysis.nis2_likelihood === "yes");
 
   return `${greeting}
 
-ich bin gerade bei ${input.company_name} gelandet — ${observation.toLowerCase()}.
+ich schaue mir gerade ${input.company_name} an — ${observation.toLowerCase()}.
 
-Bei ${industry} sehe ich oft: ${nis2Hint}, aber die Nachweise (Verantwortlichkeiten, Dokumente, Audit-Ordner) fehlen noch strukturiert.
+${risk}
 
-Wir helfen Mittelständlern, das ohne großes Beratungsprojekt in einem System abzubilden — kurz und prüfbar.
+Wir bilden NIS2-Dokumentation und Audit-Ordner in einem System ab — ohne Beratungsprojekt, in wenigen Tagen startklar.
 
-Ist NIS2 bei Ihnen gerade aktiv Thema, ${role}, oder steht es noch hinten an?`;
+Ist das bei Ihnen schon strukturiert — oder fehlt Ihnen die Basis noch?`;
+}
+
+function buildRiskLine(industry: string, highRelevance: boolean): string {
+  if (highRelevance) {
+    return `Bei ${industry} passiert das regelmäßig: Audits und Partner fordern NIS2-Nachweise — und es fehlen Verantwortlichkeiten, Dokumente und ein prüfbarer Audit-Ordner.`;
+  }
+  return `Bei ${industry} kommt NIS2 plötzlich über Kunden oder Lieferanten — und dann fehlen Verantwortlichkeiten, Dokumente und ein prüfbarer Audit-Ordner.`;
+}
+
+/** 1-Satz-Hook für Lead-Listen (gleicher Ton wie Erstnachricht) */
+export function buildOutreachHook(input: {
+  company_name: string;
+  industry: string;
+  employee_count: number;
+  hasSecurity?: boolean;
+}): string {
+  const industry = input.industry;
+  if (!input.hasSecurity) {
+    return `Bei ${input.company_name} fehlt online die sichtbare NIS2-Struktur — ist das bei Ihnen bereits adressiert?`;
+  }
+  return `Als ${industry}-Unternehmen mit ${input.employee_count} MA fehlt oft die prüfbare NIS2-Basis — wie sieht das bei ${input.company_name} aus?`;
 }

@@ -1,5 +1,6 @@
 import type { QualifiedLeadInput, QualifiedScoreResult } from "@/lib/jarvis/outreach/qualified-lead-types";
 import { QUALIFIED_MIN_SCORE } from "@/lib/jarvis/outreach/qualified-lead-types";
+import { buildOutreachHook as buildHookFromEngine } from "@/lib/jarvis/outreach/prompt-engine";
 
 const HIGH_PRIORITY = [
   { label: "Industrie / Produktion", keywords: ["industrie", "produktion", "fertigung", "werk", "stahl"] },
@@ -170,7 +171,12 @@ export function scoreQualifiedLead(
   score = Math.min(10, score);
 
   const relevance_reason = buildRelevanceReason(lead, industryLabel, hasDigital, hasSecurity, score);
-  const outreach_hook = buildOutreachHook(lead, industryLabel, hasSecurity);
+  const outreach_hook = buildHookFromEngine({
+    company_name: lead.company_name,
+    industry: industryLabel,
+    employee_count: lead.employee_count,
+    hasSecurity: hasSecurity,
+  });
 
   if (score < minScore) {
     return {
@@ -215,20 +221,6 @@ function buildRelevanceReason(
   if (!hasSecurity) parts.push("Security-Lücke erkennbar");
   parts.push(`Score ${score}/10`);
   return parts.join(" · ");
-}
-
-function buildOutreachHook(lead: QualifiedLeadInput, industryLabel: string, hasSecurity: boolean): string {
-  const sizeHint =
-    lead.employee_count > 250
-      ? "Ihrer Größe"
-      : lead.employee_count >= 80
-        ? "Ihrer Unternehmensgröße"
-        : "Ihrer Branche";
-
-  if (!hasSecurity) {
-    return `Bei ${industryLabel}-Unternehmen wie ${lead.company_name} fehlt online oft die sichtbare NIS2-Struktur — ist das bei Ihnen gerade Thema?`;
-  }
-  return `Als ${industryLabel} mit ${lead.employee_count} MA sehe ich bei ${sizeHint} häufig Lücken in der NIS2-Dokumentation — wie sieht das bei Ihnen aus?`;
 }
 
 export function rankQualifiedLeads(
