@@ -10,6 +10,7 @@ import {
   Search,
   Send,
   Target,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TRAFFIC_DISCLAIMER } from "@/lib/jarvis/traffic/constants";
@@ -18,6 +19,7 @@ const trafficTabs = [
   { href: "/jarvis/traffic", label: "Übersicht", icon: LayoutDashboard, exact: true },
   { href: "/jarvis/traffic/target-groups", label: "Zielgruppen", icon: Target },
   { href: "/jarvis/traffic/search-profiles", label: "Suchprofile", icon: Search },
+  { href: "/jarvis/traffic/b2b-outreach", label: "B2B Outreach", icon: Users },
   { href: "/jarvis/traffic/outreach", label: "Outreach", icon: Send },
   { href: "/jarvis/traffic/content-ideas", label: "Content-Ideen", icon: FileText },
   { href: "/jarvis/traffic/campaigns", label: "Kampagnen", icon: Megaphone },

@@ -39,6 +39,8 @@ const ORDER = [
   "add_acquisition_system.sql",
   "add_follow_up_lifecycle.sql",
   "add_consultant_mandanten.sql",
+  "add_b2b_outreach.sql",
+  "add_b2b_outreach_nis2_score.sql",
 ];
 
 const url = process.env.DATABASE_URL;
@@ -91,6 +93,7 @@ const checks = [
   ["companies.access_enabled", "SELECT access_enabled FROM companies LIMIT 0"],
   ["acquisition_visitors", "SELECT 1 FROM acquisition_visitors LIMIT 0"],
   ["acquisition_leads", "SELECT 1 FROM acquisition_leads LIMIT 0"],
+  ["b2b_outreach_leads", "SELECT 1 FROM b2b_outreach_leads LIMIT 0"],
 ];
 
 for (const [name, q] of checks) {

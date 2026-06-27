@@ -319,6 +319,41 @@ export interface TrafficTask {
   campaign?: TrafficCampaign | null;
 }
 
+export type B2BOutreachStatus =
+  | "new"
+  | "ready"
+  | "contacted"
+  | "replied"
+  | "customer"
+  | "skipped";
+
+export type Nis2Likelihood = "yes" | "no" | "uncertain";
+export type ItMaturity = "low" | "medium" | "high" | "unknown";
+
+export interface B2BOutreachLead {
+  id: string;
+  company_name: string;
+  industry: string | null;
+  website: string | null;
+  employee_count: string | null;
+  contact_name: string | null;
+  contact_role: string | null;
+  contact_email: string | null;
+  source: string;
+  nis2_likelihood: Nis2Likelihood;
+  nis2_relevance_score: number | null;
+  it_maturity: ItMaturity;
+  hints: string | null;
+  analysis_bullets: string[];
+  observation: string | null;
+  outreach_message: string | null;
+  status: B2BOutreachStatus;
+  processed_at: string | null;
+  contacted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AssessmentResult {
   status: Nis2Status;
   reasoning: string;

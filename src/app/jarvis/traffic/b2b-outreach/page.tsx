@@ -1,0 +1,88 @@
+import { DashboardShell } from "@/components/layout/DashboardShell";
+import { JarvisShell } from "@/components/jarvis/JarvisShell";
+import { TrafficShell } from "@/components/jarvis/traffic/TrafficShell";
+import { B2BOutreachDashboard } from "@/components/jarvis/outreach/B2BOutreachDashboard";
+import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
+import { createClient } from "@/lib/supabase/server";
+import {
+  getRemainingDailyQuota,
+  countProcessedToday,
+} from "@/lib/jarvis/outreach/processor";
+import { OUTREACH_DAILY_LIMIT } from "@/lib/jarvis/outreach/constants";
+import type { B2BOutreachLead } from "@/lib/types";
+import { isMissingTableError } from "@/lib/supabase/db-error";
+import { redirect } from "next/navigation";
+import { canAccessJarvis } from "@/lib/jarvis/access";
+
+function mapLead(row: Record<string, unknown>): B2BOutreachLead {
+  return {
+    ...(row as unknown as B2BOutreachLead),
+    analysis_bullets: Array.isArray(row.analysis_bullets)
+      ? (row.analysis_bullets as string[])
+      : [],
+  };
+}
+
+export default async function B2BOutreachPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!canAccessJarvis(user.email, profile?.role)) {
+    redirect("/dashboard");
+  }
+
+  const { data, error } = await supabase
+    .from("b2b_outreach_leads")
+    .select("*")
+    .order("nis2_relevance_score", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  let quota = {
+    dailyLimit: OUTREACH_DAILY_LIMIT,
+    processedToday: 0,
+    remaining: OUTREACH_DAILY_LIMIT,
+  };
+
+  if (!error) {
+    const [remaining, processedToday] = await Promise.all([
+      getRemainingDailyQuota(supabase),
+      countProcessedToday(supabase),
+    ]);
+    quota = { dailyLimit: OUTREACH_DAILY_LIMIT, processedToday, remaining };
+  }
+
+  return (
+    <DashboardShell>
+      {error && isMissingTableError(error) && <SupabaseSetupBanner />}
+      <JarvisShell>
+        <TrafficShell>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">B2B Outreach Pipeline</h2>
+            <p className="text-sm text-slate-500">
+              Leads sammeln → Website analysieren → personalisierte Nachricht → manuell versenden.
+            </p>
+          </div>
+          {!error && (
+            <B2BOutreachDashboard
+              leads={(data ?? []).map(mapLead)}
+              quota={quota}
+            />
+          )}
+          {error && !isMissingTableError(error) && (
+            <p className="text-sm text-red-600">{error.message}</p>
+          )}
+        </TrafficShell>
+      </JarvisShell>
+    </DashboardShell>
+  );
+}
