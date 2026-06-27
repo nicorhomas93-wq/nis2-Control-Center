@@ -5,7 +5,23 @@ import {
   fetchWebsiteSnapshot,
 } from "@/lib/jarvis/outreach/website-analyzer";
 import { generateOutreachMessage } from "@/lib/jarvis/outreach/prompt-engine";
-import { OUTREACH_DAILY_LIMIT } from "@/lib/jarvis/outreach/constants";
+import {
+  OUTREACH_DAILY_SEND_LIMIT,
+} from "@/lib/jarvis/outreach/constants";
+
+export interface OutreachQuotaInfo {
+  sendLimit: number;
+  sentToday: number;
+  sendRemaining: number;
+  sendLimitReached: boolean;
+  analyzedToday: number;
+}
+
+function getDayStart(): Date {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
 
 export interface ProcessResult {
   processed: number;
@@ -24,34 +40,68 @@ function mapLead(row: Record<string, unknown>): B2BOutreachLead {
 }
 
 export async function countProcessedToday(supabase: SupabaseClient): Promise<number> {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-
   const { count } = await supabase
     .from("b2b_outreach_leads")
     .select("*", { count: "exact", head: true })
-    .gte("processed_at", start.toISOString());
+    .gte("processed_at", getDayStart().toISOString());
 
   return count ?? 0;
 }
 
+export async function countContactedToday(supabase: SupabaseClient): Promise<number> {
+  const { count } = await supabase
+    .from("b2b_outreach_leads")
+    .select("*", { count: "exact", head: true })
+    .gte("contacted_at", getDayStart().toISOString());
+
+  return count ?? 0;
+}
+
+export async function getOutreachQuotaInfo(supabase: SupabaseClient): Promise<OutreachQuotaInfo> {
+  const [sentToday, analyzedToday] = await Promise.all([
+    countContactedToday(supabase),
+    countProcessedToday(supabase),
+  ]);
+  const sendRemaining = Math.max(0, OUTREACH_DAILY_SEND_LIMIT - sentToday);
+
+  return {
+    sendLimit: OUTREACH_DAILY_SEND_LIMIT,
+    sentToday,
+    sendRemaining,
+    sendLimitReached: sendRemaining <= 0,
+    analyzedToday,
+  };
+}
+
+/** @deprecated Nutze getOutreachQuotaInfo().sendRemaining */
 export async function getRemainingDailyQuota(supabase: SupabaseClient): Promise<number> {
-  const used = await countProcessedToday(supabase);
-  return Math.max(0, OUTREACH_DAILY_LIMIT - used);
+  const quota = await getOutreachQuotaInfo(supabase);
+  return quota.sendRemaining;
+}
+
+export async function assertCanMarkContacted(
+  supabase: SupabaseClient,
+  currentStatus: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (currentStatus === "contacted") {
+    return { ok: true };
+  }
+
+  const sentToday = await countContactedToday(supabase);
+  if (sentToday >= OUTREACH_DAILY_SEND_LIMIT) {
+    return {
+      ok: false,
+      error: `Tageslimit erreicht (${OUTREACH_DAILY_SEND_LIMIT} Nachrichten/Tag).`,
+    };
+  }
+
+  return { ok: true };
 }
 
 export async function processOutreachLead(
   supabase: SupabaseClient,
   leadId: string
 ): Promise<{ lead: B2BOutreachLead | null; error: string | null }> {
-  const remaining = await getRemainingDailyQuota(supabase);
-  if (remaining <= 0) {
-    return {
-      lead: null,
-      error: `Tageslimit erreicht (${OUTREACH_DAILY_LIMIT} Leads/Tag).`,
-    };
-  }
-
   const { data: row, error: loadError } = await supabase
     .from("b2b_outreach_leads")
     .select("*")
@@ -117,13 +167,7 @@ export async function processPendingLeads(
     leads: [],
   };
 
-  const remaining = await getRemainingDailyQuota(supabase);
-  const batchSize = Math.min(limit ?? remaining, remaining);
-
-  if (batchSize <= 0) {
-    result.errors.push(`Tageslimit erreicht (${OUTREACH_DAILY_LIMIT}/Tag).`);
-    return result;
-  }
+  const batchSize = limit ?? 100;
 
   const { data: pending } = await supabase
     .from("b2b_outreach_leads")

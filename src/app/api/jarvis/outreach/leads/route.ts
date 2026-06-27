@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
 import { importLeads } from "@/lib/jarvis/outreach/lead-import";
-import {
-  getRemainingDailyQuota,
-  countProcessedToday,
-} from "@/lib/jarvis/outreach/processor";
-import { OUTREACH_DAILY_LIMIT } from "@/lib/jarvis/outreach/constants";
+import { getOutreachQuotaInfo } from "@/lib/jarvis/outreach/processor";
 import type { B2BOutreachLead } from "@/lib/types";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
 
@@ -40,18 +36,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
   }
 
-  const [remaining, processedToday] = await Promise.all([
-    getRemainingDailyQuota(supabase),
-    countProcessedToday(supabase),
-  ]);
+  const quota = await getOutreachQuotaInfo(supabase);
 
   return NextResponse.json({
     leads: (data ?? []).map(mapLead),
-    quota: {
-      dailyLimit: OUTREACH_DAILY_LIMIT,
-      processedToday,
-      remaining,
-    },
+    quota,
   });
 }
 

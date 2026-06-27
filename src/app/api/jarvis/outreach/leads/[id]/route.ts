@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
-import { processOutreachLead } from "@/lib/jarvis/outreach/processor";
+import { assertCanMarkContacted, processOutreachLead } from "@/lib/jarvis/outreach/processor";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
 import type { B2BOutreachLead, B2BOutreachStatus } from "@/lib/types";
 
@@ -34,11 +34,31 @@ export async function PATCH(
   const body = await request.json();
   const supabase = await createClient();
 
+  const { data: existing, error: loadError } = await supabase
+    .from("b2b_outreach_leads")
+    .select("status")
+    .eq("id", id)
+    .single();
+
+  if (loadError || !existing) {
+    return NextResponse.json(
+      { error: loadError?.message ?? "Lead nicht gefunden" },
+      { status: 404 }
+    );
+  }
+
   const updates: Record<string, unknown> = {};
 
   if (body.status && VALID_STATUS.includes(body.status)) {
-    updates.status = body.status;
     if (body.status === "contacted") {
+      const check = await assertCanMarkContacted(supabase, existing.status);
+      if (!check.ok) {
+        return NextResponse.json({ error: check.error }, { status: 429 });
+      }
+    }
+
+    updates.status = body.status;
+    if (body.status === "contacted" && existing.status !== "contacted") {
       updates.contacted_at = new Date().toISOString();
     }
   }

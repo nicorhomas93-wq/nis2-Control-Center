@@ -20,21 +20,18 @@ import {
   B2B_OUTREACH_STATUS_LABELS,
   IT_MATURITY_LABELS,
   NIS2_LIKELIHOOD_LABELS,
-  OUTREACH_DAILY_LIMIT,
+  OUTREACH_DAILY_SEND_LIMIT,
+  OUTREACH_MIN_VISIBLE_SCORE,
+  OUTREACH_PRIORITY_SCORE,
 } from "@/lib/jarvis/outreach/constants";
 import { scoreBadgeClass } from "@/lib/jarvis/outreach/nis2-relevance-score";
+import type { OutreachQuotaInfo } from "@/lib/jarvis/outreach/processor";
 import type { B2BOutreachLead, B2BOutreachStatus } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
-interface QuotaInfo {
-  dailyLimit: number;
-  processedToday: number;
-  remaining: number;
-}
-
 interface B2BOutreachDashboardProps {
   leads: B2BOutreachLead[];
-  quota: QuotaInfo;
+  quota: OutreachQuotaInfo;
 }
 
 export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreachDashboardProps) {
@@ -44,7 +41,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
   const [showForm, setShowForm] = useState(false);
   const [showCsv, setShowCsv] = useState(false);
   const [filter, setFilter] = useState<B2BOutreachStatus | "all">("all");
-  const [scoreFilter, setScoreFilter] = useState<"all" | "high" | "medium" | "low">("all");
+  const [scoreFilter, setScoreFilter] = useState<"all" | "top" | "qualified">("qualified");
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     company_name: "",
@@ -63,19 +60,28 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
   const leads = initialLeads
     .filter((l) => filter === "all" || l.status === filter)
     .filter((l) => {
-      if (scoreFilter === "all" || l.nis2_relevance_score == null) return scoreFilter === "all";
-      if (scoreFilter === "high") return l.nis2_relevance_score >= 7;
-      if (scoreFilter === "medium") return l.nis2_relevance_score >= 4 && l.nis2_relevance_score < 7;
-      return l.nis2_relevance_score < 4;
+      if (scoreFilter === "all") return true;
+      const score = l.nis2_relevance_score ?? 0;
+      if (scoreFilter === "top") return score >= OUTREACH_PRIORITY_SCORE;
+      return score >= OUTREACH_MIN_VISIBLE_SCORE;
+    })
+    .sort((a, b) => {
+      const scoreA = a.nis2_relevance_score ?? 0;
+      const scoreB = b.nis2_relevance_score ?? 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
   const scoreSummary = {
-    high: initialLeads.filter((l) => (l.nis2_relevance_score ?? 0) >= 7).length,
-    medium: initialLeads.filter(
-      (l) => (l.nis2_relevance_score ?? 0) >= 4 && (l.nis2_relevance_score ?? 0) < 7
+    top: initialLeads.filter((l) => (l.nis2_relevance_score ?? 0) >= OUTREACH_PRIORITY_SCORE)
+      .length,
+    qualified: initialLeads.filter(
+      (l) =>
+        (l.nis2_relevance_score ?? 0) >= OUTREACH_MIN_VISIBLE_SCORE &&
+        (l.nis2_relevance_score ?? 0) < OUTREACH_PRIORITY_SCORE
     ).length,
-    low: initialLeads.filter(
-      (l) => l.nis2_relevance_score != null && l.nis2_relevance_score < 4
+    hidden: initialLeads.filter(
+      (l) => l.nis2_relevance_score != null && l.nis2_relevance_score < OUTREACH_MIN_VISIBLE_SCORE
     ).length,
   };
 
@@ -116,18 +122,22 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2 text-sm text-slate-600">
           <span>
-            Tageslimit: <strong>{quota.processedToday}</strong> / {quota.dailyLimit} analysiert
+            Heute gesendet: <strong>{quota.sentToday}</strong> / {quota.sendLimit}
           </span>
           <span className="text-slate-300">|</span>
           <span>
-            Noch <strong>{quota.remaining}</strong> heute möglich
+            Noch möglich: <strong>{quota.sendRemaining}</strong>
+          </span>
+          <span className="text-slate-300">|</span>
+          <span>
+            Analysiert heute: <strong>{quota.analyzedToday}</strong> · Analyse unbegrenzt
           </span>
           <span className="text-slate-300">|</span>
           <span>
             Priorität:{" "}
-            <strong className="text-red-700">{scoreSummary.high}</strong> hoch ·{" "}
-            <strong className="text-amber-700">{scoreSummary.medium}</strong> mittel ·{" "}
-            {scoreSummary.low} niedrig
+            <strong className="text-red-700">{scoreSummary.top}</strong> Top (8+) ·{" "}
+            <strong className="text-amber-700">{scoreSummary.qualified}</strong> normal (6–7) ·{" "}
+            {scoreSummary.hidden} ausgeblendet (&lt;6)
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -162,7 +172,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
           </Button>
           <Button
             size="sm"
-            disabled={!!loading || quota.remaining <= 0}
+            disabled={!!loading}
             onClick={() => apiCall("/api/jarvis/outreach/leads/process", "POST")}
           >
             <Play className="h-4 w-4" />
@@ -185,6 +195,13 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
           </Button>
         </div>
       </div>
+
+      {quota.sendLimitReached && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Tageslimit erreicht — heute wurden bereits {quota.sendLimit} Nachrichten als kontaktiert
+          markiert. Analysen sind weiterhin möglich.
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -218,7 +235,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
 
       <div className="flex flex-wrap gap-2">
         <span className="self-center text-xs font-medium text-slate-500">NIS2-Score:</span>
-        {(["all", "high", "medium", "low"] as const).map((s) => (
+        {(["top", "qualified", "all"] as const).map((s) => (
           <button
             key={s}
             type="button"
@@ -229,7 +246,11 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            {s === "all" ? "Alle Scores" : s === "high" ? "7–10" : s === "medium" ? "4–6" : "0–3"}
+            {s === "top"
+              ? "Top (8+)"
+              : s === "qualified"
+                ? "Qualifiziert (6+)"
+                : "Alle Scores"}
           </button>
         ))}
       </div>
@@ -328,8 +349,13 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
         </p>
       ) : (
         <div className="space-y-4">
-          {leads.map((lead) => (
-            <Card key={lead.id}>
+          {leads.map((lead) => {
+            const isTopLead = (lead.nis2_relevance_score ?? 0) >= OUTREACH_PRIORITY_SCORE;
+            return (
+            <Card
+              key={lead.id}
+              className={isTopLead ? "border-red-200 ring-1 ring-red-100" : undefined}
+            >
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
                 <div>
                   <CardTitle className="text-base">{lead.company_name}</CardTitle>
@@ -412,7 +438,11 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                     </Button>
                   )}
                   {lead.status === "ready" && (
-                    <Button size="sm" onClick={() => updateStatus(lead.id, "contacted")}>
+                    <Button
+                      size="sm"
+                      disabled={quota.sendLimitReached}
+                      onClick={() => updateStatus(lead.id, "contacted")}
+                    >
                       Als kontaktiert
                     </Button>
                   )}
@@ -447,13 +477,14 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                 </p>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
       <p className="text-xs text-slate-400">
-        Kein Auto-Versand. Tageslimit: {OUTREACH_DAILY_LIMIT} Analysen/Tag (env:
-        OUTREACH_DAILY_LIMIT). OpenAI optional für bessere Texte.
+        Kein Auto-Versand. Versand-Limit: {OUTREACH_DAILY_SEND_LIMIT} Kontakte/Tag (env:
+        OUTREACH_DAILY_SEND_LIMIT). Analysen unbegrenzt. OpenAI optional für bessere Texte.
       </p>
     </div>
   );

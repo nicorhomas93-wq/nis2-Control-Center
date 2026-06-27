@@ -4,11 +4,8 @@ import { TrafficShell } from "@/components/jarvis/traffic/TrafficShell";
 import { B2BOutreachDashboard } from "@/components/jarvis/outreach/B2BOutreachDashboard";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { createClient } from "@/lib/supabase/server";
-import {
-  getRemainingDailyQuota,
-  countProcessedToday,
-} from "@/lib/jarvis/outreach/processor";
-import { OUTREACH_DAILY_LIMIT } from "@/lib/jarvis/outreach/constants";
+import { getOutreachQuotaInfo } from "@/lib/jarvis/outreach/processor";
+import { OUTREACH_DAILY_SEND_LIMIT } from "@/lib/jarvis/outreach/constants";
 import type { B2BOutreachLead } from "@/lib/types";
 import { isMissingTableError } from "@/lib/supabase/db-error";
 import { redirect } from "next/navigation";
@@ -47,18 +44,16 @@ export default async function B2BOutreachPage() {
     .order("created_at", { ascending: false })
     .limit(200);
 
-  let quota = {
-    dailyLimit: OUTREACH_DAILY_LIMIT,
-    processedToday: 0,
-    remaining: OUTREACH_DAILY_LIMIT,
-  };
+  let quota = await getOutreachQuotaInfo(supabase);
 
-  if (!error) {
-    const [remaining, processedToday] = await Promise.all([
-      getRemainingDailyQuota(supabase),
-      countProcessedToday(supabase),
-    ]);
-    quota = { dailyLimit: OUTREACH_DAILY_LIMIT, processedToday, remaining };
+  if (error) {
+    quota = {
+      sendLimit: OUTREACH_DAILY_SEND_LIMIT,
+      sentToday: 0,
+      sendRemaining: OUTREACH_DAILY_SEND_LIMIT,
+      sendLimitReached: false,
+      analyzedToday: 0,
+    };
   }
 
   return (

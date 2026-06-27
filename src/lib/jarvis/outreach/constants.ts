@@ -1,8 +1,21 @@
+/** @deprecated Nutze OUTREACH_DAILY_SEND_LIMIT — Fallback für bestehende Env-Variablen */
 export const OUTREACH_DAILY_LIMIT = Number(process.env.OUTREACH_DAILY_LIMIT ?? "15") || 15;
+
+/** Max. als kontaktiert markierte Nachrichten pro Tag */
+export const OUTREACH_DAILY_SEND_LIMIT =
+  Number(
+    process.env.OUTREACH_DAILY_SEND_LIMIT ??
+      process.env.OUTREACH_DAILY_LIMIT ??
+      "15"
+  ) || 15;
+
+/** Score-Schwellen für Priorisierung in der UI */
+export const OUTREACH_PRIORITY_SCORE = 8;
+export const OUTREACH_MIN_VISIBLE_SCORE = 6;
 
 export const B2B_OUTREACH_STATUS_LABELS: Record<string, string> = {
   new: "Neu",
-  ready: "Bereit (Copy)",
+  ready: "Analysiert / Bereit",
   contacted: "Kontaktiert",
   replied: "Antwort",
   customer: "Kunde",
