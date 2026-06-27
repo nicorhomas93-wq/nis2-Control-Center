@@ -24,6 +24,7 @@ import {
   OUTREACH_MIN_VISIBLE_SCORE,
   OUTREACH_PRIORITY_SCORE,
 } from "@/lib/jarvis/outreach/constants";
+import { OUTREACH_DAY_TIMEZONE } from "@/lib/jarvis/outreach/day-boundary";
 import { scoreBadgeClass } from "@/lib/jarvis/outreach/nis2-relevance-score";
 import type { OutreachQuotaInfo } from "@/lib/jarvis/outreach/processor";
 import type { B2BOutreachLead, B2BOutreachStatus } from "@/lib/types";
@@ -117,22 +118,55 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
     await apiCall(`/api/jarvis/outreach/leads/${id}`, "PATCH", { status });
   }
 
+  const sendProgress = Math.min(100, (quota.sentToday / quota.sendLimit) * 100);
+
   return (
     <div className="space-y-6">
+      <Card className="border-slate-200 bg-slate-50/50">
+        <CardContent className="space-y-3 pt-4">
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-700">
+            <span>
+              Heute gesendet:{" "}
+              <strong>
+                {quota.sentToday} / {quota.sendLimit}
+              </strong>
+            </span>
+            <span>
+              Noch möglich: <strong>{quota.sendRemaining}</strong>
+            </span>
+            <span>
+              Analysiert: <strong>unbegrenzt</strong>
+            </span>
+          </div>
+          <div className="max-w-md space-y-1">
+            <div className="flex justify-between text-xs text-slate-500">
+              <span>Versand-Fortschritt</span>
+              <span>{Math.round(sendProgress)}%</span>
+            </div>
+            <div
+              className="h-2 overflow-hidden rounded-full bg-slate-200"
+              role="progressbar"
+              aria-valuenow={quota.sentToday}
+              aria-valuemin={0}
+              aria-valuemax={quota.sendLimit}
+              aria-label="Versand-Fortschritt heute"
+            >
+              <div
+                className={`h-full rounded-full transition-all ${
+                  quota.sendLimitReached ? "bg-amber-500" : "bg-sky-600"
+                }`}
+                style={{ width: `${sendProgress}%` }}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-slate-400">
+            Tages-Reset um 00:00 ({OUTREACH_DAY_TIMEZONE})
+          </p>
+        </CardContent>
+      </Card>
+
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2 text-sm text-slate-600">
-          <span>
-            Heute gesendet: <strong>{quota.sentToday}</strong> / {quota.sendLimit}
-          </span>
-          <span className="text-slate-300">|</span>
-          <span>
-            Noch möglich: <strong>{quota.sendRemaining}</strong>
-          </span>
-          <span className="text-slate-300">|</span>
-          <span>
-            Analysiert heute: <strong>{quota.analyzedToday}</strong> · Analyse unbegrenzt
-          </span>
-          <span className="text-slate-300">|</span>
           <span>
             Priorität:{" "}
             <strong className="text-red-700">{scoreSummary.top}</strong> Top (8+) ·{" "}
@@ -198,8 +232,8 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
 
       {quota.sendLimitReached && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Tageslimit erreicht — heute wurden bereits {quota.sendLimit} Nachrichten als kontaktiert
-          markiert. Analysen sind weiterhin möglich.
+          Tageslimit erreicht — heute wurden bereits {quota.sendLimit} Nachrichten gesendet.
+          Analysen sind weiterhin möglich.
         </div>
       )}
 
@@ -381,7 +415,9 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                     </Badge>
                   )}
                   <Badge className="bg-slate-100 text-slate-700">
-                    {B2B_OUTREACH_STATUS_LABELS[lead.status] ?? lead.status}
+                    {lead.status === "ready" && lead.processed_at
+                      ? "Analysiert · Bereit"
+                      : B2B_OUTREACH_STATUS_LABELS[lead.status] ?? lead.status}
                   </Badge>
                   {lead.nis2_likelihood !== "uncertain" && (
                     <Badge

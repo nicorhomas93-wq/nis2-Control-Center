@@ -13,9 +13,12 @@ export const OUTREACH_DAILY_SEND_LIMIT =
 export const OUTREACH_PRIORITY_SCORE = 8;
 export const OUTREACH_MIN_VISIBLE_SCORE = 6;
 
+/** Soft-Limit Analyse pro Batch (kein hartes Tageslimit) */
+export const OUTREACH_BATCH_ANALYSIS_LIMIT = 200;
+
 export const B2B_OUTREACH_STATUS_LABELS: Record<string, string> = {
   new: "Neu",
-  ready: "Analysiert / Bereit",
+  ready: "Bereit",
   contacted: "Kontaktiert",
   replied: "Antwort",
   customer: "Kunde",

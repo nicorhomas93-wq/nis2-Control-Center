@@ -6,8 +6,10 @@ import {
 } from "@/lib/jarvis/outreach/website-analyzer";
 import { generateOutreachMessage } from "@/lib/jarvis/outreach/prompt-engine";
 import {
+  OUTREACH_BATCH_ANALYSIS_LIMIT,
   OUTREACH_DAILY_SEND_LIMIT,
 } from "@/lib/jarvis/outreach/constants";
+import { getDayStartInTimezone } from "@/lib/jarvis/outreach/day-boundary";
 
 export interface OutreachQuotaInfo {
   sendLimit: number;
@@ -18,9 +20,7 @@ export interface OutreachQuotaInfo {
 }
 
 function getDayStart(): Date {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  return start;
+  return getDayStartInTimezone();
 }
 
 export interface ProcessResult {
@@ -52,6 +52,7 @@ export async function countContactedToday(supabase: SupabaseClient): Promise<num
   const { count } = await supabase
     .from("b2b_outreach_leads")
     .select("*", { count: "exact", head: true })
+    .not("contacted_at", "is", null)
     .gte("contacted_at", getDayStart().toISOString());
 
   return count ?? 0;
@@ -167,7 +168,7 @@ export async function processPendingLeads(
     leads: [],
   };
 
-  const batchSize = limit ?? 100;
+  const batchSize = limit ?? OUTREACH_BATCH_ANALYSIS_LIMIT;
 
   const { data: pending } = await supabase
     .from("b2b_outreach_leads")
