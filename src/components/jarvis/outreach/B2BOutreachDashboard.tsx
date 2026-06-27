@@ -448,6 +448,10 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                   <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-800">
                     {lead.outreach_message}
                   </pre>
+                ) : lead.processed_at ? (
+                  <p className="text-sm text-slate-400 italic">
+                    Keine Nachricht (Score &lt; 6 — niedrige Priorität).
+                  </p>
                 ) : (
                   <p className="text-sm text-slate-400 italic">Noch nicht analysiert.</p>
                 )}

@@ -143,7 +143,7 @@ export async function processOutreachLead(
       analysis_bullets: analysis.analysis_bullets,
       observation: analysis.observation,
       outreach_message,
-      status: "ready",
+      status: outreach_message ? "ready" : "skipped",
       processed_at: new Date().toISOString(),
     })
     .eq("id", leadId)
