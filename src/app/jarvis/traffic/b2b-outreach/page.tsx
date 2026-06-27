@@ -69,7 +69,7 @@ export default async function B2BOutreachPage() {
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-slate-900">B2B Outreach Pipeline</h2>
             <p className="text-sm text-slate-500">
-              Leads sammeln → Website analysieren → personalisierte Nachricht → manuell versenden.
+              Deutschland-weite Top-Leads (Score ≥ 6) — filtern, analysieren, manuell versenden.
             </p>
           </div>
           {!error && (

@@ -6,6 +6,7 @@ import {
   Copy,
   Check,
   Download,
+  MapPin,
   Play,
   Plus,
   RefreshCw,
@@ -132,12 +133,32 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
+            disabled={!!loading}
+            onClick={() =>
+              apiCall("/api/jarvis/outreach/leads/discover-germany", "POST", { limit: 15 })
+            }
+          >
+            <MapPin className="h-4 w-4" />
+            DE Top-Leads (15)
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!!loading}
+            onClick={() =>
+              apiCall("/api/jarvis/outreach/leads/discover-dresden", "POST", { limit: 10 })
+            }
+          >
+            Dresden (10)
+          </Button>
+          <Button
+            size="sm"
             variant="outline"
             disabled={!!loading}
             onClick={() => apiCall("/api/jarvis/outreach/leads/discover", "POST", { count: 5 })}
           >
             <Search className="h-4 w-4" />
-            5 Leads finden
+            Demo-Pool
           </Button>
           <Button
             size="sm"
@@ -313,11 +334,19 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                 <div>
                   <CardTitle className="text-base">{lead.company_name}</CardTitle>
                   <p className="mt-1 text-xs text-slate-500">
+                    {lead.city ? `${lead.city} · ` : ""}
                     {lead.industry ?? "—"}
                     {lead.employee_count ? ` · ${lead.employee_count} MA` : ""}
                     {lead.contact_role ? ` · ${lead.contact_role}` : ""}
-                    {lead.website ? ` · ${lead.website}` : ""}
                   </p>
+                  {lead.observation && (
+                    <p className="mt-2 text-sm text-slate-700">{lead.observation}</p>
+                  )}
+                  {lead.outreach_hook && (
+                    <p className="mt-1 rounded-lg bg-sky-50 px-3 py-2 text-sm italic text-sky-900">
+                      Hook: {lead.outreach_hook}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {lead.nis2_relevance_score != null && (

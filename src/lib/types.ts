@@ -334,6 +334,8 @@ export interface B2BOutreachLead {
   id: string;
   company_name: string;
   industry: string | null;
+  city: string | null;
+  region: string | null;
   website: string | null;
   employee_count: string | null;
   contact_name: string | null;
@@ -346,6 +348,7 @@ export interface B2BOutreachLead {
   hints: string | null;
   analysis_bullets: string[];
   observation: string | null;
+  outreach_hook: string | null;
   outreach_message: string | null;
   status: B2BOutreachStatus;
   processed_at: string | null;
