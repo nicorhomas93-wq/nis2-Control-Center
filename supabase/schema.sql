@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS companies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE, -- Besitzer (owner)
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL, -- Besitzer (owner)
   company_name TEXT,
   industry TEXT,
   employee_count INTEGER,
@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS companies (
   plan TEXT DEFAULT 'pilot',
   role TEXT DEFAULT 'user',
   is_demo BOOLEAN DEFAULT FALSE,
+  is_mandant BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -144,6 +145,12 @@ CREATE TABLE IF NOT EXISTS pilot_requests (
 -- INDIZES
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_companies_user_id ON companies(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS companies_user_own_unique
+  ON companies (user_id)
+  WHERE is_mandant = FALSE;
+CREATE INDEX IF NOT EXISTS companies_mandanten_by_user
+  ON companies (user_id)
+  WHERE is_mandant = TRUE;
 CREATE INDEX IF NOT EXISTS idx_assessments_company_id ON nis2_assessments(company_id);
 CREATE INDEX IF NOT EXISTS idx_documents_company_id ON documents(company_id);
 CREATE INDEX IF NOT EXISTS idx_measures_company_id ON measures(company_id);

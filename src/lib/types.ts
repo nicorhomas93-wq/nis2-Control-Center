@@ -43,6 +43,7 @@ export interface Company {
   plan?: string | null;
   role?: string | null;
   is_demo?: boolean;
+  is_mandant?: boolean;
   stripe_customer_id?: string | null;
   stripe_subscription_id?: string | null;
   subscription_status?: string | null;

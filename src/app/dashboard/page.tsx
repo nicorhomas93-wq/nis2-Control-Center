@@ -2,8 +2,9 @@ import { DashboardShell } from "@/components/layout/DashboardShell";
 import { DashboardActions } from "@/components/dashboard/DashboardActions";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { BillingStatusBanner } from "@/components/billing/BillingStatusBanner";
+import { ActiveMandantBanner } from "@/components/consultant/ActiveMandantBanner";
 import { createClient } from "@/lib/supabase/server";
-import { getOrCreateCompany, isCompanyProfileComplete, getOrCreateProfile } from "@/lib/company";
+import { getWorkspaceCompany, isCompanyProfileComplete, getOrCreateProfile } from "@/lib/company";
 import { isPlatformOwner } from "@/lib/jarvis/access";
 import { calculateAuditFolderScore } from "@/lib/audit/audit-folders";
 import { calculateComplianceScore } from "@/lib/nis2/compliance-score";
@@ -59,7 +60,7 @@ export default async function DashboardPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { company, missingTable } = await getOrCreateCompany(user.id);
+  const { company, ownCompany, missingTable, isViewingMandant } = await getWorkspaceCompany(user.id);
   const profile = await getOrCreateProfile(user.id, user.email);
   const platformOwner = isPlatformOwner(user.email, profile?.role);
 
@@ -94,6 +95,7 @@ export default async function DashboardPage({
   return (
     <DashboardShell>
       {missingTable && <SupabaseSetupBanner />}
+      {isViewingMandant && <ActiveMandantBanner companyName={company?.company_name ?? null} />}
 
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
@@ -103,7 +105,7 @@ export default async function DashboardPage({
         </p>
       </div>
 
-      <BillingStatusBanner company={company} platformOwner={platformOwner} />
+      <BillingStatusBanner company={ownCompany} platformOwner={platformOwner} />
 
       {showFunnelWelcome && company && (
         <FunnelWelcomeBanner

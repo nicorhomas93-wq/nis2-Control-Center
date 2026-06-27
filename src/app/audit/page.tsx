@@ -1,8 +1,9 @@
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { AuditPageClient } from "@/components/audit/AuditPageClient";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
+import { ActiveMandantBanner } from "@/components/consultant/ActiveMandantBanner";
 import { createClient } from "@/lib/supabase/server";
-import { getOrCreateCompany, isCompanyProfileComplete } from "@/lib/company";
+import { getWorkspaceCompany, isCompanyProfileComplete } from "@/lib/company";
 import type { Document, Measure, Risk } from "@/lib/types";
 import { redirect } from "next/navigation";
 
@@ -13,7 +14,7 @@ export default async function AuditPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { company, missingTable } = await getOrCreateCompany(user.id);
+  const { company, missingTable, isViewingMandant } = await getWorkspaceCompany(user.id);
   if (!company && !missingTable) redirect("/login");
 
   let documents: Document[] = [];
@@ -42,6 +43,7 @@ export default async function AuditPage() {
   return (
     <DashboardShell>
       {missingTable && <SupabaseSetupBanner />}
+      {isViewingMandant && <ActiveMandantBanner companyName={company?.company_name ?? null} />}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Audit-Ordner</h1>
         <p className="mt-1 text-slate-500">

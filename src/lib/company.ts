@@ -1,6 +1,7 @@
 import type { Company, Profile } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
 import { getDbErrorMessage, isMissingTableError } from "@/lib/supabase/db-error";
+import { resolveWorkspaceCompany } from "@/lib/consultant/mandanten";
 
 export async function getOrCreateProfile(
   userId: string,
@@ -38,14 +39,14 @@ export async function getOrCreateCompany(
     .from("companies")
     .select("*")
     .eq("user_id", userId)
-    .single();
+    .eq("is_mandant", false)
+    .maybeSingle();
 
   if (fetchError && isMissingTableError(fetchError)) {
     return { company: null, missingTable: true, error: getDbErrorMessage(fetchError) };
   }
 
-  // PGRST116 = keine Zeile gefunden → neues Unternehmen anlegen
-  if (fetchError && fetchError.code !== "PGRST116") {
+  if (fetchError) {
     return {
       company: null,
       missingTable: false,
@@ -59,7 +60,7 @@ export async function getOrCreateCompany(
 
   const { data: created, error: createError } = await supabase
     .from("companies")
-    .insert({ user_id: userId })
+    .insert({ user_id: userId, is_mandant: false })
     .select()
     .single();
 
@@ -84,9 +85,39 @@ export async function verifyCompanyOwnership(
     .select("*")
     .eq("id", companyId)
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
   return (data as Company) ?? null;
+}
+
+export async function getWorkspaceCompany(
+  userId: string
+): Promise<{
+  company: Company | null;
+  ownCompany: Company | null;
+  missingTable: boolean;
+  error: string | null;
+  isViewingMandant: boolean;
+}> {
+  const base = await getOrCreateCompany(userId);
+  if (!base.company) {
+    return {
+      company: null,
+      ownCompany: null,
+      missingTable: base.missingTable,
+      error: base.error,
+      isViewingMandant: false,
+    };
+  }
+
+  const workspace = await resolveWorkspaceCompany(userId, base.company);
+  return {
+    company: workspace.company,
+    ownCompany: base.company,
+    missingTable: base.missingTable,
+    error: base.error,
+    isViewingMandant: workspace.isViewingMandant,
+  };
 }
 
 export function isCompanyProfileComplete(company: Company | null): boolean {

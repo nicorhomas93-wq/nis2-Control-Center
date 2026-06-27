@@ -38,6 +38,7 @@ const ORDER = [
   "add_access_enabled.sql",
   "add_acquisition_system.sql",
   "add_follow_up_lifecycle.sql",
+  "add_consultant_mandanten.sql",
 ];
 
 const url = process.env.DATABASE_URL;

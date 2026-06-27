@@ -1,8 +1,9 @@
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { IncidentsPageClient } from "@/components/incidents/IncidentsPageClient";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
+import { ActiveMandantBanner } from "@/components/consultant/ActiveMandantBanner";
 import { createClient } from "@/lib/supabase/server";
-import { getOrCreateCompany } from "@/lib/company";
+import { getWorkspaceCompany } from "@/lib/company";
 import type { Incident } from "@/lib/types";
 import { redirect } from "next/navigation";
 
@@ -11,7 +12,7 @@ export default async function IncidentsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { company, missingTable } = await getOrCreateCompany(user.id);
+  const { company, missingTable, isViewingMandant } = await getWorkspaceCompany(user.id);
   if (!company && !missingTable) redirect("/login");
 
   let incidents: Incident[] = [];
@@ -23,6 +24,7 @@ export default async function IncidentsPage() {
   return (
     <DashboardShell>
       {missingTable && <SupabaseSetupBanner />}
+      {isViewingMandant && <ActiveMandantBanner companyName={company?.company_name ?? null} />}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Sicherheitsvorfall</h1>
         <p className="mt-1 text-slate-500">Vorfälle dokumentieren und Meldeberichte erstellen.</p>

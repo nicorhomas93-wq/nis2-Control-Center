@@ -17,14 +17,18 @@ import {
   Shield,
   ShieldAlert,
   ShieldCheck,
+  Users,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { canAccessJarvis } from "@/lib/jarvis/access";
+import { canUseFeature } from "@/lib/billingAccess";
+import type { Company } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/mandanten", label: "Meine Mandanten", icon: Users, consultantOnly: true },
   { href: "/company", label: "Unternehmen", icon: Building2 },
   { href: "/assessment", label: "Betroffenheitscheck", icon: ShieldCheck },
   { href: "/documents", label: "Dokumente", icon: FileText },
@@ -41,26 +45,37 @@ export function DashboardSidebar() {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showJarvis, setShowJarvis] = useState(false);
+  const [showMandanten, setShowMandanten] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user?.email) {
         setShowJarvis(false);
+        setShowMandanten(false);
         return;
       }
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .maybeSingle();
+      const [{ data: profile }, { data: company }] = await Promise.all([
+        supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle(),
+        supabase
+          .from("companies")
+          .select("plan, access_enabled, pilot_setup_paid_at, subscription_status")
+          .eq("user_id", data.user.id)
+          .eq("is_mandant", false)
+          .maybeSingle(),
+      ]);
       setShowJarvis(canAccessJarvis(data.user.email, profile?.role));
+      setShowMandanten(
+        canUseFeature(company as Company | null, "multi_tenant", canAccessJarvis(data.user.email, profile?.role))
+      );
     });
   }, []);
 
-  const visibleNavItems = navItems.filter(
-    (item) => item.href !== "/jarvis" || showJarvis
-  );
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.href === "/jarvis" && !showJarvis) return false;
+    if (item.consultantOnly && !showMandanten) return false;
+    return true;
+  });
 
   async function handleLogout() {
     const supabase = createClient();
