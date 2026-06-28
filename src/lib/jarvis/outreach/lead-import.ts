@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { SEED_LEADS } from "@/lib/jarvis/outreach/constants";
 import { calculateNis2RelevanceScore } from "@/lib/jarvis/outreach/nis2-relevance-score";
+import {
+  buildAssessmentBullets,
+  MISSING_WEBSITE_OBSERVATION,
+  websiteStatusFromImport,
+} from "@/lib/jarvis/outreach/assessment-quality";
 
 export interface ImportLeadInput {
   company_name: string;
@@ -106,12 +111,26 @@ export async function importLeads(
       continue;
     }
 
+    const websiteStatus = websiteStatusFromImport(lead.website);
+
     const scored = calculateNis2RelevanceScore({
       company_name: lead.company_name,
       industry: lead.industry,
       employee_count: lead.employee_count,
       hints: lead.hints,
+      website_data_status: websiteStatus,
     });
+
+    const assessment_quality = {
+      external_data:
+        websiteStatus === "none"
+          ? ("nicht verfügbar" as const)
+          : ("eingeschränkt" as const),
+      confidence_percent: scored.confidence_percent,
+      flags: scored.assessment_flags,
+      identifiable_assets_found: 0,
+      identifiable_assets_checked: 4,
+    };
 
     const { error } = await supabase.from("b2b_outreach_leads").insert({
       company_name: lead.company_name.trim(),
@@ -126,8 +145,11 @@ export async function importLeads(
       status: "new",
       nis2_relevance_score: scored.score,
       nis2_likelihood: scored.nis2_likelihood,
-      analysis_bullets: scored.breakdown,
-      observation: scored.breakdown[scored.breakdown.length - 1] ?? null,
+      analysis_bullets: [...buildAssessmentBullets(assessment_quality), ...scored.breakdown],
+      observation:
+        websiteStatus === "none"
+          ? MISSING_WEBSITE_OBSERVATION
+          : "Website hinterlegt, aber noch nicht verifiziert — externe Bewertbarkeit steht aus.",
     });
 
     if (error) {

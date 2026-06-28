@@ -1,4 +1,12 @@
 import { calculateNis2RelevanceScore } from "@/lib/jarvis/outreach/nis2-relevance-score";
+import {
+  buildAssessmentBullets,
+  MISSING_WEBSITE_OBSERVATION,
+  UNREACHABLE_WEBSITE_OBSERVATION,
+  websiteStatusFromSnapshot,
+  type AssessmentQuality,
+  type WebsiteDataStatus,
+} from "@/lib/jarvis/outreach/assessment-quality";
 
 export interface WebsiteSnapshot {
   url: string | null;
@@ -101,6 +109,9 @@ function stripHtml(html: string): string {
 
 export interface LeadAnalysisResult {
   nis2_relevance_score: number;
+  assessment_confidence: number;
+  assessment_flags: string[];
+  assessment_quality: AssessmentQuality;
   nis2_likelihood: "yes" | "no" | "uncertain";
   it_maturity: "low" | "medium" | "high" | "unknown";
   analysis_bullets: string[];
@@ -125,6 +136,61 @@ const IT_LOW = [
   "under construction",
 ];
 
+const ASSET_CHECKS: { label: string; keywords: string[] }[] = [
+  { label: "Web-Präsenz", keywords: [] },
+  { label: "Cloud/Hosting", keywords: ["cloud", "hosting", "microsoft", "365", "azure", "aws"] },
+  { label: "Security/Compliance", keywords: ["sicherheit", "security", "compliance", "datenschutz", "iso"] },
+  { label: "Organisation", keywords: ["karriere", "jobs", "team", "über uns", "unternehmen"] },
+];
+
+function countIdentifiableAssets(text: string, websiteStatus: WebsiteDataStatus): {
+  found: number;
+  checked: number;
+} {
+  if (websiteStatus !== "available") {
+    return { found: 0, checked: ASSET_CHECKS.length };
+  }
+
+  let found = 0;
+  for (const check of ASSET_CHECKS) {
+    if (check.keywords.length === 0) {
+      found += 1;
+      continue;
+    }
+    if (check.keywords.some((kw) => text.includes(kw))) {
+      found += 1;
+    }
+  }
+  return { found, checked: ASSET_CHECKS.length };
+}
+
+function buildExternalDataCoverage(
+  websiteStatus: WebsiteDataStatus
+): AssessmentQuality["external_data"] {
+  if (websiteStatus === "available") return "vollständig";
+  if (websiteStatus === "pending" || websiteStatus === "unreachable") return "eingeschränkt";
+  return "nicht verfügbar";
+}
+
+function buildObservation(
+  websiteStatus: WebsiteDataStatus,
+  nis2Score: number
+): string {
+  if (websiteStatus === "none") return MISSING_WEBSITE_OBSERVATION;
+  if (websiteStatus === "pending") {
+    return "Website hinterlegt, aber noch nicht verifiziert — externe Bewertbarkeit steht aus.";
+  }
+  if (websiteStatus === "unreachable") return UNREACHABLE_WEBSITE_OBSERVATION;
+
+  if (nis2Score >= 7) {
+    return "Hohe NIS2-Relevanz auf Basis der Stammdaten — externe Website ergänzt die Einordnung.";
+  }
+  if (nis2Score <= 3) {
+    return "Geringe NIS2-Relevanz auf Basis der Stammdaten — keine überhöhte Einordnung.";
+  }
+  return "Mittlere NIS2-Relevanz — weitere interne Daten würden die Einordnung schärfen.";
+}
+
 export function analyzeLeadFromContext(input: {
   company_name: string;
   industry: string | null;
@@ -132,6 +198,8 @@ export function analyzeLeadFromContext(input: {
   hints?: string | null;
   website: WebsiteSnapshot;
 }): LeadAnalysisResult {
+  const websiteStatus = websiteStatusFromSnapshot(input.website);
+
   const websiteText = [
     input.website.title ?? "",
     input.website.description ?? "",
@@ -139,23 +207,26 @@ export function analyzeLeadFromContext(input: {
   ].join(" ");
 
   const text = websiteText.toLowerCase();
-  const extraBullets: string[] = [];
+  const contextBullets: string[] = [];
 
-  if (!input.website.fetched) {
-    extraBullets.push(
-      input.website.error
-        ? `Website nicht erreichbar (${input.website.error})`
-        : "Keine Website — Einschätzung nur aus Stammdaten"
-    );
-  } else {
+  if (websiteStatus === "available") {
     if (input.website.title) {
-      extraBullets.push(`Seitentitel: „${input.website.title.slice(0, 80)}“`);
+      contextBullets.push(`Seitentitel: „${input.website.title.slice(0, 80)}“`);
     }
-    if (!text.includes("sicherheit") && !text.includes("security")) {
-      extraBullets.push("Keine Security/Compliance-Seite sichtbar");
+    const hasSecurityHints =
+      text.includes("sicherheit") ||
+      text.includes("security") ||
+      text.includes("compliance") ||
+      text.includes("datenschutz");
+    if (!hasSecurityHints) {
+      contextBullets.push(
+        "Öffentliche Website: keine erkennbaren Informationssicherheits-Hinweise (Beobachtung, kein Compliance-Befund)"
+      );
+    } else {
+      contextBullets.push("Öffentliche Website: Informationssicherheits-/Compliance-Bezug erkennbar");
     }
     if (text.includes("microsoft") || text.includes("365") || text.includes("cloud")) {
-      extraBullets.push("Cloud/Microsoft-Bezug erkennbar");
+      contextBullets.push("Cloud-/Microsoft-Bezug in öffentlichen Inhalten erkennbar");
     }
   }
 
@@ -165,37 +236,51 @@ export function analyzeLeadFromContext(input: {
     employee_count: input.employee_count,
     website_text: websiteText,
     hints: input.hints,
+    website_data_status: websiteStatus,
   });
 
+  const assets = countIdentifiableAssets(text, websiteStatus);
+  const assessment_quality: AssessmentQuality = {
+    external_data: buildExternalDataCoverage(websiteStatus),
+    confidence_percent: nis2.confidence_percent,
+    flags: [...new Set([...nis2.assessment_flags])],
+    identifiable_assets_found: assets.found,
+    identifiable_assets_checked: assets.checked,
+  };
+
   let itScore = 0;
-  for (const kw of IT_HIGH) {
-    if (text.includes(kw)) itScore += 2;
+  if (websiteStatus === "available") {
+    for (const kw of IT_HIGH) {
+      if (text.includes(kw)) itScore += 2;
+    }
+    for (const kw of IT_LOW) {
+      if (text.includes(kw)) itScore -= 1;
+    }
   }
-  for (const kw of IT_LOW) {
-    if (text.includes(kw)) itScore -= 1;
-  }
-  if (!input.website.fetched) itScore = 0;
 
   let it_maturity: LeadAnalysisResult["it_maturity"] = "medium";
-  if (itScore >= 3) it_maturity = "high";
-  else if (itScore <= 0) it_maturity = "low";
-  if (!input.website.fetched && !input.industry?.toLowerCase().includes("it")) {
+  if (websiteStatus !== "available") {
     it_maturity = "unknown";
+  } else if (itScore >= 3) {
+    it_maturity = "high";
+  } else if (itScore <= 0) {
+    it_maturity = "low";
   }
 
-  const observation =
-    extraBullets[0] ??
-    (nis2.score >= 7
-      ? "Hohes NIS2-Potenzial — priorisieren"
-      : nis2.score <= 3
-        ? "Geringes NIS2-Potenzial"
-        : "Mittleres Potenzial — genauer prüfen");
+  const observation = buildObservation(websiteStatus, nis2.score);
 
   return {
     nis2_relevance_score: nis2.score,
+    assessment_confidence: nis2.confidence_percent,
+    assessment_flags: assessment_quality.flags,
+    assessment_quality,
     nis2_likelihood: nis2.nis2_likelihood,
     it_maturity,
-    analysis_bullets: [...nis2.breakdown, ...extraBullets].slice(0, 8),
+    analysis_bullets: [
+      ...buildAssessmentBullets(assessment_quality),
+      ...nis2.breakdown,
+      ...contextBullets,
+    ].slice(0, 12),
     observation,
   };
 }

@@ -25,7 +25,8 @@ import {
   OUTREACH_PRIORITY_SCORE,
 } from "@/lib/jarvis/outreach/constants";
 import { OUTREACH_DAY_TIMEZONE } from "@/lib/jarvis/outreach/day-boundary";
-import { scoreBadgeClass } from "@/lib/jarvis/outreach/nis2-relevance-score";
+import { scoreBadgeClass, confidenceBadgeClass } from "@/lib/jarvis/outreach/nis2-relevance-score";
+import { splitAnalysisBullets } from "@/lib/jarvis/outreach/assessment-quality";
 import type { OutreachQuotaInfo } from "@/lib/jarvis/outreach/processor";
 import type { B2BOutreachLead, B2BOutreachStatus } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -385,6 +386,10 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
         <div className="space-y-4">
           {leads.map((lead) => {
             const isTopLead = (lead.nis2_relevance_score ?? 0) >= OUTREACH_PRIORITY_SCORE;
+            const { assessment, scoring } = splitAnalysisBullets(lead.analysis_bullets);
+            const confidenceLine = assessment.find((l) => l.startsWith("Bewertungssicherheit:"));
+            const confidenceMatch = confidenceLine?.match(/(\d+)%/);
+            const confidencePercent = confidenceMatch ? Number(confidenceMatch[1]) : null;
             return (
             <Card
               key={lead.id}
@@ -414,6 +419,11 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                       NIS2 {lead.nis2_relevance_score}/10
                     </Badge>
                   )}
+                  {confidencePercent != null && (
+                    <Badge className={confidenceBadgeClass(confidencePercent)}>
+                      Sicherheit {confidencePercent}%
+                    </Badge>
+                  )}
                   <Badge className="bg-slate-100 text-slate-700">
                     {lead.status === "ready" && lead.processed_at
                       ? "Analysiert · Bereit"
@@ -436,9 +446,22 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {lead.analysis_bullets.length > 0 && (
+                {assessment.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Bewertungsqualität
+                    </p>
+                    <ul className="list-inside list-disc text-sm text-slate-600">
+                      {assessment.map((b) => (
+                        <li key={b}>{b}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {scoring.length > 0 && (
                   <ul className="list-inside list-disc text-sm text-slate-600">
-                    {lead.analysis_bullets.map((b) => (
+                    {scoring.map((b) => (
                       <li key={b}>{b}</li>
                     ))}
                   </ul>

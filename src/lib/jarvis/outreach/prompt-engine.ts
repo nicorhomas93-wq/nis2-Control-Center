@@ -92,12 +92,28 @@ function pickVariantIndex(seed: string, count: number): number {
   return hash % count;
 }
 
+function outreachObservation(input: OutreachPromptInput): string {
+  const obs = input.analysis.observation.replace(/\.$/, "");
+  const isAssessmentNote =
+    obs.includes("Bewertbarkeit") ||
+    obs.includes("verifizierbar") ||
+    obs.includes("verifiziert") ||
+    obs.includes("Angriffsfläche") ||
+    input.analysis.assessment_flags.includes("Informationslücke");
+
+  if (isAssessmentNote) {
+    const industry = input.industry ?? "Ihrer Branche";
+    return `in ${industry} werden NIS2-Nachweise zunehmend über Audits und Partneranfragen relevant`;
+  }
+  return obs;
+}
+
 function buildContext(input: OutreachPromptInput): MessageContext {
   return {
     greeting: input.contact_name ? `Hallo ${input.contact_name},` : "Hallo,",
     company: input.company_name,
     industry: input.industry ?? "Ihrer Branche",
-    observation: input.analysis.observation.replace(/\.$/, ""),
+    observation: outreachObservation(input),
     question: CLOSING_QUESTIONS[pickVariantIndex(input.company_name + ":q", CLOSING_QUESTIONS.length)]!,
   };
 }

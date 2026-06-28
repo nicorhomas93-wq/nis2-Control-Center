@@ -5,6 +5,10 @@ import {
   type Nis2ScoreInput,
 } from "@/lib/jarvis/outreach/nis2-relevance-score";
 import { fetchWebsiteSnapshot } from "@/lib/jarvis/outreach/website-analyzer";
+import {
+  websiteStatusFromImport,
+  websiteStatusFromSnapshot,
+} from "@/lib/jarvis/outreach/assessment-quality";
 
 interface ScoreRequestLead extends Nis2ScoreInput {
   website?: string | null;
@@ -38,9 +42,14 @@ export async function POST(request: Request) {
       }
 
       let website_text = lead.website_text ?? null;
+      let website_data_status = websiteStatusFromImport(lead.website);
+
       if (fetchWebsite && lead.website) {
         const snap = await fetchWebsiteSnapshot(lead.website);
-        website_text = [snap.title, snap.description, snap.textSample].filter(Boolean).join(" ");
+        website_data_status = websiteStatusFromSnapshot(snap);
+        if (snap.fetched) {
+          website_text = [snap.title, snap.description, snap.textSample].filter(Boolean).join(" ");
+        }
       }
 
       const scored = calculateNis2RelevanceScore({
@@ -49,6 +58,7 @@ export async function POST(request: Request) {
         employee_count: lead.employee_count ?? null,
         website_text,
         hints: lead.hints ?? null,
+        website_data_status,
       });
 
       return {

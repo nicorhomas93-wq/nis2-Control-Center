@@ -218,7 +218,7 @@ function buildRelevanceReason(
   ];
   if (lead.employee_count > 100) parts.push("NIS2-relevante Größe");
   if (hasDigital) parts.push("IT-abhängig");
-  if (!hasSecurity) parts.push("Security-Lücke erkennbar");
+  if (!hasSecurity) parts.push("Keine öffentlichen Security-Hinweise");
   parts.push(`Score ${score}/10`);
   return parts.join(" · ");
 }
