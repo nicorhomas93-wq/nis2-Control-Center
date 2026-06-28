@@ -43,7 +43,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
   const [showForm, setShowForm] = useState(false);
   const [showCsv, setShowCsv] = useState(false);
   const [filter, setFilter] = useState<B2BOutreachStatus | "all">("all");
-  const [scoreFilter, setScoreFilter] = useState<"all" | "top" | "qualified">("qualified");
+  const [scoreFilter, setScoreFilter] = useState<"all" | "top" | "qualified">("all");
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     company_name: "",
@@ -63,7 +63,11 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
     .filter((l) => filter === "all" || l.status === filter)
     .filter((l) => {
       if (scoreFilter === "all") return true;
-      const score = l.nis2_relevance_score ?? 0;
+      if (l.nis2_relevance_score == null) {
+        // Noch nicht bewertet — immer sichtbar, damit Analyse möglich bleibt
+        return scoreFilter === "qualified";
+      }
+      const score = l.nis2_relevance_score;
       if (scoreFilter === "top") return score >= OUTREACH_PRIORITY_SCORE;
       return score >= OUTREACH_MIN_VISIBLE_SCORE;
     })
@@ -85,6 +89,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
     hidden: initialLeads.filter(
       (l) => l.nis2_relevance_score != null && l.nis2_relevance_score < OUTREACH_MIN_VISIBLE_SCORE
     ).length,
+    unscored: initialLeads.filter((l) => l.nis2_relevance_score == null).length,
   };
 
   async function apiCall(url: string, method = "POST", body?: unknown) {
@@ -172,7 +177,12 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
             Priorität:{" "}
             <strong className="text-red-700">{scoreSummary.top}</strong> Top (8+) ·{" "}
             <strong className="text-amber-700">{scoreSummary.qualified}</strong> normal (6–7) ·{" "}
-            {scoreSummary.hidden} ausgeblendet (&lt;6)
+            {scoreSummary.hidden} niedrig (&lt;6)
+            {scoreSummary.unscored > 0 ? ` · ${scoreSummary.unscored} ohne Score` : ""}
+          </span>
+          <span className="text-slate-300">|</span>
+          <span>
+            Angezeigt: <strong>{leads.length}</strong> von {initialLeads.length}
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -270,7 +280,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
 
       <div className="flex flex-wrap gap-2">
         <span className="self-center text-xs font-medium text-slate-500">NIS2-Score:</span>
-        {(["top", "qualified", "all"] as const).map((s) => (
+        {(["all", "top", "qualified"] as const).map((s) => (
           <button
             key={s}
             type="button"
@@ -380,13 +390,16 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
 
       {leads.length === 0 ? (
         <p className="text-sm text-slate-500">
-          Keine Leads. „5 Leads finden“ oder manuell anlegen — dann „Batch analysieren“.
+          {initialLeads.length === 0
+            ? "Keine Leads in der Pipeline. „DE Top-Leads“ oder manuell anlegen — dann „Batch analysieren“."
+            : `Keine Leads für den aktuellen Filter (${initialLeads.length} insgesamt). Score-Filter auf „Alle Scores“ stellen oder Status-Filter prüfen.`}
         </p>
       ) : (
         <div className="space-y-4">
           {leads.map((lead) => {
             const isTopLead = (lead.nis2_relevance_score ?? 0) >= OUTREACH_PRIORITY_SCORE;
-            const { assessment, scoring } = splitAnalysisBullets(lead.analysis_bullets);
+            const bullets = Array.isArray(lead.analysis_bullets) ? lead.analysis_bullets : [];
+            const { assessment, scoring } = splitAnalysisBullets(bullets);
             const confidenceLine = assessment.find((l) => l.startsWith("Bewertungssicherheit:"));
             const confidenceMatch = confidenceLine?.match(/(\d+)%/);
             const confidencePercent = confidenceMatch ? Number(confidenceMatch[1]) : null;
