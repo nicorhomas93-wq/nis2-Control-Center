@@ -404,10 +404,10 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
           {leads.map((lead) => {
             const isTopLead = (lead.nis2_relevance_score ?? 0) >= OUTREACH_PRIORITY_SCORE;
             const bullets = Array.isArray(lead.analysis_bullets) ? lead.analysis_bullets : [];
-            const { assessment, scoring } = splitAnalysisBullets(bullets);
-            const confidenceLine = assessment.find((l) => l.startsWith("Bewertungssicherheit:"));
-            const confidenceMatch = confidenceLine?.match(/(\d+)%/);
-            const confidencePercent = confidenceMatch ? Number(confidenceMatch[1]) : null;
+            const { assessment, webPresence, scoring } = splitAnalysisBullets(bullets);
+            const stammdatenLine = scoring.find((l) => l.includes("Stammdaten:"));
+            const stammdatenMatch = stammdatenLine?.match(/Stammdaten:\s*(\d+)%/);
+            const stammdatenConfidence = stammdatenMatch ? Number(stammdatenMatch[1]) : null;
             return (
             <Card
               key={lead.id}
@@ -445,9 +445,9 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                         : ""}
                     </Badge>
                   )}
-                  {confidencePercent != null && (
-                    <Badge className={confidenceBadgeClass(confidencePercent)}>
-                      Sicherheit {confidencePercent}%
+                  {stammdatenConfidence != null && (
+                    <Badge className={confidenceBadgeClass(stammdatenConfidence)}>
+                      Stammdaten {stammdatenConfidence}%
                     </Badge>
                   )}
                   {lead.detected_website_type &&
@@ -492,12 +492,21 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                   </div>
                 )}
 
-                {(lead.web_presence_note || (lead.web_presence_evidence?.length ?? 0) > 0) && (
+                {(webPresence.length > 0 ||
+                  lead.web_presence_note ||
+                  (lead.web_presence_evidence?.length ?? 0) > 0) && (
                   <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-indigo-700">
                       Web-Präsenz
                     </p>
-                    {lead.web_presence_note && (
+                    {webPresence.length > 0 && (
+                      <ul className="mb-2 list-inside list-disc text-sm text-slate-600">
+                        {webPresence.map((b) => (
+                          <li key={b}>{b}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {lead.web_presence_note && !webPresence.some((b) => b.includes(lead.web_presence_note!)) && (
                       <p className="mb-2 text-sm text-slate-700">{lead.web_presence_note}</p>
                     )}
                     {lead.detected_website_url && (
@@ -534,11 +543,16 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                 )}
 
                 {scoring.length > 0 && (
-                  <ul className="list-inside list-disc text-sm text-slate-600">
-                    {scoring.map((b) => (
-                      <li key={b}>{b}</li>
-                    ))}
-                  </ul>
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      NIS2-Relevanz (Stammdaten)
+                    </p>
+                    <ul className="list-inside list-disc text-sm text-slate-600">
+                      {scoring.map((b) => (
+                        <li key={b}>{b}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
 
                 {lead.outreach_message ? (

@@ -4,28 +4,18 @@ import {
   calculateNis2RelevanceScore,
   type Nis2ScoreInput,
 } from "@/lib/jarvis/outreach/nis2-relevance-score";
-import { fetchWebsiteSnapshot } from "@/lib/jarvis/outreach/website-analyzer";
-import {
-  websiteStatusFromImport,
-  websiteStatusFromSnapshot,
-} from "@/lib/jarvis/outreach/assessment-quality";
-
-interface ScoreRequestLead extends Nis2ScoreInput {
-  website?: string | null;
-  fetch_website?: boolean;
-}
 
 /**
  * Bulk-Scoring: Liste filtern & priorisieren ohne CRM-Speicherung.
- * POST { leads: [...], fetch_website?: boolean }
+ * NIS2-Score ausschließlich aus Stammdaten (Größe, Branche, Kritikalität).
+ * POST { leads: [...] }
  */
 export async function POST(request: Request) {
   const access = await requireJarvisApiAccess();
   if (!access.ok) return access.response;
 
   const body = await request.json();
-  const leads = Array.isArray(body.leads) ? (body.leads as ScoreRequestLead[]) : [];
-  const fetchWebsite = Boolean(body.fetch_website);
+  const leads = Array.isArray(body.leads) ? (body.leads as Nis2ScoreInput[]) : [];
 
   if (leads.length === 0) {
     return NextResponse.json({ error: "leads-Array fehlt" }, { status: 400 });
@@ -34,43 +24,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Maximal 100 Leads pro Anfrage" }, { status: 400 });
   }
 
-  const results = await Promise.all(
-    leads.map(async (lead, index) => {
-      const company_name = String(lead.company_name ?? "").trim();
-      if (!company_name) {
-        return { index, error: "Firmenname fehlt" };
-      }
+  const results = leads.map((lead, index) => {
+    const company_name = String(lead.company_name ?? "").trim();
+    if (!company_name) {
+      return { index, error: "Firmenname fehlt" };
+    }
 
-      let website_text = lead.website_text ?? null;
-      let website_data_status = websiteStatusFromImport(lead.website);
+    const scored = calculateNis2RelevanceScore({
+      company_name,
+      industry: lead.industry ?? null,
+      employee_count: lead.employee_count ?? null,
+      hints: lead.hints ?? null,
+    });
 
-      if (fetchWebsite && lead.website) {
-        const snap = await fetchWebsiteSnapshot(lead.website);
-        website_data_status = websiteStatusFromSnapshot(snap);
-        if (snap.fetched) {
-          website_text = [snap.title, snap.description, snap.textSample].filter(Boolean).join(" ");
-        }
-      }
-
-      const scored = calculateNis2RelevanceScore({
-        company_name,
-        industry: lead.industry ?? null,
-        employee_count: lead.employee_count ?? null,
-        website_text,
-        hints: lead.hints ?? null,
-        website_data_status,
-      });
-
-      return {
-        index,
-        company_name,
-        industry: lead.industry ?? null,
-        employee_count: lead.employee_count ?? null,
-        website: lead.website ?? null,
-        ...scored,
-      };
-    })
-  );
+    return {
+      index,
+      company_name,
+      industry: lead.industry ?? null,
+      employee_count: lead.employee_count ?? null,
+      ...scored,
+    };
+  });
 
   const ranked = results
     .filter((r): r is Exclude<typeof r, { error: string }> => !("error" in r && r.error))

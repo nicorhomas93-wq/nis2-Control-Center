@@ -1,10 +1,8 @@
 /**
- * NIS2-Relevanz-Score (0–10) für B2B-Lead-Priorisierung.
- * Risiko-Score basiert auf Stammdaten (Größe, Branche) — nicht auf fehlenden Websites.
- * Bewertungssicherheit (Confidence) separat, 0–100 %.
+ * NIS2-Relevanz-Score (0–10) — ausschließlich Stammdaten.
+ * Basis: Unternehmensgröße, Branche, Kritikalität/Infrastrukturrolle.
+ * Keine Website-, Web-Präsenz- oder Erreichbarkeits-Signale.
  */
-
-import type { WebsiteDataStatus } from "@/lib/jarvis/outreach/assessment-quality";
 
 export type Nis2Priority = "high" | "medium" | "low";
 
@@ -12,20 +10,17 @@ export interface Nis2ScoreInput {
   company_name: string;
   industry?: string | null;
   employee_count?: string | number | null;
-  /** Nur auslesen, wenn website_data_status === "available" */
-  website_text?: string | null;
+  /** Optionale Hinweise — nur für Branchen-Matching, nicht für Web-Signale */
   hints?: string | null;
-  website_data_status?: WebsiteDataStatus;
 }
 
 export interface Nis2ScoreResult {
-  /** NIS2-Relevanz / Priorisierung (0–10) — kein Website-Strafpunkt bei fehlenden Daten */
   score: number;
-  /** Bewertungssicherheit (0–100 %) — sinkt bei Informationslücken */
-  confidence_percent: number;
+  /** Wie belastbar die Stammdaten für diesen Score sind (0–100 %) */
+  score_data_confidence: number;
   priority: Nis2Priority;
   breakdown: string[];
-  assessment_flags: string[];
+  data_flags: string[];
   nis2_likelihood: "yes" | "no" | "uncertain";
 }
 
@@ -121,17 +116,6 @@ const LOW_RELEVANCE_KEYWORDS = [
   "kleinstunternehmen",
 ];
 
-const SIGNAL_KEYWORDS = [
-  "nis2",
-  "cyber",
-  "compliance",
-  "iso 27001",
-  "informationssicherheit",
-  "it-sicherheit",
-  "microsoft 365",
-  "cloud",
-];
-
 export function parseEmployeeCount(value: string | number | null | undefined): number | null {
   if (value == null || value === "") return null;
   if (typeof value === "number" && !Number.isNaN(value)) return value;
@@ -141,18 +125,13 @@ export function parseEmployeeCount(value: string | number | null | undefined): n
 
 export function calculateNis2RelevanceScore(input: Nis2ScoreInput): Nis2ScoreResult {
   const breakdown: string[] = [];
-  const assessment_flags: string[] = [];
+  const data_flags: string[] = [];
   let score = 0;
-  let confidence = 100;
-
-  const websiteStatus = input.website_data_status ?? "none";
-  const websiteAvailable = websiteStatus === "available";
+  let scoreDataConfidence = 100;
 
   const stammdatenText = [input.company_name, input.industry ?? "", input.hints ?? ""]
     .join(" ")
     .toLowerCase();
-
-  const websiteText = websiteAvailable ? (input.website_text ?? "").toLowerCase() : "";
 
   const employees = parseEmployeeCount(input.employee_count);
 
@@ -166,9 +145,9 @@ export function calculateNis2RelevanceScore(input: Nis2ScoreInput): Nis2ScoreRes
     score += 1;
     breakdown.push(`Unternehmensgröße: ${employees} MA → unter 50 MA (+1)`);
   } else {
-    confidence -= 5;
-    assessment_flags.push("Mitarbeiterzahl unbekannt");
-    breakdown.push("Mitarbeiterzahl unbekannt — Relevanz nur aus Branche ableitbar");
+    scoreDataConfidence -= 15;
+    data_flags.push("Mitarbeiterzahl unbekannt");
+    breakdown.push("Mitarbeiterzahl unbekannt — Score nur aus Branche");
   }
 
   let bestIndustry: IndustryRule | null = null;
@@ -184,48 +163,13 @@ export function calculateNis2RelevanceScore(input: Nis2ScoreInput): Nis2ScoreRes
 
   if (bestIndustry) {
     score += bestIndustry.bonus;
-    breakdown.push(`Branche: ${bestIndustry.label} (+${bestIndustry.bonus})`);
+    breakdown.push(`Branche/Kritikalität: ${bestIndustry.label} (+${bestIndustry.bonus})`);
   } else if (input.industry) {
     breakdown.push(`Branche „${input.industry}“ ohne erhöhte NIS2-Einordnung`);
   } else {
-    confidence -= 5;
-    assessment_flags.push("Branche unbekannt");
-    breakdown.push("Branche unbekannt — Einordnung eingeschränkt");
-  }
-
-  if (websiteStatus === "none") {
-    confidence -= 10;
-    assessment_flags.push("Informationslücke");
-    breakdown.push(
-      "Keine Website hinterlegt → reduzierte externe Bewertbarkeit (kein Compliance-Abzug)"
-    );
-  } else if (websiteStatus === "pending") {
-    confidence -= 5;
-    breakdown.push(
-      "Website hinterlegt, aber noch nicht geprüft → externe Einordnung ausstehend (kein Compliance-Abzug)"
-    );
-  } else if (websiteStatus === "unreachable") {
-    confidence -= 10;
-    assessment_flags.push("Informationslücke");
-    breakdown.push(
-      "Website nicht verifizierbar → externe Angriffsfläche nicht bewertbar (kein Compliance-Abzug)"
-    );
-  } else {
-    let signalHits = 0;
-    for (const kw of SIGNAL_KEYWORDS) {
-      if (websiteText.includes(kw)) signalHits += 1;
-    }
-    if (signalHits >= 2) {
-      score += 2;
-      breakdown.push("Öffentliche Website: mehrere IT-/Compliance-Hinweise (+2)");
-    } else if (signalHits === 1) {
-      score += 1;
-      breakdown.push("Öffentliche Website: ein IT-/Compliance-Hinweis (+1)");
-    } else {
-      breakdown.push(
-        "Öffentliche Website: keine erkennbaren Security-Hinweise (Beobachtung, kein NIS2-Abzug)"
-      );
-    }
+    scoreDataConfidence -= 15;
+    data_flags.push("Branche unbekannt");
+    breakdown.push("Branche unbekannt — Score eingeschränkt");
   }
 
   for (const kw of LOW_RELEVANCE_KEYWORDS) {
@@ -237,7 +181,7 @@ export function calculateNis2RelevanceScore(input: Nis2ScoreInput): Nis2ScoreRes
   }
 
   score = Math.max(0, Math.min(10, score));
-  confidence = Math.max(0, Math.min(100, confidence));
+  scoreDataConfidence = Math.max(0, Math.min(100, scoreDataConfidence));
 
   const priority: Nis2Priority =
     score >= 7 ? "high" : score >= 4 ? "medium" : "low";
@@ -246,17 +190,22 @@ export function calculateNis2RelevanceScore(input: Nis2ScoreInput): Nis2ScoreRes
     score >= 7 ? "yes" : score <= 3 ? "no" : "uncertain";
 
   breakdown.unshift(
-    `NIS2-Relevanz: ${score}/10 (${priorityLabel(priority)}) · Bewertungssicherheit: ${confidence}%`
+    `NIS2-Relevanz: ${score}/10 (${priorityLabel(priority)}) · Stammdaten: ${scoreDataConfidence}%`
   );
 
   return {
     score,
-    confidence_percent: confidence,
+    score_data_confidence: scoreDataConfidence,
     priority,
     breakdown,
-    assessment_flags,
+    data_flags,
     nis2_likelihood,
   };
+}
+
+/** @deprecated Nutze score_data_confidence */
+export function nis2ScoreConfidence(result: Nis2ScoreResult): number {
+  return result.score_data_confidence;
 }
 
 export function priorityLabel(priority: Nis2Priority): string {

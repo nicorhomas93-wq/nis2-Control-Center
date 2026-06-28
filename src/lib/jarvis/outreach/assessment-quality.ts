@@ -1,5 +1,9 @@
+import type { WebPresenceStatus, WebPresenceResult } from "@/lib/jarvis/outreach/web-presence-types";
+
+/** Präfix für Web-Präsenz-Zeilen in analysis_bullets */
+export const WEB_PRESENCE_BULLET_PREFIX = "【Web-Präsenz】";
+
 /** Präfix für Bewertungsqualität-Zeilen in analysis_bullets */
-import type { WebPresenceStatus } from "@/lib/jarvis/outreach/web-presence-types";
 
 export const ASSESSMENT_BULLET_PREFIX = "【Bewertungsqualität】";
 
@@ -52,31 +56,57 @@ export function stripAssessmentPrefix(bullet: string): string {
   return bullet.replace(ASSESSMENT_BULLET_PREFIX, "").trim();
 }
 
+export function formatWebPresenceBullet(text: string): string {
+  return `${WEB_PRESENCE_BULLET_PREFIX} ${text}`;
+}
+
+export function isWebPresenceBullet(bullet: string): boolean {
+  return bullet.startsWith(WEB_PRESENCE_BULLET_PREFIX);
+}
+
+export function stripWebPresencePrefix(bullet: string): string {
+  return bullet.replace(WEB_PRESENCE_BULLET_PREFIX, "").trim();
+}
+
+export function buildWebPresenceBullets(presence: WebPresenceResult): string[] {
+  const lines = [
+    `Status: ${presence.webPresenceStatus} (${presence.webPresenceConfidence}% Confidence)`,
+    presence.webPresenceNote,
+  ];
+  if (presence.detectedWebsiteUrl) {
+    lines.push(`Erkannte URL: ${presence.detectedWebsiteUrl}`);
+  }
+  if (presence.detectedWebsiteType !== "none" && presence.detectedWebsiteType !== "unclear") {
+    lines.push(`Typ: ${presence.detectedWebsiteType}`);
+  }
+  return lines.filter(Boolean).map(formatWebPresenceBullet);
+}
+
 export function splitAnalysisBullets(bullets: string[]): {
   assessment: string[];
+  webPresence: string[];
   scoring: string[];
 } {
   const assessment: string[] = [];
+  const webPresence: string[] = [];
   const scoring: string[] = [];
   for (const b of bullets) {
     if (isAssessmentBullet(b)) {
       assessment.push(stripAssessmentPrefix(b));
+    } else if (isWebPresenceBullet(b)) {
+      webPresence.push(stripWebPresencePrefix(b));
     } else {
       scoring.push(b);
     }
   }
-  return { assessment, scoring };
+  return { assessment, webPresence, scoring };
 }
 
-export function buildAssessmentBullets(quality: AssessmentQuality, webPresenceNote?: string | null): string[] {
+export function buildAssessmentBullets(quality: AssessmentQuality): string[] {
   const lines = [
     `Externe Datenlage: ${quality.external_data}`,
-    `Bewertungssicherheit: ${quality.confidence_percent}%`,
-    `Identifizierbare Assets: ${quality.identifiable_assets_found} von ${quality.identifiable_assets_checked}`,
+    `Web-Präsenz-Confidence: ${quality.confidence_percent}%`,
   ];
-  if (webPresenceNote) {
-    lines.push(`Web-Präsenz: ${webPresenceNote}`);
-  }
   for (const flag of quality.flags) {
     lines.push(`Flag: ${flag}`);
   }
