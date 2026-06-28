@@ -3,16 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
 import { importLeads } from "@/lib/jarvis/outreach/lead-import";
 import { getOutreachQuotaInfo } from "@/lib/jarvis/outreach/processor";
+import { mapOutreachLead } from "@/lib/jarvis/outreach/outreach-lead-map";
 import type { B2BOutreachLead } from "@/lib/types";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
 
 function mapLead(row: Record<string, unknown>): B2BOutreachLead {
-  return {
-    ...(row as unknown as B2BOutreachLead),
-    analysis_bullets: Array.isArray(row.analysis_bullets)
-      ? (row.analysis_bullets as string[])
-      : [],
-  };
+  return mapOutreachLead(row);
 }
 
 export async function GET(request: Request) {

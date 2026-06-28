@@ -1,111 +1,18 @@
 import { calculateNis2RelevanceScore } from "@/lib/jarvis/outreach/nis2-relevance-score";
 import {
   buildAssessmentBullets,
-  MISSING_WEBSITE_OBSERVATION,
-  UNREACHABLE_WEBSITE_OBSERVATION,
-  websiteStatusFromSnapshot,
+  websiteDataStatusFromPresence,
+  WEB_PRESENCE_OBSERVATION_FALLBACK,
   type AssessmentQuality,
   type WebsiteDataStatus,
 } from "@/lib/jarvis/outreach/assessment-quality";
+import { resolveWebPresence } from "@/lib/jarvis/outreach/web-presence-resolver";
+import type { WebPresenceResult } from "@/lib/jarvis/outreach/web-presence-types";
+import { WEB_PRESENCE_STATUS_LABELS } from "@/lib/jarvis/outreach/web-presence-types";
+import type { WebsiteSnapshot } from "@/lib/jarvis/outreach/website-snapshot";
 
-export interface WebsiteSnapshot {
-  url: string | null;
-  title: string | null;
-  description: string | null;
-  textSample: string;
-  fetched: boolean;
-  error?: string;
-}
-
-export async function fetchWebsiteSnapshot(
-  website: string | null | undefined
-): Promise<WebsiteSnapshot> {
-  if (!website?.trim()) {
-    return {
-      url: null,
-      title: null,
-      description: null,
-      textSample: "",
-      fetched: false,
-      error: "Keine Website hinterlegt",
-    };
-  }
-
-  let url = website.trim();
-  if (!/^https?:\/\//i.test(url)) {
-    url = `https://${url}`;
-  }
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "TKND-Outreach-Bot/1.0 (+https://tknd.de)",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      redirect: "follow",
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      return {
-        url,
-        title: null,
-        description: null,
-        textSample: "",
-        fetched: false,
-        error: `HTTP ${res.status}`,
-      };
-    }
-
-    const html = await res.text();
-    const title = extractMeta(html, "title") ?? extractTag(html, "title");
-    const description =
-      extractMeta(html, "description") ?? extractMeta(html, "og:description");
-    const textSample = stripHtml(html).slice(0, 4000);
-
-    return { url, title, description, textSample, fetched: true };
-  } catch (err) {
-    return {
-      url,
-      title: null,
-      description: null,
-      textSample: "",
-      fetched: false,
-      error: err instanceof Error ? err.message : "Fetch fehlgeschlagen",
-    };
-  }
-}
-
-function extractTag(html: string, tag: string): string | null {
-  const match = html.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
-  return match?.[1]?.replace(/\s+/g, " ").trim() ?? null;
-}
-
-function extractMeta(html: string, name: string): string | null {
-  const patterns = [
-    new RegExp(`<meta[^>]+name=["']${name}["'][^>]+content=["']([^"']+)`, "i"),
-    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${name}["']`, "i"),
-    new RegExp(`<meta[^>]+property=["']og:${name}["'][^>]+content=["']([^"']+)`, "i"),
-  ];
-  for (const re of patterns) {
-    const m = html.match(re);
-    if (m?.[1]) return m[1].trim();
-  }
-  return null;
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export type { WebsiteSnapshot } from "@/lib/jarvis/outreach/website-snapshot";
+export { fetchWebsiteSnapshot } from "@/lib/jarvis/outreach/website-snapshot";
 
 export interface LeadAnalysisResult {
   nis2_relevance_score: number;
@@ -116,6 +23,7 @@ export interface LeadAnalysisResult {
   it_maturity: "low" | "medium" | "high" | "unknown";
   analysis_bullets: string[];
   observation: string;
+  web_presence: WebPresenceResult;
 }
 
 const IT_HIGH = [
@@ -165,53 +73,78 @@ function countIdentifiableAssets(text: string, websiteStatus: WebsiteDataStatus)
 }
 
 function buildExternalDataCoverage(
-  websiteStatus: WebsiteDataStatus
+  websiteStatus: WebsiteDataStatus,
+  presence: WebPresenceResult
 ): AssessmentQuality["external_data"] {
   if (websiteStatus === "available") return "vollständig";
+  if (
+    presence.webPresenceStatus === "group_or_brand_presence" ||
+    presence.webPresenceStatus === "directory_presence_only" ||
+    presence.webPresenceStatus === "unclear_presence"
+  ) {
+    return "eingeschränkt";
+  }
   if (websiteStatus === "pending" || websiteStatus === "unreachable") return "eingeschränkt";
   return "nicht verfügbar";
 }
 
-function buildObservation(
-  websiteStatus: WebsiteDataStatus,
-  nis2Score: number
-): string {
-  if (websiteStatus === "none") return MISSING_WEBSITE_OBSERVATION;
-  if (websiteStatus === "pending") {
-    return "Website hinterlegt, aber noch nicht verifiziert — externe Bewertbarkeit steht aus.";
-  }
-  if (websiteStatus === "unreachable") return UNREACHABLE_WEBSITE_OBSERVATION;
+function buildObservation(presence: WebPresenceResult, nis2Score: number): string {
+  if (presence.webPresenceNote) return presence.webPresenceNote;
 
   if (nis2Score >= 7) {
-    return "Hohe NIS2-Relevanz auf Basis der Stammdaten — externe Website ergänzt die Einordnung.";
+    return "Hohe NIS2-Relevanz auf Basis der Stammdaten — externe Quellen ergänzen die Einordnung.";
   }
   if (nis2Score <= 3) {
     return "Geringe NIS2-Relevanz auf Basis der Stammdaten — keine überhöhte Einordnung.";
   }
-  return "Mittlere NIS2-Relevanz — weitere interne Daten würden die Einordnung schärfen.";
+  return WEB_PRESENCE_OBSERVATION_FALLBACK;
 }
 
-export function analyzeLeadFromContext(input: {
+function blendConfidence(nis2Confidence: number, webConfidence: number): number {
+  return Math.round(nis2Confidence * 0.6 + webConfidence * 0.4);
+}
+
+export async function analyzeLeadFromContext(input: {
   company_name: string;
   industry: string | null;
   employee_count: string | null;
   hints?: string | null;
-  website: WebsiteSnapshot;
-}): LeadAnalysisResult {
-  const websiteStatus = websiteStatusFromSnapshot(input.website);
+  website?: string | null;
+  city?: string | null;
+  contact_email?: string | null;
+}): Promise<LeadAnalysisResult> {
+  const { presence, snapshot } = await resolveWebPresence({
+    company_name: input.company_name,
+    website: input.website,
+    hints: input.hints,
+    city: input.city,
+    contact_email: input.contact_email,
+  });
 
-  const websiteText = [
-    input.website.title ?? "",
-    input.website.description ?? "",
-    input.website.textSample,
-  ].join(" ");
+  const websiteStatus = websiteDataStatusFromPresence({
+    webPresenceStatus: presence.webPresenceStatus,
+    snapshotFetched: snapshot.fetched,
+    hasUrl: Boolean(snapshot.url ?? input.website),
+  });
+
+  const websiteText = snapshot.fetched
+    ? [snapshot.title ?? "", snapshot.description ?? "", snapshot.textSample].join(" ")
+    : "";
 
   const text = websiteText.toLowerCase();
   const contextBullets: string[] = [];
 
+  contextBullets.push(
+    `Web-Präsenz-Status: ${WEB_PRESENCE_STATUS_LABELS[presence.webPresenceStatus]} (${presence.webPresenceConfidence}% Confidence)`
+  );
+
+  if (presence.detectedWebsiteUrl) {
+    contextBullets.push(`Erkannte URL: ${presence.detectedWebsiteUrl}`);
+  }
+
   if (websiteStatus === "available") {
-    if (input.website.title) {
-      contextBullets.push(`Seitentitel: „${input.website.title.slice(0, 80)}“`);
+    if (snapshot.title) {
+      contextBullets.push(`Seitentitel: „${snapshot.title.slice(0, 80)}“`);
     }
     const hasSecurityHints =
       text.includes("sicherheit") ||
@@ -239,11 +172,20 @@ export function analyzeLeadFromContext(input: {
     website_data_status: websiteStatus,
   });
 
+  const blendedConfidence = blendConfidence(nis2.confidence_percent, presence.webPresenceConfidence);
+  const assessment_flags = [...new Set([...nis2.assessment_flags])];
+  if (presence.webPresenceStatus === "unclear_presence") {
+    assessment_flags.push("Web-Präsenz unklar");
+  }
+  if (presence.webPresenceStatus === "no_reliable_web_presence") {
+    assessment_flags.push("Informationslücke");
+  }
+
   const assets = countIdentifiableAssets(text, websiteStatus);
   const assessment_quality: AssessmentQuality = {
-    external_data: buildExternalDataCoverage(websiteStatus),
-    confidence_percent: nis2.confidence_percent,
-    flags: [...new Set([...nis2.assessment_flags])],
+    external_data: buildExternalDataCoverage(websiteStatus, presence),
+    confidence_percent: blendedConfidence,
+    flags: assessment_flags,
     identifiable_assets_found: assets.found,
     identifiable_assets_checked: assets.checked,
   };
@@ -267,20 +209,21 @@ export function analyzeLeadFromContext(input: {
     it_maturity = "low";
   }
 
-  const observation = buildObservation(websiteStatus, nis2.score);
+  const observation = buildObservation(presence, nis2.score);
 
   return {
     nis2_relevance_score: nis2.score,
-    assessment_confidence: nis2.confidence_percent,
-    assessment_flags: assessment_quality.flags,
+    assessment_confidence: blendedConfidence,
+    assessment_flags,
     assessment_quality,
     nis2_likelihood: nis2.nis2_likelihood,
     it_maturity,
     analysis_bullets: [
-      ...buildAssessmentBullets(assessment_quality),
+      ...buildAssessmentBullets(assessment_quality, presence.webPresenceNote),
       ...nis2.breakdown,
       ...contextBullets,
-    ].slice(0, 12),
+    ].slice(0, 14),
     observation,
+    web_presence: presence,
   };
 }

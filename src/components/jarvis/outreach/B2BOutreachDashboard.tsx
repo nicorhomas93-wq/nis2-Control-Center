@@ -27,6 +27,11 @@ import {
 import { OUTREACH_DAY_TIMEZONE } from "@/lib/jarvis/outreach/day-boundary";
 import { scoreBadgeClass, confidenceBadgeClass } from "@/lib/jarvis/outreach/nis2-relevance-score";
 import { splitAnalysisBullets } from "@/lib/jarvis/outreach/assessment-quality";
+import {
+  DETECTED_WEBSITE_TYPE_LABELS,
+  WEB_PRESENCE_STATUS_LABELS,
+  webPresenceBadgeClass,
+} from "@/lib/jarvis/outreach/web-presence-types";
 import type { OutreachQuotaInfo } from "@/lib/jarvis/outreach/processor";
 import type { B2BOutreachLead, B2BOutreachStatus } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -432,9 +437,24 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                       NIS2 {lead.nis2_relevance_score}/10
                     </Badge>
                   )}
+                  {lead.web_presence_status && (
+                    <Badge className={webPresenceBadgeClass(lead.web_presence_status)}>
+                      {WEB_PRESENCE_STATUS_LABELS[lead.web_presence_status]}
+                      {lead.web_presence_confidence != null
+                        ? ` · ${lead.web_presence_confidence}%`
+                        : ""}
+                    </Badge>
+                  )}
                   {confidencePercent != null && (
                     <Badge className={confidenceBadgeClass(confidencePercent)}>
                       Sicherheit {confidencePercent}%
+                    </Badge>
+                  )}
+                  {lead.detected_website_type &&
+                    lead.detected_website_type !== "none" &&
+                    lead.detected_website_type !== "unclear" && (
+                    <Badge className="bg-indigo-50 text-indigo-800">
+                      {DETECTED_WEBSITE_TYPE_LABELS[lead.detected_website_type]}
                     </Badge>
                   )}
                   <Badge className="bg-slate-100 text-slate-700">
@@ -469,6 +489,47 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                         <li key={b}>{b}</li>
                       ))}
                     </ul>
+                  </div>
+                )}
+
+                {(lead.web_presence_note || (lead.web_presence_evidence?.length ?? 0) > 0) && (
+                  <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                      Web-Präsenz
+                    </p>
+                    {lead.web_presence_note && (
+                      <p className="mb-2 text-sm text-slate-700">{lead.web_presence_note}</p>
+                    )}
+                    {lead.detected_website_url && (
+                      <p className="mb-2 text-xs text-slate-500">
+                        Erkannte URL:{" "}
+                        <a
+                          href={lead.detected_website_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-700 underline"
+                        >
+                          {lead.detected_website_url}
+                        </a>
+                      </p>
+                    )}
+                    {(lead.web_presence_evidence?.length ?? 0) > 0 && (
+                      <ul className="space-y-2 text-xs text-slate-600">
+                        {lead.web_presence_evidence!.map((ev, i) => (
+                          <li key={`${ev.source}-${i}`} className="rounded border border-white/80 bg-white/60 p-2">
+                            <span className="font-medium text-slate-700">{ev.source}</span>
+                            {" — "}
+                            {ev.reason}
+                            {ev.url ? (
+                              <>
+                                {" "}
+                                <span className="text-slate-400">({ev.url})</span>
+                              </>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )}
 

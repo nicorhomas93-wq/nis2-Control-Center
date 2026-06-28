@@ -6,18 +6,15 @@ import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { createClient } from "@/lib/supabase/server";
 import { getOutreachQuotaInfo } from "@/lib/jarvis/outreach/processor";
 import { OUTREACH_DAILY_SEND_LIMIT } from "@/lib/jarvis/outreach/constants";
-import type { B2BOutreachLead } from "@/lib/types";
+import { mapOutreachLead } from "@/lib/jarvis/outreach/outreach-lead-map";
 import { isMissingTableError } from "@/lib/supabase/db-error";
 import { redirect } from "next/navigation";
 import { canAccessJarvis } from "@/lib/jarvis/access";
 
+import type { B2BOutreachLead } from "@/lib/types";
+
 function mapLead(row: Record<string, unknown>): B2BOutreachLead {
-  return {
-    ...(row as unknown as B2BOutreachLead),
-    analysis_bullets: Array.isArray(row.analysis_bullets)
-      ? (row.analysis_bullets as string[])
-      : [],
-  };
+  return mapOutreachLead(row);
 }
 
 export default async function B2BOutreachPage() {

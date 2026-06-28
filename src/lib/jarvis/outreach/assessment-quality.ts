@@ -1,9 +1,36 @@
 /** Präfix für Bewertungsqualität-Zeilen in analysis_bullets */
+import type { WebPresenceStatus } from "@/lib/jarvis/outreach/web-presence-types";
+
 export const ASSESSMENT_BULLET_PREFIX = "【Bewertungsqualität】";
 
 export type ExternalDataCoverage = "vollständig" | "eingeschränkt" | "nicht verfügbar";
 
 export type WebsiteDataStatus = "none" | "pending" | "unreachable" | "available";
+
+export function websiteDataStatusFromPresence(input: {
+  webPresenceStatus?: WebPresenceStatus | null;
+  snapshotFetched: boolean;
+  hasUrl: boolean;
+}): WebsiteDataStatus {
+  const status = input.webPresenceStatus;
+  if (!input.hasUrl && status === "no_reliable_web_presence") return "none";
+  if (!input.snapshotFetched) return input.hasUrl ? "unreachable" : "none";
+
+  switch (status) {
+    case "own_website_confirmed":
+    case "group_or_brand_presence":
+      return "available";
+    case "directory_presence_only":
+      return "pending";
+    case "unclear_presence":
+      return "pending";
+    default:
+      return input.snapshotFetched ? "pending" : "none";
+  }
+}
+
+export const WEB_PRESENCE_OBSERVATION_FALLBACK =
+  "Öffentliche Web-Präsenz nicht eindeutig erkennbar — externe Bewertbarkeit wirkt eingeschränkt. Manuelle Prüfung empfohlen.";
 
 export interface AssessmentQuality {
   external_data: ExternalDataCoverage;
@@ -41,12 +68,15 @@ export function splitAnalysisBullets(bullets: string[]): {
   return { assessment, scoring };
 }
 
-export function buildAssessmentBullets(quality: AssessmentQuality): string[] {
+export function buildAssessmentBullets(quality: AssessmentQuality, webPresenceNote?: string | null): string[] {
   const lines = [
     `Externe Datenlage: ${quality.external_data}`,
     `Bewertungssicherheit: ${quality.confidence_percent}%`,
     `Identifizierbare Assets: ${quality.identifiable_assets_found} von ${quality.identifiable_assets_checked}`,
   ];
+  if (webPresenceNote) {
+    lines.push(`Web-Präsenz: ${webPresenceNote}`);
+  }
   for (const flag of quality.flags) {
     lines.push(`Flag: ${flag}`);
   }
@@ -67,7 +97,7 @@ export function websiteStatusFromImport(website: string | null | undefined): Web
 }
 
 export const MISSING_WEBSITE_OBSERVATION =
-  "Keine öffentlich erkennbare Web-Präsenz → reduzierte Bewertbarkeit der externen Angriffsfläche. Eine vollständige Risikoeinschätzung ist dadurch eingeschränkt.";
+  "Öffentliche Web-Präsenz nicht eindeutig erkennbar — externe Bewertbarkeit wirkt eingeschränkt. Manuelle Prüfung empfohlen.";
 
 export const UNREACHABLE_WEBSITE_OBSERVATION =
-  "Keine verifizierbare externe IT-Oberfläche vorhanden – die Bewertung der externen Angriffsfläche ist eingeschränkt.";
+  "Hinterlegte URL nicht verifizierbar — externe Bewertbarkeit wirkt eingeschränkt. Manuelle Prüfung empfohlen.";

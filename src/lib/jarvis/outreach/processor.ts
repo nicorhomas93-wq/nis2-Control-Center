@@ -2,8 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { B2BOutreachLead } from "@/lib/types";
 import {
   analyzeLeadFromContext,
-  fetchWebsiteSnapshot,
 } from "@/lib/jarvis/outreach/website-analyzer";
+import { mapOutreachLead, webPresenceFieldsFromResult } from "@/lib/jarvis/outreach/outreach-lead-map";
 import { generateOutreachMessage } from "@/lib/jarvis/outreach/prompt-engine";
 import {
   OUTREACH_BATCH_ANALYSIS_LIMIT,
@@ -31,12 +31,7 @@ export interface ProcessResult {
 }
 
 function mapLead(row: Record<string, unknown>): B2BOutreachLead {
-  return {
-    ...(row as unknown as B2BOutreachLead),
-    analysis_bullets: Array.isArray(row.analysis_bullets)
-      ? (row.analysis_bullets as string[])
-      : [],
-  };
+  return mapOutreachLead(row);
 }
 
 export async function countProcessedToday(supabase: SupabaseClient): Promise<number> {
@@ -117,13 +112,14 @@ export async function processOutreachLead(
     return { lead: mapLead(row), error: null };
   }
 
-  const website = await fetchWebsiteSnapshot(row.website);
-  const analysis = analyzeLeadFromContext({
+  const analysis = await analyzeLeadFromContext({
     company_name: row.company_name,
     industry: row.industry,
     employee_count: row.employee_count,
     hints: row.hints,
-    website,
+    website: row.website,
+    city: row.city,
+    contact_email: row.contact_email,
   });
 
   const outreach_message = await generateOutreachMessage({
@@ -143,6 +139,7 @@ export async function processOutreachLead(
       analysis_bullets: analysis.analysis_bullets,
       observation: analysis.observation,
       outreach_message,
+      ...webPresenceFieldsFromResult(analysis.web_presence),
       status: outreach_message ? "ready" : "skipped",
       processed_at: new Date().toISOString(),
     })

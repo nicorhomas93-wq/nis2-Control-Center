@@ -1,3 +1,11 @@
+import type {
+  DetectedWebsiteType,
+  WebPresenceEvidence,
+  WebPresenceStatus,
+} from "@/lib/jarvis/outreach/web-presence-types";
+
+export type { DetectedWebsiteType, WebPresenceEvidence, WebPresenceStatus };
+
 export type Nis2Status =
   | "unbekannt"
   | "nicht_betroffen"
@@ -353,6 +361,12 @@ export interface B2BOutreachLead {
   status: B2BOutreachStatus;
   processed_at: string | null;
   contacted_at: string | null;
+  detected_website_url?: string | null;
+  detected_website_type?: DetectedWebsiteType | null;
+  web_presence_status?: WebPresenceStatus | null;
+  web_presence_confidence?: number | null;
+  web_presence_note?: string | null;
+  web_presence_evidence?: WebPresenceEvidence[];
   created_at: string;
   updated_at: string;
 }
