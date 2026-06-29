@@ -156,15 +156,19 @@ export function calculateSecurityStatus(input: {
         label: `Offener Vorfall: ${incident.title}`,
       });
     } else if (isInProgress(incident.status)) {
-      const impact = 10;
+      const impact =
+        incident.status === "documentation_open" ? 12 : incident.status === "waiting_feedback" ? 8 : 10;
       score -= impact;
       addDriver(drivers, {
         id: `incident-progress-${incident.id}`,
         title: `Unvollständiger Vorfall-Workflow: ${incident.title}`,
         asset: incident.responsible ?? "Incident-Response",
-        severity: "Hoch",
+        severity: incident.status === "documentation_open" ? "Kritisch" : "Hoch",
         impact,
-        recommendation: "Dokumentation vervollständigen und Abschluss im System markieren",
+        recommendation:
+          incident.status === "documentation_open"
+            ? "Dokumentation und Nachweise vervollständigen"
+            : "Dokumentation vervollständigen und Abschluss im System markieren",
         category: "incidents",
         label: `Vorfall in Bearbeitung: ${incident.title}`,
       });

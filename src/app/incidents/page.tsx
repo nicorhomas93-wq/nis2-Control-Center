@@ -27,9 +27,17 @@ export default async function IncidentsPage() {
       {isViewingMandant && <ActiveMandantBanner companyName={company?.company_name ?? null} />}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Sicherheitsvorfall</h1>
-        <p className="mt-1 text-slate-500">Vorfälle dokumentieren und Meldeberichte erstellen.</p>
+        <p className="mt-1 text-slate-500">
+          Vorfälle dokumentieren, Incident Response bearbeiten und Nachweise erzeugen.
+        </p>
       </div>
-      {company && <IncidentsPageClient companyId={company.id} initialIncidents={incidents} />}
+      {company && (
+        <IncidentsPageClient
+          companyId={company.id}
+          companyName={company.company_name ?? undefined}
+          initialIncidents={incidents}
+        />
+      )}
     </DashboardShell>
   );
 }

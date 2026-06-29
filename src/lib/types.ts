@@ -18,7 +18,14 @@ export type MeasureStatus = "open" | "in_progress" | "completed";
 export type MeasurePriority = "high" | "medium" | "low";
 export type DocumentStatus = "draft" | "published";
 export type RiskLevel = "high" | "medium" | "low";
-export type IncidentStatus = "open" | "investigating" | "resolved" | "closed";
+export type IncidentStatus =
+  | "open"
+  | "investigating"
+  | "waiting_feedback"
+  | "documentation_open"
+  | "completed"
+  | "resolved"
+  | "closed";
 
 export interface Profile {
   id: string;
@@ -171,6 +178,28 @@ export interface Incident {
   deadline?: string | null;
   escalation_level?: number | null;
   responsible?: string | null;
+  incident_summary?: string | null;
+  root_cause?: string | null;
+  affected_assets?: string | null;
+  affected_persons?: string | null;
+  affected_systems?: string | null;
+  data_categories?: string | null;
+  estimated_impact?: string | null;
+  containment_actions?: import("@/lib/incidents/types").IncidentActionItem[] | null;
+  corrective_actions?: import("@/lib/incidents/types").IncidentActionItem[] | null;
+  preventive_actions?: import("@/lib/incidents/types").IncidentActionItem[] | null;
+  communication_required?: boolean;
+  employee_letter_required?: boolean;
+  employee_recipient_name?: string | null;
+  employee_recipient_email?: string | null;
+  employee_letter_text?: string | null;
+  management_report_text?: string | null;
+  audit_report_text?: string | null;
+  completion_notes?: string | null;
+  completed_at?: string | null;
+  completed_by?: string | null;
+  evidence_links?: string | null;
+  generated_documents?: import("@/lib/incidents/types").GeneratedIncidentDocument[] | null;
   created_at: string;
   updated_at: string;
 }

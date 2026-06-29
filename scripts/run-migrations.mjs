@@ -44,11 +44,13 @@ const ORDER = [
   "add_b2b_outreach_location.sql",
   "add_b2b_outreach_web_presence.sql",
   "add_customer_messages.sql",
+  "add_customer_message_automation.sql",
   "add_compliance_engine.sql",
   "add_risk_quality_fields.sql",
   "add_company_assets.sql",
   "add_compliance_events.sql",
   "add_risk_treatment_status.sql",
+  "add_incident_response_fields.sql",
 ];
 
 const url = process.env.DATABASE_URL;

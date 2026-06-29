@@ -6,11 +6,20 @@ export function normalizeCriticality(value: string | null | undefined): Critical
 }
 
 export function isWorkComplete(status: string): boolean {
-  return status === "completed" || status === "resolved" || status === "closed";
+  return (
+    status === "completed" ||
+    status === "resolved" ||
+    status === "closed"
+  );
 }
 
 export function isInProgress(status: string): boolean {
-  return status === "in_progress" || status === "investigating";
+  return (
+    status === "in_progress" ||
+    status === "investigating" ||
+    status === "waiting_feedback" ||
+    status === "documentation_open"
+  );
 }
 
 export function resolveObligationStatus(input: {
