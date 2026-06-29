@@ -312,7 +312,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
           </CardHeader>
           <CardContent>
             <form
-              className="grid gap-3 grid-cols-2"
+              className="grid gap-3 sm:grid-cols-2"
               onSubmit={async (e) => {
                 e.preventDefault();
                 await apiCall("/api/jarvis/outreach/leads", "POST", form);
@@ -344,7 +344,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                 <div
                   key={key}
                   className={
-                    key === "company_name" || key === "hints" ? "col-span-2" : ""
+                    key === "company_name" || key === "hints" ? "sm:col-span-2" : ""
                   }
                 >
                   <label className="mb-1 block text-xs font-medium text-slate-600">{label}</label>
@@ -356,7 +356,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                   />
                 </div>
               ))}
-              <div className="flex gap-2 col-span-2">
+              <div className="flex gap-2 sm:col-span-2">
                 <Button type="submit" disabled={!!loading}>
                   Speichern
                 </Button>

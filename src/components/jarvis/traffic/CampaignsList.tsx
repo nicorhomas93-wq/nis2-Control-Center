@@ -16,7 +16,7 @@ export function CampaignsList({ campaigns }: { campaigns: TrafficCampaign[] }) {
   }
 
   return (
-    <div className="grid gap-4 grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-2">
       {campaigns.map((campaign) => (
         <Card key={campaign.id}>
           <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">

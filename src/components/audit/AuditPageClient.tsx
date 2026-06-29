@@ -214,7 +214,7 @@ export function AuditPageClient({
   if (!profileComplete) {
     return (
       <Card className="border-amber-200 bg-amber-50">
-        <CardContent className="flex gap-4 pt-6 flex-row items-center justify-between">
+        <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-3">
             <Building2 className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
             <div>
@@ -273,7 +273,7 @@ export function AuditPageClient({
 
         {documents.length === 0 && (
           <Card>
-            <CardContent className="flex gap-4 pt-6 flex-row items-center justify-between">
+            <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium text-slate-900">Noch keine Dokumente vorhanden</p>
                 <p className="mt-1 text-sm text-slate-500">
@@ -304,7 +304,7 @@ export function AuditPageClient({
             {folderStatuses.map((item) => (
               <div
                 key={item.folderName}
-                className="flex gap-3 rounded-lg border border-slate-200 p-4 flex-row items-center justify-between"
+                className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">

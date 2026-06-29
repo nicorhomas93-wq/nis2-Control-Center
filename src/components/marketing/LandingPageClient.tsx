@@ -167,7 +167,7 @@ export function LandingPageClient() {
             <Shield className="h-4 w-4" />
             NIS2 betrifft mehr Mittelständler als Sie denken
           </div>
-          <h1 className="mx-auto max-w-3xl font-bold tracking-tight text-5xl">
+          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
             Sind Sie NIS2-pflichtig — und können Sie das morgen beweisen?
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-600">
@@ -179,7 +179,7 @@ export function LandingPageClient() {
             Das TKND NIS2 Control Center bringt Sie von der Betroffenheitsprüfung bis zum
             fertigen Audit-Ordner. Nicht irgendwann. Jetzt.
           </p>
-          <div className="mt-8 flex items-center justify-center gap-3 flex-row">
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <PrimaryCta />
             <SecondaryCta />
           </div>
@@ -240,7 +240,7 @@ export function LandingPageClient() {
             <br />
             Die Frage ist: Sind Sie vorbereitet, wenn es passiert?
           </p>
-          <div className="mx-auto mt-10 grid max-w-3xl gap-4 grid-cols-3">
+          <div className="mx-auto mt-10 grid max-w-3xl gap-4 sm:grid-cols-3">
             {triggerStats.map((stat) => (
               <div
                 key={stat.value}
@@ -278,7 +278,7 @@ export function LandingPageClient() {
           <p className="mx-auto mt-2 text-center font-medium text-slate-800">
             So kommen Sie von Unsicherheit zu Nachweis:
           </p>
-          <div className="mt-10 grid gap-4 grid-cols-3">
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {solutionSteps.map((step, i) => (
               <div
                 key={step.title}
@@ -307,7 +307,7 @@ export function LandingPageClient() {
           <h2 className="text-center text-3xl font-bold text-slate-900">
             Was Sie davon haben — in Klartext
           </h2>
-          <div className="mt-10 grid gap-6 grid-cols-2">
+          <div className="mt-10 grid gap-6 sm:grid-cols-2">
             {features.map(({ icon: Icon, title, description }) => (
               <div key={title} className="rounded-xl border border-slate-200 p-5">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50">
@@ -342,7 +342,7 @@ export function LandingPageClient() {
           <p className="mt-10 text-center text-sm font-semibold uppercase tracking-wide text-slate-500">
             Geeignet für
           </p>
-          <ul className="mt-4 grid gap-3 grid-cols-3">
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {audiences.map((item) => (
               <li
                 key={item}
@@ -369,7 +369,7 @@ export function LandingPageClient() {
           <p className="mx-auto mt-4 max-w-xl font-medium text-white">
             Jeder Tag ohne Stand ist ein Tag, an dem Sie nicht handlungsfähig sind.
           </p>
-          <div className="mt-8 flex items-center justify-center gap-3 flex-row">
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link href="/check">
               <Button size="lg" className="bg-brand-500 hover:bg-brand-400">
                 Kostenlosen NIS2-Check starten

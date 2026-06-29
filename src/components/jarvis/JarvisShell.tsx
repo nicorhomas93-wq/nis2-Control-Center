@@ -35,7 +35,7 @@ export function JarvisShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div>
-      <div className="mb-6 flex gap-4 flex-row items-start justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <Bot className="h-7 w-7 text-brand-600" />

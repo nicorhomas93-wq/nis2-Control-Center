@@ -33,7 +33,7 @@ export function AcquisitionDashboard({ overview }: { overview: Overview }) {
         </p>
       </div>
 
-      <div className="grid gap-4 grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map(({ label, value, icon: Icon }) => (
           <div key={label} className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -47,7 +47,7 @@ export function AcquisitionDashboard({ overview }: { overview: Overview }) {
 
       <PaidAdsPlaybook />
 
-      <div className="grid gap-6 grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-slate-200 bg-white p-5">
           <h3 className="font-semibold text-slate-900">ICP — Zielsegmente</h3>
           <ul className="mt-4 space-y-3">

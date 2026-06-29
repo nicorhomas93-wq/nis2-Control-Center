@@ -74,7 +74,7 @@ export function DashboardActions({
 
       {missingCount > 0 && (
         <Card className="mb-6 border-amber-200 bg-amber-50">
-          <CardContent className="flex gap-4 pt-6 flex-row items-center justify-between">
+          <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium text-amber-900">
                 {missingCount} Dokument{missingCount === 1 ? "" : "e"} fehlen im Audit-Ordner

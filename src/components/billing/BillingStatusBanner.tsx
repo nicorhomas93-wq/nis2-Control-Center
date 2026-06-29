@@ -42,7 +42,7 @@ export function BillingStatusBanner({ company, platformOwner = false }: BillingS
         : "bg-slate-100 text-slate-700";
 
   return (
-    <div className="mb-6 flex gap-3 rounded-xl border border-slate-200 bg-white p-4 flex-row items-center justify-between">
+    <div className="mb-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-center gap-2">
         <Badge className="bg-brand-100 text-brand-800">{planLabel}</Badge>
         <Badge className={statusBadgeClass}>{statusLabel}</Badge>

@@ -86,8 +86,8 @@ export function CompanyProfileForm({ initialData, companyId }: CompanyProfileFor
           <CardTitle>Allgemeine Unternehmensdaten</CardTitle>
           <CardDescription>Grundlegende Informationen für die NIS2-Betroffenheitsprüfung.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 grid-cols-2">
-          <div className="col-span-2">
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
             <Label htmlFor="company_name">Unternehmensname</Label>
             <Input id="company_name" value={form.company_name} onChange={(e) => updateField("company_name", e.target.value)} required />
           </div>
@@ -127,7 +127,7 @@ export function CompanyProfileForm({ initialData, companyId }: CompanyProfileFor
           <CardTitle>IT- und Geschäftsumfeld</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Checkbox id="eu_operations" label="EU-weit tätig" checked={form.eu_operations} onChange={(e) => updateField("eu_operations", e.target.checked)} />
             <Checkbox id="uses_microsoft_365" label="Microsoft 365 Nutzung" checked={form.uses_microsoft_365} onChange={(e) => updateField("uses_microsoft_365", e.target.checked)} />
             <Checkbox id="uses_cloud_services" label="Cloud-Dienste" checked={form.uses_cloud_services} onChange={(e) => updateField("uses_cloud_services", e.target.checked)} />
@@ -145,7 +145,7 @@ export function CompanyProfileForm({ initialData, companyId }: CompanyProfileFor
         <CardHeader>
           <CardTitle>Ansprechpartner Informationssicherheit</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 grid-cols-2">
+        <CardContent className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="security_contact_name">Name</Label>
             <Input id="security_contact_name" value={form.security_contact_name} onChange={(e) => updateField("security_contact_name", e.target.value)} />

@@ -21,7 +21,7 @@ export function ActiveMandantBanner({ companyName }: ActiveMandantBannerProps) {
   }
 
   return (
-    <div className="mb-6 flex gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 flex-row items-center justify-between">
+    <div className="mb-6 flex flex-col gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
         <Building2 className="h-5 w-5 shrink-0 text-brand-600" />
         <div>

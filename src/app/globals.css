@@ -28,52 +28,6 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
-  min-width: 1280px;
-}
-
-/* Desktop-Layout: horizontales Scrollen, keine Mobile-Umbrüche */
-.desktop-scroll-shell {
-  position: relative;
-  -webkit-overflow-scrolling: touch;
-}
-
-.desktop-scroll-shell::before,
-.desktop-scroll-shell::after {
-  content: "";
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  width: 28px;
-  pointer-events: none;
-  z-index: 60;
-}
-
-.desktop-scroll-shell::before {
-  left: 0;
-  background: linear-gradient(to right, rgba(15, 23, 42, 0.1), transparent);
-}
-
-.desktop-scroll-shell::after {
-  right: 0;
-  background: linear-gradient(to left, rgba(15, 23, 42, 0.1), transparent);
-}
-
-.desktop-layout-canvas {
-  min-width: 1280px;
-}
-
-@media (max-width: 1279px) {
-  .desktop-scroll-shell::before,
-  .desktop-scroll-shell::after {
-    opacity: 1;
-  }
-}
-
-@media (min-width: 1280px) {
-  .desktop-scroll-shell::before,
-  .desktop-scroll-shell::after {
-    opacity: 0;
-  }
 }
 
 /* Dokument-Markdown (Bildschirm) */
@@ -156,19 +110,6 @@ body {
 
 /* Druck / PDF */
 @media print {
-  .desktop-scroll-shell::before,
-  .desktop-scroll-shell::after {
-    display: none !important;
-  }
-
-  body {
-    min-width: 0 !important;
-  }
-
-  .desktop-layout-canvas {
-    min-width: 0 !important;
-  }
-
   @page {
     size: A4;
     margin: 14mm 12mm 16mm 12mm;

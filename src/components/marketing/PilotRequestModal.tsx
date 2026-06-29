@@ -34,10 +34,10 @@ export function PilotRequestModal({ open, onClose, defaultMessage }: PilotReques
       aria-modal="true"
       aria-labelledby="pilot-request-title"
     >
-      <div className="flex min-h-full items-center justify-center p-6">
+      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
         <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />
-        <div className="relative z-10 flex w-full max-h-[90vh] flex-col overflow-hidden rounded-xl bg-white shadow-xl max-w-xl">
-          <div className="shrink-0 border-b border-slate-100 py-4 px-6">
+        <div className="relative z-10 flex w-full max-w-[95vw] max-h-[90vh] flex-col overflow-hidden rounded-xl bg-white shadow-xl sm:max-w-xl">
+          <div className="shrink-0 border-b border-slate-100 px-4 py-4 md:px-6">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 pr-2">
                 <h2 id="pilot-request-title" className="text-lg font-bold text-slate-900">
@@ -58,7 +58,7 @@ export function PilotRequestModal({ open, onClose, defaultMessage }: PilotReques
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 md:px-6 md:py-5">
             <PilotRequestForm
               defaultMessage={defaultMessage}
               layout="modal"

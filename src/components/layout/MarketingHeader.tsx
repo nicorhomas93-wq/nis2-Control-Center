@@ -6,7 +6,7 @@ import { AuthNavActions } from "@/components/auth/AuthNavActions";
 export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4">
         <Link href="/" className="flex min-w-0 shrink items-center gap-2">
           <Shield className="h-7 w-7 shrink-0 text-brand-600" />
           <div className="min-w-0">
@@ -15,7 +15,7 @@ export function MarketingHeader() {
           </div>
         </Link>
 
-        <nav className="items-center gap-6 text-sm text-slate-600 flex">
+        <nav className="hidden items-center gap-6 text-sm text-slate-600 md:flex">
           <Link href="/demo" className="hover:text-brand-600">
             Demo
           </Link>
@@ -31,7 +31,8 @@ export function MarketingHeader() {
           <AuthNavActions />
           <Link href="/check" className="shrink-0">
             <Button size="sm" className="whitespace-nowrap">
-              NIS2-Check starten
+              <span className="sm:hidden">Check</span>
+              <span className="hidden sm:inline">NIS2-Check starten</span>
             </Button>
           </Link>
         </div>

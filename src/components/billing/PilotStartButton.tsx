@@ -60,7 +60,7 @@ export function PilotStartButton({
   return (
     <div className={className}>
       <Button
-        className="w-auto"
+        className="w-full sm:w-auto"
         size={size}
         variant={variant}
         disabled={loading}

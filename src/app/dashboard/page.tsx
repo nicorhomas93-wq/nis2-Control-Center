@@ -118,7 +118,7 @@ export default async function DashboardPage({
 
       {!profileComplete && !missingTable && (
         <Card className="mb-8 border-brand-200 bg-brand-50">
-          <CardContent className="flex justify-between gap-4 pt-6 flex-row items-center">
+          <CardContent className="flex flex-col items-start justify-between gap-4 pt-6 sm:flex-row sm:items-center">
             <div className="flex items-start gap-3">
               <Building2 className="mt-0.5 h-5 w-5 text-brand-600" />
               <div>
@@ -148,7 +148,7 @@ export default async function DashboardPage({
         />
       )}
 
-      <div className="mb-8 grid gap-4 grid-cols-5">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-slate-500">Audit-Score</p>
@@ -186,7 +186,7 @@ export default async function DashboardPage({
         </Card>
       </div>
 
-      <div className="mb-8 grid gap-4 grid-cols-2">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-slate-500">NIS2-Status</p>
