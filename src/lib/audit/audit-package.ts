@@ -1,57 +1,80 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import type { Document } from "@/lib/types";
+import type { Company, Document, Measure, Risk } from "@/lib/types";
 import { AUDIT_FOLDERS } from "@/lib/audit/audit-folders";
+import { getAuditFolderPdfBasename } from "@/lib/audit/audit-folder-quality";
 import { buildAuditReadme } from "@/lib/audit/audit-summary";
-import { generateAuditPackageFileName, generateDocumentFileNameFromDocument } from "@/lib/fileNaming";
-import { buildFullMarkdownExport } from "@/lib/documents/export";
-import { generateDocumentPdfBlob } from "@/lib/documents/pdf-export";
+import {
+  buildAuditDocumentPdfHtml,
+  buildAuditSummaryPdfHtml,
+  buildPlaceholderAuditPdfHtml,
+} from "@/lib/audit/audit-pdf";
+import { generateAuditPackageFileName } from "@/lib/fileNaming";
+import { generatePdfBlobFromHtml } from "@/lib/documents/pdf-export";
 
 export interface DownloadAuditPackageOptions {
   documents: Document[];
   companyName?: string;
+  company?: Pick<Company, "company_name" | "nis2_status" | "security_contact_name"> | null;
   summaryText: string;
+  risks?: Risk[];
+  measures?: Measure[];
+  folderStatuses?: ReturnType<typeof import("@/lib/audit/audit-folders").getAuditFolderStatuses>;
   onProgress?: (message: string) => void;
 }
 
 /**
- * Erstellt und lädt das Audit-ZIP mit PDFs (oder Markdown-Fallback) herunter.
+ * Erstellt und lädt das Audit-ZIP mit PDFs je Bereich (inkl. Platzhalter) herunter.
  */
 export async function downloadAuditPackage({
   documents,
   companyName,
+  company,
   summaryText,
+  risks = [],
+  measures = [],
+  folderStatuses,
   onProgress,
 }: DownloadAuditPackageOptions): Promise<string> {
   const zip = new JSZip();
   const exportDate = new Date();
 
-  zip.file("README_Audit_Ordner.txt", buildAuditReadme(companyName));
+  onProgress?.("Audit-Paket wird vorbereitet…");
+
+  zip.file(
+    "README_Audit_Ordner.txt",
+    buildAuditReadme(companyName, folderStatuses, exportDate)
+  );
   zip.file("Audit_Zusammenfassung.txt", summaryText);
 
-  let pdfCount = 0;
+  onProgress?.("Audit-Zusammenfassung als PDF wird erstellt…");
+  const summaryPdf = await generatePdfBlobFromHtml(
+    buildAuditSummaryPdfHtml(summaryText, companyName),
+    "Audit_Zusammenfassung.pdf"
+  );
+  zip.file("Audit_Zusammenfassung.pdf", summaryPdf.blob);
 
   for (const folder of AUDIT_FOLDERS) {
     const doc = documents.find((d) => d.document_type === folder.documentType);
-    if (!doc) continue;
-
-    const pdfFilename = generateDocumentFileNameFromDocument(doc, companyName, "pdf", exportDate);
-    const zipPath = `${folder.folderName}/${pdfFilename}`;
+    const status = folderStatuses?.find((s) => s.folderName === folder.folderName);
+    const quality = status?.quality;
+    const pdfName = `${getAuditFolderPdfBasename(folder.folderName)}.pdf`;
+    const zipPath = `${folder.folderName}/${pdfName}`;
+    const ctx = { company, risks, measures, quality };
 
     try {
       onProgress?.(`PDF wird erstellt: ${folder.label}…`);
-      const { blob } = await generateDocumentPdfBlob(doc, companyName);
+      const html = doc
+        ? buildAuditDocumentPdfHtml(doc, folder, companyName, ctx)
+        : buildPlaceholderAuditPdfHtml(folder, companyName, ctx);
+      const { blob } = await generatePdfBlobFromHtml(html, pdfName);
       zip.file(zipPath, blob);
-      pdfCount++;
     } catch {
-      onProgress?.(`PDF-Fallback (Markdown): ${folder.label}…`);
-      const mdFilename = generateDocumentFileNameFromDocument(doc, companyName, "md", exportDate);
-      zip.file(`${folder.folderName}/${mdFilename}`, buildFullMarkdownExport(doc));
+      onProgress?.(`PDF-Fallback: ${folder.label}…`);
+      const html = buildPlaceholderAuditPdfHtml(folder, companyName, ctx);
+      const { blob } = await generatePdfBlobFromHtml(html, pdfName);
+      zip.file(zipPath, blob);
     }
-  }
-
-  if (pdfCount === 0 && documents.length > 0) {
-    onProgress?.("Keine PDFs erzeugbar — Markdown-Dateien werden verwendet.");
   }
 
   onProgress?.("ZIP-Archiv wird zusammengestellt…");

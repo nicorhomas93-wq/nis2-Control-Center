@@ -1,5 +1,18 @@
-import type { Document, DocumentType } from "@/lib/types";
+import type { Company, Document, DocumentType } from "@/lib/types";
 import { getDocumentTypeLabel } from "@/lib/nis2/document-types";
+import {
+  evaluateAuditFolderQuality,
+  type AuditFolderQuality,
+  type AuditAreaDisplayStatus,
+} from "@/lib/audit/audit-folder-quality";
+
+export type { AuditFolderQuality, AuditAreaDisplayStatus };
+export {
+  AUDIT_STATUS_LABELS,
+  AUDIT_STATUS_BADGE_CLASS,
+  evaluateAuditFolderQuality,
+  getAuditFolderPdfBasename,
+} from "@/lib/audit/audit-folder-quality";
 
 export interface AuditFolderDefinition {
   folderName: string;
@@ -67,6 +80,8 @@ export interface AuditFolderStatus {
   label: string;
   present: boolean;
   document?: Document;
+  quality: AuditFolderQuality;
+  displayStatus: AuditAreaDisplayStatus;
 }
 
 export function getDocumentForFolder(
@@ -76,15 +91,21 @@ export function getDocumentForFolder(
   return documents.find((d) => d.document_type === documentType);
 }
 
-export function getAuditFolderStatuses(documents: Document[]): AuditFolderStatus[] {
+export function getAuditFolderStatuses(
+  documents: Document[],
+  company?: Pick<Company, "security_contact_name"> | null
+): AuditFolderStatus[] {
   return AUDIT_FOLDERS.map((folder) => {
     const document = getDocumentForFolder(documents, folder.documentType);
+    const quality = evaluateAuditFolderQuality(document, company);
     return {
       folderName: folder.folderName,
       documentType: folder.documentType,
       label: folder.label,
       present: Boolean(document),
       document,
+      quality,
+      displayStatus: quality.status,
     };
   });
 }
@@ -95,15 +116,60 @@ export function getMissingAuditDocumentTypes(documents: Document[]): DocumentTyp
   ).map((f) => f.documentType);
 }
 
-export function calculateAuditFolderScore(documents: Document[]): {
+export function calculateDetailedAuditFolderScore(
+  documents: Document[],
+  company?: Pick<Company, "security_contact_name"> | null
+): {
+  percent: number;
+  complete: number;
+  incomplete: number;
+  missing: number;
+  total: number;
+  areas: Array<{
+    folderName: string;
+    label: string;
+    quality: AuditFolderQuality;
+  }>;
+} {
+  const areas = AUDIT_FOLDERS.map((folder) => {
+    const document = getDocumentForFolder(documents, folder.documentType);
+    const quality = evaluateAuditFolderQuality(document, company);
+    return { folderName: folder.folderName, label: folder.label, quality };
+  });
+
+  const total = areas.length;
+  const complete = areas.filter((a) => a.quality.status === "complete").length;
+  const missing = areas.filter((a) => a.quality.status === "missing").length;
+  const incomplete = total - complete - missing;
+  const percent =
+    total > 0
+      ? Math.round(areas.reduce((sum, a) => sum + a.quality.scorePercent, 0) / total)
+      : 0;
+
+  return { percent, complete, incomplete, missing, total, areas };
+}
+
+export function calculateAuditFolderScore(
+  documents: Document[],
+  company?: Pick<Company, "security_contact_name"> | null
+): {
   present: number;
   total: number;
   percent: number;
+  complete: number;
+  incomplete: number;
+  missing: number;
 } {
-  const total = AUDIT_FOLDERS.length;
-  const present = getAuditFolderStatuses(documents).filter((s) => s.present).length;
-  const percent = total > 0 ? Math.round((present / total) * 100) : 0;
-  return { present, total, percent };
+  const detailed = calculateDetailedAuditFolderScore(documents, company);
+  const present = detailed.total - detailed.missing;
+  return {
+    present,
+    total: detailed.total,
+    percent: detailed.percent,
+    complete: detailed.complete,
+    incomplete: detailed.incomplete,
+    missing: detailed.missing,
+  };
 }
 
 export function getAuditFolderName(documentType: string): string | undefined {

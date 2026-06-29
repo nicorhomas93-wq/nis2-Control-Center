@@ -163,14 +163,10 @@ async function renderBlocksToPdf(
   }
 }
 
-export async function generateDocumentPdfBlob(
-  doc: Document,
-  companyName?: string
+export async function generatePdfBlobFromHtml(
+  html: string,
+  filename: string
 ): Promise<{ blob: Blob; filename: string }> {
-  const mode = resolveGenerationMode(doc);
-  const html = buildPrintHtml(doc, companyName, mode, true);
-  const filename = generateDocumentFileNameFromDocument(doc, companyName, "pdf");
-
   const { default: jsPDF } = await import("jspdf");
   const { iframe, body, generatedAt } = await createRenderFrame(html);
 
@@ -182,6 +178,16 @@ export async function generateDocumentPdfBlob(
   } finally {
     document.body.removeChild(iframe);
   }
+}
+
+export async function generateDocumentPdfBlob(
+  doc: Document,
+  companyName?: string
+): Promise<{ blob: Blob; filename: string }> {
+  const mode = resolveGenerationMode(doc);
+  const html = buildPrintHtml(doc, companyName, mode, true);
+  const filename = generateDocumentFileNameFromDocument(doc, companyName, "pdf");
+  return generatePdfBlobFromHtml(html, filename);
 }
 
 export async function downloadDocumentPdf(

@@ -6,13 +6,15 @@ import { useRouter } from "next/navigation";
 import type { Company, Document, DocumentType, Measure, Nis2Status, Risk } from "@/lib/types";
 import {
   AUDIT_FOLDERS,
+  AUDIT_STATUS_BADGE_CLASS,
+  AUDIT_STATUS_LABELS,
   calculateAuditFolderScore,
   getAuditFolderStatuses,
   getMissingAuditDocumentTypes,
 } from "@/lib/audit/audit-folders";
 import { downloadAuditPackage } from "@/lib/audit/audit-package";
+import { downloadAuditAreaPdf } from "@/lib/audit/audit-pdf";
 import { buildStructuredAuditSummary } from "@/lib/audit/audit-summary";
-import { downloadDocumentPdf } from "@/lib/documents/pdf-export";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -20,7 +22,6 @@ import { DocumentViewer } from "@/components/documents/DocumentViewer";
 import {
   AlertTriangle,
   Building2,
-  CheckCircle2,
   Download,
   Eye,
   FileDown,
@@ -28,12 +29,13 @@ import {
   FolderArchive,
   Loader2,
   Plus,
-  XCircle,
 } from "lucide-react";
 
 interface AuditPageClientProps {
   companyId: string;
   companyName?: string;
+  securityContactName?: string | null;
+  securityScore?: number;
   nis2Status: Nis2Status;
   complianceScore: number;
   profileComplete: boolean;
@@ -42,9 +44,16 @@ interface AuditPageClientProps {
   initialRisks: Risk[];
 }
 
+const EXPORT_PREP_MESSAGE = "Audit-Paket wird vorbereitet…";
+const EXPORT_SUCCESS_MESSAGE = "Audit-Paket erfolgreich erstellt.";
+const EXPORT_ERROR_MESSAGE =
+  "Export konnte nicht erstellt werden. Bitte prüfen Sie fehlende Inhalte.";
+
 export function AuditPageClient({
   companyId,
   companyName,
+  securityContactName,
+  securityScore = 0,
   nis2Status,
   complianceScore,
   profileComplete,
@@ -60,6 +69,7 @@ export function AuditPageClient({
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [zipLoading, setZipLoading] = useState(false);
   const [zipProgress, setZipProgress] = useState<string | null>(null);
+  const [exportSuccess, setExportSuccess] = useState<string | null>(null);
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchProgress, setBatchProgress] = useState<string | null>(null);
   const [loadingType, setLoadingType] = useState<DocumentType | null>(null);
@@ -67,20 +77,28 @@ export function AuditPageClient({
   const [viewDoc, setViewDoc] = useState<Document | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const auditScore = useMemo(() => calculateAuditFolderScore(documents), [documents]);
-  const folderStatuses = useMemo(() => getAuditFolderStatuses(documents), [documents]);
-  const missingTypes = useMemo(() => getMissingAuditDocumentTypes(documents), [documents]);
-
-  const companyStub: Company = useMemo(
+  const companyCtx = useMemo(
     () =>
       ({
         id: companyId,
         nis2_status: nis2Status,
         compliance_score: complianceScore,
         company_name: companyName ?? null,
+        security_contact_name: securityContactName ?? null,
+        security_score: securityScore,
       }) as Company,
-    [companyId, nis2Status, complianceScore, companyName]
+    [companyId, nis2Status, complianceScore, companyName, securityContactName, securityScore]
   );
+
+  const auditScore = useMemo(
+    () => calculateAuditFolderScore(documents, companyCtx),
+    [documents, companyCtx]
+  );
+  const folderStatuses = useMemo(
+    () => getAuditFolderStatuses(documents, companyCtx),
+    [documents, companyCtx]
+  );
+  const missingTypes = useMemo(() => getMissingAuditDocumentTypes(documents), [documents]);
 
   function upsertDocument(doc: Document) {
     setDocuments((prev) => {
@@ -145,6 +163,8 @@ export function AuditPageClient({
   async function handleCreateSummary() {
     setSummaryLoading(true);
     setError(null);
+    setExportSuccess(null);
+    setZipProgress(EXPORT_PREP_MESSAGE);
 
     const res = await fetch("/api/generate-audit-summary", {
       method: "POST",
@@ -154,60 +174,75 @@ export function AuditPageClient({
     const data = await res.json();
 
     if (!res.ok) {
-      setError(data.error ?? "Audit-Zusammenfassung fehlgeschlagen");
+      setError(data.error ?? EXPORT_ERROR_MESSAGE);
       setSummaryLoading(false);
+      setZipProgress(null);
       return;
     }
 
     setSummaryText(data.summary_text ?? data.export?.summary_text ?? null);
+    setExportSuccess(EXPORT_SUCCESS_MESSAGE);
+    setZipProgress(null);
     setSummaryLoading(false);
   }
 
   function getSummaryForExport(): string {
     if (summaryText) return summaryText;
     return buildStructuredAuditSummary({
-      company: companyStub,
+      company: companyCtx,
       documents,
       measures,
       risks,
+      securityScore,
     });
   }
 
   async function handleDownloadZip() {
-    if (documents.length === 0) {
-      setError("Noch keine Dokumente vorhanden. Bitte zuerst Dokumente generieren.");
-      return;
-    }
-
     setZipLoading(true);
     setError(null);
-    setZipProgress("Audit-Paket wird vorbereitet…");
+    setExportSuccess(null);
+    setZipProgress(EXPORT_PREP_MESSAGE);
 
     try {
-      const filename = await downloadAuditPackage({
+      await downloadAuditPackage({
         documents,
         companyName,
+        company: companyCtx,
         summaryText: getSummaryForExport(),
+        risks,
+        measures,
+        folderStatuses,
         onProgress: setZipProgress,
       });
-      setZipProgress(`Heruntergeladen: ${filename}`);
+      setExportSuccess(EXPORT_SUCCESS_MESSAGE);
+      setZipProgress(null);
     } catch {
-      setError("ZIP-Export fehlgeschlagen. Bitte erneut versuchen.");
+      setError(EXPORT_ERROR_MESSAGE);
       setZipProgress(null);
     } finally {
       setZipLoading(false);
     }
   }
 
-  async function handlePdfDownload(doc: Document, type: DocumentType) {
-    setPdfLoadingType(type);
+  async function handlePdfDownload(item: (typeof folderStatuses)[number]) {
+    setPdfLoadingType(item.documentType);
     setError(null);
+    setExportSuccess(null);
+    setZipProgress(EXPORT_PREP_MESSAGE);
+
     try {
-      await downloadDocumentPdf(doc, companyName);
+      await downloadAuditAreaPdf(item.document, item.documentType, companyName, {
+        company: companyCtx,
+        risks,
+        measures,
+        quality: item.quality,
+      });
+      setExportSuccess(EXPORT_SUCCESS_MESSAGE);
     } catch {
-      setError("PDF-Download fehlgeschlagen.");
+      setError(EXPORT_ERROR_MESSAGE);
     } finally {
       setPdfLoadingType(null);
+      setZipProgress(null);
     }
   }
 
@@ -242,8 +277,8 @@ export function AuditPageClient({
               Audit-Vorbereitungsstand
             </CardTitle>
             <CardDescription>
-              Audit-Ordner zu {auditScore.percent} % vollständig ({auditScore.present} von{" "}
-              {auditScore.total} Dokumenten)
+              Inhaltlich bewertet: {auditScore.complete} vollständig · {auditScore.incomplete}{" "}
+              unvollständig · {auditScore.missing} fehlend (von {auditScore.total} Bereichen)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -254,6 +289,17 @@ export function AuditPageClient({
               />
             </div>
             <p className="text-2xl font-bold text-slate-900">{auditScore.percent} %</p>
+            {auditScore.percent < 100 && (
+              <p className="mt-2 text-sm text-amber-800">
+                Es bestehen noch offene Punkte, die vor einer Prüfung bearbeitet werden sollten.
+              </p>
+            )}
+            {auditScore.percent >= 100 && (
+              <p className="mt-2 text-sm text-emerald-800">
+                Der aktuelle Stand spricht für eine gute interne Vorbereitung. Eine externe Prüfung
+                oder Rechtsberatung wird dadurch nicht ersetzt.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -298,7 +344,7 @@ export function AuditPageClient({
         <Card>
           <CardHeader>
             <CardTitle>Dokumentstatus</CardTitle>
-            <CardDescription>10 Audit-Bereiche mit Status und Aktionen</CardDescription>
+            <CardDescription>10 Audit-Bereiche mit inhaltlicher Bewertung</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {folderStatuses.map((item) => (
@@ -311,15 +357,12 @@ export function AuditPageClient({
                     <span className="font-mono text-xs font-medium text-brand-600">
                       {item.folderName}
                     </span>
-                    {item.present ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                        <CheckCircle2 className="h-3 w-3" /> vorhanden
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-                        <XCircle className="h-3 w-3" /> fehlt
-                      </span>
-                    )}
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${AUDIT_STATUS_BADGE_CLASS[item.displayStatus]}`}
+                    >
+                      {AUDIT_STATUS_LABELS[item.displayStatus]}
+                    </span>
+                    <span className="text-xs text-slate-500">{item.quality.scorePercent} %</span>
                   </div>
                   <p className="mt-1 font-medium text-slate-900">{item.label}</p>
                   {item.document && (
@@ -327,6 +370,9 @@ export function AuditPageClient({
                       Version v{item.document.version ?? 1} · Zuletzt aktualisiert:{" "}
                       {formatDate(item.document.updated_at)}
                     </p>
+                  )}
+                  {item.quality.issues.length > 0 && (
+                    <p className="mt-1 text-xs text-amber-700">{item.quality.issues.join(" · ")}</p>
                   )}
                 </div>
 
@@ -344,7 +390,7 @@ export function AuditPageClient({
                         size="sm"
                         variant="outline"
                         disabled={pdfLoadingType === item.documentType}
-                        onClick={() => handlePdfDownload(item.document!, item.documentType)}
+                        onClick={() => handlePdfDownload(item)}
                       >
                         {pdfLoadingType === item.documentType ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -355,19 +401,34 @@ export function AuditPageClient({
                       </Button>
                     </>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={loadingType === item.documentType || batchLoading}
-                      onClick={() => handleGenerateSingle(item.documentType)}
-                    >
-                      {loadingType === item.documentType ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Plus className="h-3 w-3" />
-                      )}
-                      Dokument generieren
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={pdfLoadingType === item.documentType}
+                        onClick={() => handlePdfDownload(item)}
+                      >
+                        {pdfLoadingType === item.documentType ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <FileDown className="h-3 w-3" />
+                        )}
+                        PDF herunterladen
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={loadingType === item.documentType || batchLoading}
+                        onClick={() => handleGenerateSingle(item.documentType)}
+                      >
+                        {loadingType === item.documentType ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Plus className="h-3 w-3" />
+                        )}
+                        Dokument generieren
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -397,10 +458,10 @@ export function AuditPageClient({
                   )}
                 </Button>
               )}
-              <Button onClick={handleCreateSummary} disabled={summaryLoading}>
+              <Button onClick={handleCreateSummary} disabled={summaryLoading || zipLoading}>
                 {summaryLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Wird erstellt…
+                    <Loader2 className="h-4 w-4 animate-spin" /> {EXPORT_PREP_MESSAGE}
                   </>
                 ) : (
                   <>
@@ -408,14 +469,10 @@ export function AuditPageClient({
                   </>
                 )}
               </Button>
-              <Button
-                variant="outline"
-                onClick={handleDownloadZip}
-                disabled={zipLoading || documents.length === 0}
-              >
+              <Button variant="outline" onClick={handleDownloadZip} disabled={zipLoading || summaryLoading}>
                 {zipLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> {zipProgress ?? "ZIP wird erstellt…"}
+                    <Loader2 className="h-4 w-4 animate-spin" /> {zipProgress ?? EXPORT_PREP_MESSAGE}
                   </>
                 ) : (
                   <>
@@ -428,8 +485,12 @@ export function AuditPageClient({
             {batchProgress && batchLoading && (
               <p className="text-sm text-slate-600">{batchProgress}</p>
             )}
-            {zipProgress && !zipLoading && (
-              <p className="text-sm text-emerald-700">{zipProgress}</p>
+            {(zipProgress || exportSuccess) && (
+              <p
+                className={`text-sm ${exportSuccess ? "text-emerald-700" : "text-slate-600"}`}
+              >
+                {exportSuccess ?? zipProgress}
+              </p>
             )}
 
             {summaryText && (
@@ -448,6 +509,7 @@ export function AuditPageClient({
                   <li key={f.folderName}>{f.folderName}/</li>
                 ))}
                 <li>README_Audit_Ordner.txt</li>
+                <li>Audit_Zusammenfassung.pdf</li>
                 <li>Audit_Zusammenfassung.txt</li>
               </ul>
             </div>

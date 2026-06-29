@@ -54,6 +54,8 @@ export default async function AuditPage() {
         <AuditPageClient
           companyId={company.id}
           companyName={company.company_name ?? undefined}
+          securityContactName={company.security_contact_name}
+          securityScore={company.security_score ?? 0}
           nis2Status={company.nis2_status}
           complianceScore={company.compliance_score ?? 0}
           profileComplete={isCompanyProfileComplete(company)}
