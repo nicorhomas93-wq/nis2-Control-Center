@@ -9,8 +9,10 @@ import {
 import {
   deriveRiskProblemTitle,
   displayRiskField,
+  isPlaceholderValue,
   RISK_FIELD_FALLBACKS,
 } from "@/lib/compliance/risk-display";
+import { resolveRiskAsset } from "@/lib/assets/resolve";
 import type { CriticalityLevel, NextStepAction } from "@/lib/compliance/types";
 import type { Document, Incident, Measure, Risk } from "@/lib/types";
 
@@ -32,7 +34,9 @@ export function buildNextSteps(input: {
   measures: Measure[];
   risks: Risk[];
   incidents: Incident[];
+  assets?: import("@/lib/assets/types").CompanyAsset[];
 }): NextStepAction[] {
+  const assets = input.assets ?? [];
   const actions: NextStepAction[] = [];
 
   for (const measure of input.measures) {
@@ -97,7 +101,7 @@ export function buildNextSteps(input: {
       priority,
       deadline: risk.deadline ?? null,
       href: "/risks",
-      asset: displayRiskField(risk.asset, RISK_FIELD_FALLBACKS.asset),
+      asset: resolveRiskAsset(risk, assets).name,
       recommendation: measureText,
       sortScore:
         priorityWeight(priority) +

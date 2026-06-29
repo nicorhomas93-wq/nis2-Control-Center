@@ -7,10 +7,8 @@ import {
   normalizeCriticality,
   resolveObligationStatus,
 } from "@/lib/compliance/obligations";
-import {
-  deriveRiskProblemTitle,
-  isPlaceholderValue,
-} from "@/lib/compliance/risk-display";
+import { deriveRiskProblemTitle, isPlaceholderValue } from "@/lib/compliance/risk-display";
+import { resolveRiskAsset } from "@/lib/assets/resolve";
 import type {
   AuditReadinessResult,
   ScoreDriver,
@@ -76,7 +74,7 @@ export function calculateSecurityStatus(input: {
     addDriver(drivers, {
       id: `risk-open-${risk.id}`,
       title,
-      asset: isPlaceholderValue(risk.asset) ? "Nicht zugeordnet" : risk.asset,
+      asset: resolveRiskAsset(risk, []).name,
       severity,
       impact,
       recommendation:

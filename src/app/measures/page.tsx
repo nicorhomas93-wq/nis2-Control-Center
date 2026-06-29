@@ -4,7 +4,8 @@ import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { ActiveMandantBanner } from "@/components/consultant/ActiveMandantBanner";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceCompany } from "@/lib/company";
-import type { Measure } from "@/lib/types";
+import { ensureSuggestedAssets } from "@/lib/assets/sync";
+import type { CompanyAsset, Measure, Risk } from "@/lib/types";
 import { redirect } from "next/navigation";
 
 export default async function MeasuresPage() {
@@ -16,9 +17,16 @@ export default async function MeasuresPage() {
   if (!company && !missingTable) redirect("/login");
 
   let measures: Measure[] = [];
+  let risks: Risk[] = [];
+  let assets: CompanyAsset[] = [];
   if (company) {
-    const { data } = await supabase.from("measures").select("*").eq("company_id", company.id).order("created_at", { ascending: false });
-    measures = (data ?? []) as Measure[];
+    const [measRes, risksRes] = await Promise.all([
+      supabase.from("measures").select("*").eq("company_id", company.id).order("created_at", { ascending: false }),
+      supabase.from("risks").select("*").eq("company_id", company.id).order("created_at", { ascending: false }),
+    ]);
+    measures = (measRes.data ?? []) as Measure[];
+    risks = (risksRes.data ?? []) as Risk[];
+    assets = await ensureSuggestedAssets(supabase, company.id, company);
   }
 
   return (
@@ -29,7 +37,14 @@ export default async function MeasuresPage() {
         <h1 className="text-2xl font-bold text-slate-900">Maßnahmen</h1>
         <p className="mt-1 text-slate-500">Sicherheitsmaßnahmen mit Status und Priorität verwalten.</p>
       </div>
-      {company && <MeasuresPageClient companyId={company.id} initialMeasures={measures} />}
+      {company && (
+        <MeasuresPageClient
+          companyId={company.id}
+          initialMeasures={measures}
+          initialRisks={risks}
+          initialAssets={assets}
+        />
+      )}
     </DashboardShell>
   );
 }

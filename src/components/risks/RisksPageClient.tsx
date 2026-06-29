@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Risk } from "@/lib/types";
+import type { CompanyAsset, Risk } from "@/lib/types";
+import { resolveRiskAsset } from "@/lib/assets/resolve";
+import { ASSET_CATEGORY_LABELS } from "@/lib/assets/types";
+import { AssetPicker } from "@/components/assets/AssetPicker";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -26,11 +29,17 @@ const LEVEL_LABELS = { high: "Hoch", medium: "Mittel", low: "Niedrig" };
 interface RisksPageClientProps {
   companyId: string;
   initialRisks: Risk[];
+  initialAssets: CompanyAsset[];
 }
 
-export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProps) {
+export function RisksPageClient({
+  companyId,
+  initialRisks,
+  initialAssets,
+}: RisksPageClientProps) {
   const router = useRouter();
   const [risks, setRisks] = useState(initialRisks);
+  const [assets, setAssets] = useState(initialAssets);
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +65,9 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
     setRisks(data.risks ?? []);
     setAnalysis(data.analysis ?? null);
     setLoading(false);
+    const assetsRes = await fetch(`/api/assets?companyId=${companyId}`);
+    const assetsData = await assetsRes.json();
+    if (assetsRes.ok) setAssets(assetsData.assets ?? []);
     router.refresh();
   }
 
@@ -98,6 +110,34 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
         </CardContent>
       </Card>
 
+      {assets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Asset-Register</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-slate-600">
+              Jedes Risiko ist einem Asset mit Kategorie zugeordnet. Fehlt eine Zuordnung, gilt
+              automatisch „Allgemeines Unternehmensrisiko“.
+            </p>
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {assets.map((a) => (
+                <li
+                  key={a.id}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                >
+                  <p className="font-medium text-slate-900">{a.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {ASSET_CATEGORY_LABELS[a.category]} · Kritikalität:{" "}
+                    {a.criticality === "high" ? "Hoch" : a.criticality === "low" ? "Niedrig" : "Mittel"}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {risks.length > 0 && (
         <Card>
           <CardHeader><CardTitle>Risikomatrix</CardTitle></CardHeader>
@@ -106,6 +146,7 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
               <thead>
                 <tr className="border-b border-slate-100 text-left text-slate-500">
                   <th className="px-4 py-3 font-medium">Asset</th>
+                  <th className="px-4 py-3 font-medium">Kategorie</th>
                   <th className="px-4 py-3 font-medium">Bedrohung</th>
                   <th className="px-4 py-3 font-medium">Schwachstelle</th>
                   <th className="px-4 py-3 font-medium">Risiko</th>
@@ -133,10 +174,17 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
                         ? "bg-amber-100 text-amber-800"
                         : "bg-slate-100 text-slate-700";
 
-                  return (
+                    const resolvedAsset = resolveRiskAsset(r, assets);
+
+                    return (
                     <tr key={r.id} className="align-top">
                       <td className="px-4 py-4 font-medium text-slate-900">
-                        {displayRiskField(r.asset, RISK_FIELD_FALLBACKS.asset)}
+                        {resolvedAsset.name}
+                      </td>
+                      <td className="px-4 py-4">
+                        <Badge className="bg-slate-100 text-slate-700">
+                          {resolvedAsset.categoryLabel}
+                        </Badge>
                       </td>
                       <td className="px-4 py-4 text-slate-600">
                         {displayRiskField(r.threat, RISK_FIELD_FALLBACKS.threat)}
@@ -189,7 +237,10 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
 
       {editingId && (
         <RiskObligationEditor
+          companyId={companyId}
           risk={risks.find((r) => r.id === editingId)!}
+          assets={assets}
+          onAssetsChange={setAssets}
           onSave={updateRisk}
           onCancel={() => setEditingId(null)}
         />
@@ -216,14 +267,21 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
 }
 
 function RiskObligationEditor({
+  companyId,
   risk,
+  assets,
+  onAssetsChange,
   onSave,
   onCancel,
 }: {
+  companyId: string;
   risk: Risk;
+  assets: CompanyAsset[];
+  onAssetsChange: (assets: CompanyAsset[]) => void;
   onSave: (id: string, fields: Record<string, unknown>) => void;
   onCancel: () => void;
 }) {
+  const [assetId, setAssetId] = useState(risk.asset_id ?? null);
   const [isMandatory, setIsMandatory] = useState(Boolean(risk.is_mandatory));
   const [criticality, setCriticality] = useState(risk.criticality ?? "medium");
   const [deadline, setDeadline] = useState(risk.deadline?.slice(0, 10) ?? "");
@@ -236,10 +294,19 @@ function RiskObligationEditor({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">
-          Pflichtfelder: {displayRiskField(risk.asset, RISK_FIELD_FALLBACKS.asset)}
+          Pflichtfelder: {resolveRiskAsset(risk, assets).name}
         </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="sm:col-span-2 lg:col-span-3">
+          <AssetPicker
+            companyId={companyId}
+            assets={assets}
+            value={assetId}
+            onChange={(id) => setAssetId(id)}
+            onAssetsChange={onAssetsChange}
+          />
+        </div>
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -288,6 +355,7 @@ function RiskObligationEditor({
           <Button
             onClick={() =>
               onSave(risk.id, {
+                asset_id: assetId,
                 is_mandatory: isMandatory,
                 criticality,
                 deadline: deadline || null,

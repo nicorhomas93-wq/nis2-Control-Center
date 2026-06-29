@@ -21,6 +21,8 @@ export async function POST(request: Request) {
     criticality,
     deadline,
     escalation_level,
+    asset_id,
+    risk_id,
   } = body;
 
   const company = await verifyCompanyOwnership(user.id, companyId);
@@ -38,6 +40,8 @@ export async function POST(request: Request) {
     is_mandatory: Boolean(is_mandatory),
     deadline: deadline || null,
     escalation_level: escalation_level ?? 0,
+    asset_id: asset_id || null,
+    risk_id: risk_id || null,
   }).select().single();
 
   if (error) {

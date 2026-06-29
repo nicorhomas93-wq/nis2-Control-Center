@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Measure, MeasurePriority, MeasureStatus } from "@/lib/types";
+import type { CompanyAsset, Measure, MeasurePriority, MeasureStatus, Risk } from "@/lib/types";
+import { validateMeasureTitle } from "@/lib/measures/naming";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -41,14 +42,20 @@ const PRIORITY_COLORS: Record<MeasurePriority, string> = {
 interface MeasuresPageClientProps {
   companyId: string;
   initialMeasures: Measure[];
+  initialRisks: Risk[];
+  initialAssets: CompanyAsset[];
 }
 
 export function MeasuresPageClient({
   companyId,
   initialMeasures,
+  initialRisks,
+  initialAssets,
 }: MeasuresPageClientProps) {
   const router = useRouter();
   const [measures, setMeasures] = useState(initialMeasures);
+  const [risks] = useState(initialRisks);
+  const [assets] = useState(initialAssets);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -58,11 +65,40 @@ export function MeasuresPageClient({
   const [isMandatory, setIsMandatory] = useState(false);
   const [criticality, setCriticality] = useState("medium");
   const [deadline, setDeadline] = useState("");
+  const [selectedRiskId, setSelectedRiskId] = useState("");
+  const [titleWarning, setTitleWarning] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  function handleTitleChange(value: string) {
+    setTitle(value);
+    const check = validateMeasureTitle(value);
+    setTitleWarning(check.warning);
+  }
+
+  async function suggestMeasure() {
+    setSuggesting(true);
+    const res = await fetch("/api/measures/suggest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyId,
+        riskId: selectedRiskId || undefined,
+      }),
+    });
+    const data = await res.json();
+    setSuggesting(false);
+    if (!res.ok) return;
+    handleTitleChange(data.suggestion.title);
+    setDescription(data.suggestion.description ?? "");
+    setTargetState(data.suggestion.target_state ?? "");
+  }
 
   async function addMeasure(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+
+    const selectedRisk = risks.find((r) => r.id === selectedRiskId);
 
     const res = await fetch("/api/measures", {
       method: "POST",
@@ -77,6 +113,8 @@ export function MeasuresPageClient({
         is_mandatory: isMandatory,
         criticality,
         deadline: deadline || null,
+        risk_id: selectedRiskId || null,
+        asset_id: selectedRisk?.asset_id ?? null,
       }),
     });
 
@@ -90,6 +128,8 @@ export function MeasuresPageClient({
       setIsMandatory(false);
       setCriticality("medium");
       setDeadline("");
+      setSelectedRiskId("");
+      setTitleWarning(null);
       setShowForm(false);
       router.refresh();
     }
@@ -150,14 +190,47 @@ export function MeasuresPageClient({
           </CardHeader>
           <CardContent>
             <form onSubmit={addMeasure} className="space-y-4">
+              {risks.length > 0 && (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="flex-1">
+                    <Label htmlFor="risk-select">Bezug-Risiko (optional)</Label>
+                    <Select
+                      id="risk-select"
+                      value={selectedRiskId}
+                      onChange={(e) => setSelectedRiskId(e.target.value)}
+                    >
+                      <option value="">Kein Risiko ausgewählt</option>
+                      {risks.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.asset} — {r.threat}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={suggesting}
+                    onClick={suggestMeasure}
+                  >
+                    {suggesting ? "Wird vorgeschlagen…" : "Maßnahme vorschlagen"}
+                  </Button>
+                </div>
+              )}
               <div>
                 <Label htmlFor="title">Titel</Label>
                 <Input
                   id="title"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => handleTitleChange(e.target.value)}
                   required
+                  placeholder="z. B. MFA für alle Konten aktivieren und dokumentieren"
                 />
+                {titleWarning && (
+                  <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    {titleWarning}
+                  </p>
+                )}
               </div>
               <div>
                 <Label htmlFor="description">Beschreibung</Label>

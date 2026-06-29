@@ -19,6 +19,7 @@ export async function PATCH(request: Request) {
     responsible,
     vulnerability,
     business_impact,
+    asset_id,
   } = body;
 
   const { data: risk } = await supabase.from("risks").select("id, company_id").eq("id", id).single();
@@ -35,6 +36,17 @@ export async function PATCH(request: Request) {
   if (responsible !== undefined) updates.responsible = responsible;
   if (vulnerability !== undefined) updates.vulnerability = vulnerability;
   if (business_impact !== undefined) updates.business_impact = business_impact;
+  if (asset_id !== undefined) {
+    updates.asset_id = asset_id || null;
+    if (asset_id) {
+      const { data: asset } = await supabase
+        .from("company_assets")
+        .select("name")
+        .eq("id", asset_id)
+        .single();
+      if (asset?.name) updates.asset = asset.name;
+    }
+  }
 
   const { error } = await supabase.from("risks").update(updates).eq("id", id);
   if (error) return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });

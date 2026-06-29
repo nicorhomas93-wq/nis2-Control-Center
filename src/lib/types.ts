@@ -5,6 +5,7 @@ import type {
 } from "@/lib/jarvis/outreach/web-presence-types";
 
 export type { DetectedWebsiteType, WebPresenceEvidence, WebPresenceStatus };
+export type { CompanyAsset, AssetCategory, AssetCriticality } from "@/lib/assets/types";
 
 export type Nis2Status =
   | "unbekannt"
@@ -131,6 +132,8 @@ export interface Measure {
   criticality?: string | null;
   deadline?: string | null;
   escalation_level?: number | null;
+  asset_id?: string | null;
+  risk_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -150,6 +153,7 @@ export interface Risk {
   deadline?: string | null;
   escalation_level?: number | null;
   responsible?: string | null;
+  asset_id?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -7,6 +7,7 @@ import {
   generateFallbackRiskAnalysis,
   generateWithAI,
 } from "@/lib/ai/generate";
+import { attachAssetsToRiskRows } from "@/lib/assets/sync";
 import { buildQualityRiskRows } from "@/lib/compliance/risk-rows";
 import { syncCompanySecurityScore } from "@/lib/compliance/sync";
 
@@ -28,7 +29,13 @@ export async function POST(request: Request) {
   await supabase.from("risks").delete().eq("company_id", companyId);
 
   const riskRows = buildQualityRiskRows(company, analysis);
-  const { data: risks, error } = await supabase.from("risks").insert(riskRows).select();
+  const rowsWithAssets = await attachAssetsToRiskRows(
+    supabase,
+    companyId,
+    company,
+    riskRows
+  );
+  const { data: risks, error } = await supabase.from("risks").insert(rowsWithAssets).select();
 
   if (error) {
     return NextResponse.json(
