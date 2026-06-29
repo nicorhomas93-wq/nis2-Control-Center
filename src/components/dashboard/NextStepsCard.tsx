@@ -26,17 +26,17 @@ export function NextStepsCard({ steps }: { steps: NextStepAction[] }) {
       <CardHeader>
         <div className="flex items-center gap-2">
           <ListChecks className="h-5 w-5 text-brand-600" />
-          <CardTitle>Das solltest du jetzt tun</CardTitle>
+          <CardTitle>Nächste empfohlene Schritte</CardTitle>
         </div>
         <p className="text-sm text-slate-500">
-          Konkrete nächste Schritte — priorisiert nach Kritikalität, Frist und Audit-Relevanz.
+          Konkrete nächste Schritte – priorisiert nach Kritikalität, Frist und Audit-Relevanz.
         </p>
       </CardHeader>
       <CardContent>
         {steps.length === 0 ? (
           <div className="space-y-2 text-sm text-slate-600">
             <p className="font-medium text-emerald-800">
-              Tolle Arbeit – aktuell sind keine kritischen nächsten Schritte offen.
+              Aktuell sind keine kritischen nächsten Schritte offen.
             </p>
             <p className="text-slate-500">
               Bitte prüfen Sie regelmäßig Nachweise, Dokumente und Maßnahmen.
