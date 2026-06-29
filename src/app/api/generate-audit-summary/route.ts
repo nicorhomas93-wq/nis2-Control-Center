@@ -13,6 +13,7 @@ import {
   getAuditFolderStatuses,
 } from "@/lib/audit/audit-folders";
 import { buildStructuredAuditSummary } from "@/lib/audit/audit-summary";
+import { syncCompanySecurityScore } from "@/lib/compliance/sync";
 import type { Company, Document, Measure, Risk } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -118,6 +119,8 @@ export async function POST(request: Request) {
       { status: 503 }
     );
   }
+
+  await syncCompanySecurityScore(supabase, companyId);
 
   return NextResponse.json({
     export: exportPayload,

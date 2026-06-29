@@ -7,6 +7,7 @@ import {
   generateFallbackIncidentReport,
   generateWithAI,
 } from "@/lib/ai/generate";
+import { syncCompanySecurityScore } from "@/lib/compliance/sync";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -26,6 +27,9 @@ export async function POST(request: Request) {
   const aiContent = await generateWithAI(prompt);
   const reportContent = aiContent ?? generateFallbackIncidentReport(company, title, description);
 
+  const deadline = new Date();
+  deadline.setHours(deadline.getHours() + 24);
+
   const { data: incident, error } = await supabase
     .from("incidents")
     .insert({
@@ -34,6 +38,10 @@ export async function POST(request: Request) {
       description,
       report_content: reportContent,
       status: "open",
+      is_mandatory: true,
+      criticality: "critical",
+      deadline: deadline.toISOString(),
+      escalation_level: 0,
     })
     .select()
     .single();
@@ -44,6 +52,8 @@ export async function POST(request: Request) {
       { status: isMissingTableError(error) ? 503 : 500 }
     );
   }
+
+  await syncCompanySecurityScore(supabase, companyId);
 
   return NextResponse.json({ incident, mode: aiContent ? "openai" : "demo" });
 }

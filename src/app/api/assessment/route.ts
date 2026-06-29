@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyCompanyOwnership } from "@/lib/company";
 import { assessNis2 } from "@/lib/nis2/betroffenheit";
+import { syncCompanySecurityScore } from "@/lib/compliance/sync";
 import { getDbErrorMessage, isMissingTableError } from "@/lib/supabase/db-error";
 
 export async function POST(request: Request) {
@@ -39,6 +40,8 @@ export async function POST(request: Request) {
       { status: isMissingTableError(insertError) ? 503 : 500 }
     );
   }
+
+  await syncCompanySecurityScore(supabase, companyId);
 
   return NextResponse.json(result);
 }

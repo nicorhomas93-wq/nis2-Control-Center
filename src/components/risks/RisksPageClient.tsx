@@ -4,8 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Risk } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
+import { Select } from "@/components/ui/Select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { resolveObligationStatus } from "@/lib/compliance/obligations";
+import { OBLIGATION_STATUS_LABELS } from "@/lib/compliance/types";
 import { Loader2, Sparkles } from "lucide-react";
 
 const LEVEL_COLORS = {
@@ -27,6 +32,7 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   async function generateAnalysis() {
     setLoading(true);
@@ -51,6 +57,29 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
     router.refresh();
   }
 
+  async function updateRisk(
+    id: string,
+    fields: {
+      is_mandatory?: boolean;
+      criticality?: string;
+      deadline?: string | null;
+      responsible?: string;
+      escalation_level?: number;
+    }
+  ) {
+    const res = await fetch("/api/risks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...fields }),
+    });
+    if (!res.ok) return;
+    setRisks((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...fields } : r))
+    );
+    setEditingId(null);
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -63,6 +92,7 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
         <CardContent>
           <p className="mb-4 text-sm text-slate-600">
             Generieren Sie eine strukturierte Risikoanalyse auf Basis Ihrer Unternehmensdaten.
+            Kritische Risiken werden automatisch als Pflichtaufgaben mit Frist hinterlegt.
           </p>
           <Button onClick={generateAnalysis} disabled={loading}>
             {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Wird generiert...</> : "Risikoanalyse generieren"}
@@ -82,23 +112,69 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
                   <th className="px-6 py-3 font-medium">Bedrohung</th>
                   <th className="px-6 py-3 font-medium">Risiko</th>
                   <th className="px-6 py-3 font-medium">Maßnahme</th>
+                  <th className="px-6 py-3 font-medium">Pflicht / Frist</th>
+                  <th className="px-6 py-3 font-medium">Pflichtstatus</th>
+                  <th className="px-6 py-3 font-medium">Aktion</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {risks.map((r) => (
-                  <tr key={r.id}>
-                    <td className="px-6 py-4 font-medium text-slate-900">{r.asset}</td>
-                    <td className="px-6 py-4 text-slate-600">{r.threat}</td>
-                    <td className="px-6 py-4">
-                      <Badge className={LEVEL_COLORS[r.risk_level]}>{LEVEL_LABELS[r.risk_level]}</Badge>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">{r.measure ?? "–"}</td>
-                  </tr>
-                ))}
+                {risks.map((r) => {
+                  const obligation = resolveObligationStatus({
+                    status: r.risk_level === "low" ? "completed" : "open",
+                    deadline: r.deadline,
+                    criticality: r.criticality,
+                    isMandatory: r.is_mandatory,
+                  });
+                  const obligationClass =
+                    obligation === "critically_overdue"
+                      ? "bg-red-100 text-red-800"
+                      : obligation === "overdue"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-slate-100 text-slate-700";
+
+                  return (
+                    <tr key={r.id}>
+                      <td className="px-6 py-4 font-medium text-slate-900">{r.asset}</td>
+                      <td className="px-6 py-4 text-slate-600">{r.threat}</td>
+                      <td className="px-6 py-4">
+                        <Badge className={LEVEL_COLORS[r.risk_level]}>{LEVEL_LABELS[r.risk_level]}</Badge>
+                      </td>
+                      <td className="px-6 py-4 text-slate-600">{r.measure ?? "–"}</td>
+                      <td className="px-6 py-4">
+                        {r.is_mandatory ? (
+                          <Badge className="bg-indigo-100 text-indigo-800">Pflicht</Badge>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                        {r.deadline && (
+                          <p className="mt-1 text-xs text-slate-500">{r.deadline.slice(0, 10)}</p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Badge className={obligationClass}>
+                          {OBLIGATION_STATUS_LABELS[obligation]}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Button size="sm" variant="outline" onClick={() => setEditingId(r.id)}>
+                          Bearbeiten
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </CardContent>
         </Card>
+      )}
+
+      {editingId && (
+        <RiskObligationEditor
+          risk={risks.find((r) => r.id === editingId)!}
+          onSave={updateRisk}
+          onCancel={() => setEditingId(null)}
+        />
       )}
 
       {analysis && (
@@ -118,5 +194,85 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
         </Card>
       )}
     </div>
+  );
+}
+
+function RiskObligationEditor({
+  risk,
+  onSave,
+  onCancel,
+}: {
+  risk: Risk;
+  onSave: (id: string, fields: Record<string, unknown>) => void;
+  onCancel: () => void;
+}) {
+  const [isMandatory, setIsMandatory] = useState(Boolean(risk.is_mandatory));
+  const [criticality, setCriticality] = useState(risk.criticality ?? "medium");
+  const [deadline, setDeadline] = useState(risk.deadline?.slice(0, 10) ?? "");
+  const [responsible, setResponsible] = useState(risk.responsible ?? "");
+  const [escalationLevel, setEscalationLevel] = useState(String(risk.escalation_level ?? 0));
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Pflichtfelder: {risk.asset}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={isMandatory}
+            onChange={(e) => setIsMandatory(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300"
+          />
+          <Label>Pflichtaufgabe</Label>
+        </div>
+        <div>
+          <Label>Kritikalität</Label>
+          <Select value={criticality} onChange={(e) => setCriticality(e.target.value)}>
+            <option value="low">Niedrig</option>
+            <option value="medium">Mittel</option>
+            <option value="high">Hoch</option>
+            <option value="critical">Kritisch</option>
+          </Select>
+        </div>
+        <div>
+          <Label>Deadline</Label>
+          <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+        </div>
+        <div>
+          <Label>Verantwortlich</Label>
+          <Input value={responsible} onChange={(e) => setResponsible(e.target.value)} />
+        </div>
+        <div>
+          <Label>Eskalationsstufe</Label>
+          <Input
+            type="number"
+            min={0}
+            max={5}
+            value={escalationLevel}
+            onChange={(e) => setEscalationLevel(e.target.value)}
+          />
+        </div>
+        <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-3">
+          <Button
+            onClick={() =>
+              onSave(risk.id, {
+                is_mandatory: isMandatory,
+                criticality,
+                deadline: deadline || null,
+                responsible: responsible || null,
+                escalation_level: Number(escalationLevel) || 0,
+              })
+            }
+          >
+            Speichern
+          </Button>
+          <Button variant="outline" onClick={onCancel}>
+            Abbrechen
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

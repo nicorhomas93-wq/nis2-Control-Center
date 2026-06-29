@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDbErrorMessage, isMissingColumnError, isMissingTableError } from "@/lib/supabase/db-error";
 import type { Document, DocumentType } from "@/lib/types";
 import type { GenerationMode } from "@/lib/documents/generation-mode";
+import { AUDIT_FOLDERS } from "@/lib/audit/audit-folders";
 
 type SaveResult =
   | { document: Document; error: null }
@@ -20,6 +21,18 @@ export async function saveGeneratedDocument(
 ): Promise<SaveResult> {
   const { companyId, documentType, typeLabel, content, mode, existing } = params;
 
+  const isAuditDoc = AUDIT_FOLDERS.some((f) => f.documentType === documentType);
+  const reviewDeadline = new Date();
+  reviewDeadline.setFullYear(reviewDeadline.getFullYear() + 1);
+  const obligationFields: Record<string, unknown> = isAuditDoc
+    ? {
+        is_mandatory: true,
+        criticality: "high",
+        deadline: reviewDeadline.toISOString(),
+        escalation_level: 0,
+      }
+    : {};
+
   const baseFields = {
     content,
     title: typeLabel,
@@ -29,9 +42,9 @@ export async function saveGeneratedDocument(
   if (existing) {
     const newVersion = (existing.version ?? 1) + 1;
     const payloads = [
-      { ...baseFields, version: newVersion, generation_mode: mode },
-      { ...baseFields, version: newVersion },
-      { ...baseFields },
+      { ...baseFields, version: newVersion, generation_mode: mode, ...obligationFields },
+      { ...baseFields, version: newVersion, ...obligationFields },
+      { ...baseFields, ...obligationFields },
     ];
 
     for (const payload of payloads) {
@@ -73,17 +86,20 @@ export async function saveGeneratedDocument(
       ...baseFields,
       version: 1,
       generation_mode: mode,
+      ...obligationFields,
     },
     {
       company_id: companyId,
       document_type: documentType,
       ...baseFields,
       version: 1,
+      ...obligationFields,
     },
     {
       company_id: companyId,
       document_type: documentType,
       ...baseFields,
+      ...obligationFields,
     },
   ];
 

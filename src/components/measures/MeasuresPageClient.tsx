@@ -11,6 +11,8 @@ import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Plus } from "lucide-react";
+import { resolveObligationStatus } from "@/lib/compliance/obligations";
+import { OBLIGATION_STATUS_LABELS } from "@/lib/compliance/types";
 
 const STATUS_LABELS: Record<MeasureStatus, string> = {
   open: "Offen",
@@ -53,6 +55,9 @@ export function MeasuresPageClient({
   const [priority, setPriority] = useState<MeasurePriority>("medium");
   const [responsible, setResponsible] = useState("");
   const [targetState, setTargetState] = useState("");
+  const [isMandatory, setIsMandatory] = useState(false);
+  const [criticality, setCriticality] = useState("medium");
+  const [deadline, setDeadline] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function addMeasure(e: React.FormEvent) {
@@ -69,6 +74,9 @@ export function MeasuresPageClient({
         priority,
         responsible,
         target_state: targetState,
+        is_mandatory: isMandatory,
+        criticality,
+        deadline: deadline || null,
       }),
     });
 
@@ -79,6 +87,9 @@ export function MeasuresPageClient({
       setDescription("");
       setResponsible("");
       setTargetState("");
+      setIsMandatory(false);
+      setCriticality("medium");
+      setDeadline("");
       setShowForm(false);
       router.refresh();
     }
@@ -190,6 +201,39 @@ export function MeasuresPageClient({
                   placeholder="z. B. MFA für alle Benutzer aktiv"
                 />
               </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="criticality">Kritikalität</Label>
+                  <Select
+                    id="criticality"
+                    value={criticality}
+                    onChange={(e) => setCriticality(e.target.value)}
+                  >
+                    <option value="low">Niedrig</option>
+                    <option value="medium">Mittel</option>
+                    <option value="high">Hoch</option>
+                    <option value="critical">Kritisch</option>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="deadline">Deadline</Label>
+                  <Input
+                    id="deadline"
+                    type="date"
+                    value={deadline}
+                    onChange={(e) => setDeadline(e.target.value)}
+                  />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={isMandatory}
+                  onChange={(e) => setIsMandatory(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Pflichtaufgabe (Audit-relevant)
+              </label>
               <Button type="submit" disabled={saving}>
                 {saving ? "Wird gespeichert..." : "Maßnahme speichern"}
               </Button>
@@ -215,13 +259,29 @@ export function MeasuresPageClient({
                   <tr className="border-b border-slate-100 text-left text-slate-500">
                     <th className="px-6 py-3 font-medium">Maßnahme</th>
                     <th className="px-6 py-3 font-medium">Priorität</th>
-                    <th className="px-6 py-3 font-medium">Status</th>
+                    <th className="px-6 py-3 font-medium">Pflicht / Frist</th>
+                    <th className="px-6 py-3 font-medium">Pflichtstatus</th>
+                    <th className="px-6 py-3 font-medium">Fortschritt</th>
                     <th className="px-6 py-3 font-medium">Verantwortlich</th>
                     <th className="px-6 py-3 font-medium">Aktion</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {measures.map((m) => (
+                  {measures.map((m) => {
+                    const obligation = resolveObligationStatus({
+                      status: m.status,
+                      deadline: m.deadline,
+                      criticality: m.criticality ?? m.priority,
+                      isMandatory: m.is_mandatory,
+                    });
+                    const obligationClass =
+                      obligation === "critically_overdue"
+                        ? "bg-red-100 text-red-800"
+                        : obligation === "overdue"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-slate-100 text-slate-700";
+
+                    return (
                     <tr key={m.id}>
                       <td className="px-6 py-4">
                         <p className="font-medium text-slate-900">{m.title}</p>
@@ -239,6 +299,21 @@ export function MeasuresPageClient({
                       <td className="px-6 py-4">
                         <Badge className={PRIORITY_COLORS[m.priority]}>
                           {PRIORITY_LABELS[m.priority]}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        {m.is_mandatory ? (
+                          <Badge className="bg-indigo-100 text-indigo-800">Pflicht</Badge>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                        {m.deadline && (
+                          <p className="mt-1 text-xs text-slate-500">{m.deadline.slice(0, 10)}</p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Badge className={obligationClass}>
+                          {OBLIGATION_STATUS_LABELS[obligation]}
                         </Badge>
                       </td>
                       <td className="px-6 py-4">
@@ -266,7 +341,8 @@ export function MeasuresPageClient({
                         </Select>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

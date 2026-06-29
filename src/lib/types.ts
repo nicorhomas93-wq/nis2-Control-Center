@@ -61,6 +61,7 @@ export interface Company {
   billing_email?: string | null;
   pilot_setup_paid_at?: string | null;
   pilot_phase_completed_at?: string | null;
+  security_score?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -109,6 +110,10 @@ export interface Document {
   status: DocumentStatus;
   version: number;
   generation_mode?: "openai" | "demo" | null;
+  is_mandatory?: boolean;
+  criticality?: string | null;
+  deadline?: string | null;
+  escalation_level?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -122,6 +127,10 @@ export interface Measure {
   priority: MeasurePriority;
   responsible: string | null;
   target_state: string | null;
+  is_mandatory?: boolean;
+  criticality?: string | null;
+  deadline?: string | null;
+  escalation_level?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -134,6 +143,11 @@ export interface Risk {
   risk_level: RiskLevel;
   measure: string | null;
   analysis_content: string | null;
+  is_mandatory?: boolean;
+  criticality?: string | null;
+  deadline?: string | null;
+  escalation_level?: number | null;
+  responsible?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -145,6 +159,11 @@ export interface Incident {
   description: string | null;
   status: IncidentStatus;
   report_content: string | null;
+  is_mandatory?: boolean;
+  criticality?: string | null;
+  deadline?: string | null;
+  escalation_level?: number | null;
+  responsible?: string | null;
   created_at: string;
   updated_at: string;
 }

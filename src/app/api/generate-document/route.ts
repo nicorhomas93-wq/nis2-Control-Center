@@ -8,6 +8,7 @@ import {
 } from "@/lib/ai/generate";
 import { finalizeDocumentContent, type GenerationMode } from "@/lib/documents/generation-mode";
 import { saveGeneratedDocument } from "@/lib/documents/save-document";
+import { syncCompanySecurityScore } from "@/lib/compliance/sync";
 import { getDocumentTypeLabel } from "@/lib/nis2/document-types";
 import type { Document, DocumentType } from "@/lib/types";
 
@@ -64,6 +65,8 @@ export async function POST(request: Request) {
       { status: result.error.missingTable ? 503 : 500 }
     );
   }
+
+  await syncCompanySecurityScore(supabase, companyId);
 
   return NextResponse.json({
     document: result.document,

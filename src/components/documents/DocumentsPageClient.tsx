@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { DOCUMENT_TYPES } from "@/lib/nis2/document-types";
 import type { Document, DocumentType } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
+import { resolveObligationStatus } from "@/lib/compliance/obligations";
+import { OBLIGATION_STATUS_LABELS } from "@/lib/compliance/types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
@@ -163,6 +165,22 @@ export function DocumentsPageClient({
                     <div className="w-full space-y-1 text-xs text-slate-400">
                       <p>Version {existing.version ?? 1}</p>
                       <p>Aktualisiert: {formatDate(existing.updated_at)}</p>
+                      {existing.is_mandatory && (
+                        <p className="font-medium text-indigo-600">Pflichtdokument</p>
+                      )}
+                      {existing.deadline && (
+                        <p>
+                          Frist: {formatDate(existing.deadline)} ·{" "}
+                          {OBLIGATION_STATUS_LABELS[
+                            resolveObligationStatus({
+                              status: "completed",
+                              deadline: existing.deadline,
+                              criticality: existing.criticality,
+                              isMandatory: existing.is_mandatory,
+                            })
+                          ]}
+                        </p>
+                      )}
                     </div>
                   </>
                 )}

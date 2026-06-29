@@ -8,6 +8,19 @@ import {
   generateWithAI,
 } from "@/lib/ai/generate";
 import type { RiskLevel } from "@/lib/types";
+import { syncCompanySecurityScore } from "@/lib/compliance/sync";
+
+function obligationDefaultsForRisk(level: RiskLevel) {
+  const deadline = new Date();
+  const days = level === "high" ? 30 : level === "medium" ? 90 : 180;
+  deadline.setDate(deadline.getDate() + days);
+  return {
+    is_mandatory: level === "high",
+    criticality: level === "high" ? "critical" : level === "medium" ? "high" : "medium",
+    deadline: deadline.toISOString(),
+    escalation_level: 0,
+  };
+}
 
 function parseRisksFromAnalysis(content: string, companyId: string) {
   const lines = content.split("\n").filter((l) => l.includes("|") && !l.startsWith("---") && !l.toLowerCase().includes("asset"));
@@ -21,6 +34,7 @@ function parseRisksFromAnalysis(content: string, companyId: string) {
       risk_level: level,
       measure: parts[3] || null,
       analysis_content: content,
+      ...obligationDefaultsForRisk(level),
     };
   });
 }
@@ -51,6 +65,8 @@ export async function POST(request: Request) {
       { status: isMissingTableError(error) ? 503 : 500 }
     );
   }
+
+  await syncCompanySecurityScore(supabase, companyId);
 
   return NextResponse.json({ analysis, risks, mode: aiContent ? "openai" : "demo" });
 }

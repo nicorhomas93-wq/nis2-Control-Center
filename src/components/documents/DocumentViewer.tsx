@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DocumentContent } from "@/components/documents/DocumentContent";
 import { DocumentMetadata } from "@/components/documents/DocumentMetadata";
+import { DocumentObligationPanel } from "@/components/documents/DocumentObligationPanel";
 import {
   Copy,
   Download,
@@ -157,6 +158,8 @@ export function DocumentViewer({
         <div className="mb-6">
           <DocumentMetadata document={doc} companyName={companyName} />
         </div>
+
+        <DocumentObligationPanel document={doc} />
 
         <DocumentContent content={prepared.text} />
         <p className="mt-2 text-xs text-slate-400">

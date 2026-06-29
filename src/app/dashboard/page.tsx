@@ -1,5 +1,8 @@
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { DashboardActions } from "@/components/dashboard/DashboardActions";
+import { NextStepsCard } from "@/components/dashboard/NextStepsCard";
+import { ComplianceWarningsBanner } from "@/components/dashboard/ComplianceWarningsBanner";
+import { SecurityStatusCard } from "@/components/dashboard/SecurityStatusCard";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { BillingStatusBanner } from "@/components/billing/BillingStatusBanner";
 import { ActiveMandantBanner } from "@/components/consultant/ActiveMandantBanner";
@@ -8,9 +11,12 @@ import { getWorkspaceCompany, isCompanyProfileComplete, getOrCreateProfile } fro
 import { isPlatformOwner } from "@/lib/jarvis/access";
 import { calculateAuditFolderScore } from "@/lib/audit/audit-folders";
 import { calculateComplianceScore } from "@/lib/nis2/compliance-score";
+import { buildNextSteps, calculateSecurityStatus } from "@/lib/compliance";
+import { buildComplianceWarnings } from "@/lib/compliance/warnings";
+import { loadSecurityScoreHistory, syncCompanySecurityScore } from "@/lib/compliance/sync";
 import { getNis2StatusColor, getNis2StatusLabel } from "@/lib/nis2/betroffenheit";
 import { formatDate } from "@/lib/utils";
-import type { ActivityItem, Document, Measure, Nis2Assessment, Risk } from "@/lib/types";
+import type { ActivityItem, Document, Incident, Measure, Nis2Assessment, Risk } from "@/lib/types";
 import Link from "next/link";
 import { ArrowRight, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
@@ -67,23 +73,50 @@ export default async function DashboardPage({
   let docs: Document[] = [];
   let meas: Measure[] = [];
   let risks: Risk[] = [];
+  let incidents: Incident[] = [];
   let assessments: Nis2Assessment[] = [];
   let lastAuditExport: string | null = null;
+  let securityHistory: Awaited<ReturnType<typeof loadSecurityScoreHistory>> = [];
 
   if (company) {
-    const [docRes, measRes, risksRes, assessRes, auditRes] = await Promise.all([
+    const [docRes, measRes, risksRes, incidentsRes, assessRes, auditRes] = await Promise.all([
       supabase.from("documents").select("*").eq("company_id", company.id).order("created_at", { ascending: false }),
       supabase.from("measures").select("*").eq("company_id", company.id),
       supabase.from("risks").select("*").eq("company_id", company.id),
+      supabase.from("incidents").select("*").eq("company_id", company.id),
       supabase.from("nis2_assessments").select("*").eq("company_id", company.id).order("created_at", { ascending: false }).limit(5),
       supabase.from("audit_exports").select("created_at").eq("company_id", company.id).order("created_at", { ascending: false }).limit(1),
     ]);
     docs = (docRes.data ?? []) as Document[];
     meas = (measRes.data ?? []) as Measure[];
     risks = (risksRes.data ?? []) as Risk[];
+    incidents = (incidentsRes.data ?? []) as Incident[];
     assessments = (assessRes.data ?? []) as Nis2Assessment[];
     lastAuditExport = auditRes.data?.[0]?.created_at ?? null;
+
+    await syncCompanySecurityScore(supabase, company.id);
+    securityHistory = await loadSecurityScoreHistory(supabase, company.id);
   }
+
+  const securityStatus = calculateSecurityStatus({
+    company,
+    documents: docs,
+    measures: meas,
+    risks,
+    incidents,
+  });
+  const nextSteps = buildNextSteps({
+    documents: docs,
+    measures: meas,
+    risks,
+    incidents,
+  });
+  const complianceWarnings = buildComplianceWarnings({
+    documents: docs,
+    measures: meas,
+    risks,
+    incidents,
+  });
 
   const profileComplete = isCompanyProfileComplete(company);
   const openMeasures = meas.filter((m) => m.status !== "completed").length;
@@ -106,6 +139,21 @@ export default async function DashboardPage({
       </div>
 
       <BillingStatusBanner company={ownCompany} platformOwner={platformOwner} />
+
+      {company && (
+        <SecurityStatusCard
+          score={securityStatus.score}
+          level={securityStatus.level}
+          summary={securityStatus.summary}
+          drivers={securityStatus.drivers}
+          auditReadinessPercent={securityStatus.auditReadinessPercent}
+          history={securityHistory}
+        />
+      )}
+
+      {company && <ComplianceWarningsBanner warnings={complianceWarnings} />}
+
+      {company && <NextStepsCard steps={nextSteps} />}
 
       {showFunnelWelcome && company && (
         <FunnelWelcomeBanner
