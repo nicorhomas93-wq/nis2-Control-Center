@@ -37,7 +37,7 @@ export function SyncPilotRequestsButton({
   }
 
   return (
-    <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+    <div className="flex gap-2 flex-row items-center">
       <Button onClick={handleSync} disabled={loading}>
         <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
         Pilotanfragen synchronisieren

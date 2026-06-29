@@ -74,8 +74,8 @@ export function IncidentsPageClient({ companyId, initialIncidents }: IncidentsPa
       </Card>
 
       {incidents.length > 0 && (
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-1">
+        <div className="grid gap-6 grid-cols-3">
+          <Card className="col-span-1">
             <CardHeader><CardTitle>Vorfälle ({incidents.length})</CardTitle></CardHeader>
             <CardContent className="p-0">
               <ul className="divide-y divide-slate-100">
@@ -93,7 +93,7 @@ export function IncidentsPageClient({ companyId, initialIncidents }: IncidentsPa
               </ul>
             </CardContent>
           </Card>
-          <Card className="lg:col-span-2">
+          <Card className="col-span-2">
             <CardHeader><CardTitle>{selected?.title ?? "Bericht"}</CardTitle></CardHeader>
             <CardContent>
               {selected?.report_content ? (

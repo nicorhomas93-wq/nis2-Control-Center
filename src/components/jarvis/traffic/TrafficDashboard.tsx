@@ -26,7 +26,7 @@ export function TrafficDashboard({
     <div className="space-y-8">
       {showSeed && (
         <Card className="border-sky-200 bg-sky-50">
-          <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <CardContent className="flex gap-3 pt-6 flex-row items-center justify-between">
             <p className="text-sm text-sky-900">
               Noch keine Traffic-Daten — Standard-Zielgruppen, Suchprofile und Vorlagen laden.
             </p>
@@ -35,7 +35,7 @@ export function TrafficDashboard({
         </Card>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-4 grid-cols-5">
         <StatCard label="Aktive Zielgruppen" value={overview.stats.activeTargetGroups} />
         <StatCard label="Aktive Kampagnen" value={overview.stats.activeCampaigns} />
         <StatCard label="Offene Traffic-Aufgaben" value={overview.stats.openTrafficTasks} />

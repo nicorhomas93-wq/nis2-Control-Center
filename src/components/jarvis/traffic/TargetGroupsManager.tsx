@@ -83,7 +83,7 @@ export function TargetGroupsManager({
             <CardTitle>Zielgruppe anlegen</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={createGroup} className="grid gap-4 sm:grid-cols-2">
+            <form onSubmit={createGroup} className="grid gap-4 grid-cols-2">
               <div>
                 <Label htmlFor="tg-name">Name *</Label>
                 <Input
@@ -101,7 +101,7 @@ export function TargetGroupsManager({
                   onChange={(e) => setForm({ ...form, industry: e.target.value })}
                 />
               </div>
-              <div className="sm:col-span-2">
+              <div className="col-span-2">
                 <Label htmlFor="tg-desc">Beschreibung</Label>
                 <Textarea
                   id="tg-desc"
@@ -130,7 +130,7 @@ export function TargetGroupsManager({
                   <option value="low">Niedrig</option>
                 </select>
               </div>
-              <div className="sm:col-span-2">
+              <div className="col-span-2">
                 <Label htmlFor="tg-pain">Pain Points</Label>
                 <Textarea
                   id="tg-pain"
@@ -138,7 +138,7 @@ export function TargetGroupsManager({
                   onChange={(e) => setForm({ ...form, pain_points: e.target.value })}
                 />
               </div>
-              <div className="sm:col-span-2">
+              <div className="col-span-2">
                 <Label htmlFor="tg-value">Value Proposition</Label>
                 <Textarea
                   id="tg-value"
@@ -163,7 +163,7 @@ export function TargetGroupsManager({
           Noch keine Zielgruppen. Laden Sie Standard-Daten oder legen Sie manuell an.
         </p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 grid-cols-2">
           {groups.map((group) => (
             <Card key={group.id} className={!group.active ? "opacity-60" : ""}>
               <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">

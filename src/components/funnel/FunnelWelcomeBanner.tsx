@@ -26,7 +26,7 @@ export function FunnelWelcomeBanner({
   return (
     <Card className="mb-8 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
       <CardContent className="pt-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-4 flex-row items-center justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
               Setup abgeschlossen
@@ -46,7 +46,7 @@ export function FunnelWelcomeBanner({
             </Button>
           </Link>
         </div>
-        <ul className="mt-6 grid gap-2 sm:grid-cols-2">
+        <ul className="mt-6 grid gap-2 grid-cols-2">
           {steps.map((s) => (
             <li key={s.label} className="flex items-center gap-2 text-sm text-slate-700">
               <CheckCircle2

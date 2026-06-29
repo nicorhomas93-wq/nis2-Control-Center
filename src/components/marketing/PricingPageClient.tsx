@@ -78,7 +78,7 @@ export function PricingPageClient() {
         <StripeTestModeBanner />
 
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-900 sm:text-4xl">Preise & Pakete</h1>
+          <h1 className="font-bold text-4xl">Preise & Pakete</h1>
           <p className="mx-auto mt-4 max-w-2xl text-slate-600">
             Wählen Sie Ihr Paket und schließen Sie Ihr Abo sicher über Stripe ab.
           </p>
@@ -103,7 +103,7 @@ export function PricingPageClient() {
           </p>
         )}
 
-        <div className="mt-12 grid gap-6 lg:grid-cols-3">
+        <div className="mt-12 grid gap-6 grid-cols-3">
           {SUBSCRIPTION_PLANS.map((plan) => (
             <Card
               key={plan.id}
@@ -178,7 +178,7 @@ export function PricingPageClient() {
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ul className="grid gap-2 sm:grid-cols-2">
+            <ul className="grid gap-2 grid-cols-2">
               {PILOT_PLAN.features.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-slate-600">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />

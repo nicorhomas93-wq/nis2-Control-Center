@@ -78,7 +78,7 @@ export function DemoPageClient() {
 
   return (
     <DemoShell>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex gap-4 flex-row items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Produkt-Demo</h1>
           <p className="mt-1 text-slate-500">
@@ -109,7 +109,7 @@ export function DemoPageClient() {
 
       {activeTab === "dashboard" && (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-4">
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-slate-500">Audit-Score</p>
@@ -158,7 +158,7 @@ export function DemoPageClient() {
             <CardTitle>Unternehmensprofil (Demo)</CardTitle>
             <CardDescription>MusterTech GmbH – Beispieldaten</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
+          <CardContent className="grid gap-3 text-sm grid-cols-2">
             <p><span className="font-medium">Name:</span> {DEMO_COMPANY.company_name}</p>
             <p><span className="font-medium">Branche:</span> {DEMO_COMPANY.industry}</p>
             <p><span className="font-medium">Mitarbeiter:</span> {DEMO_COMPANY.employee_count}</p>
@@ -169,7 +169,7 @@ export function DemoPageClient() {
             <p><span className="font-medium">Microsoft 365:</span> Ja</p>
             <p><span className="font-medium">Cloud-Dienste:</span> Ja</p>
             <p><span className="font-medium">ISB:</span> {DEMO_COMPANY.security_contact_name}</p>
-            <p className="sm:col-span-2">
+            <p className="col-span-2">
               <span className="font-medium">Kritische Prozesse:</span>{" "}
               {DEMO_COMPANY.critical_business_processes}
             </p>
@@ -247,7 +247,7 @@ export function DemoPageClient() {
             </CardContent>
           </Card>
 
-          <Button onClick={handleDemoZip} disabled={zipLoading} className="w-full sm:w-auto">
+          <Button onClick={handleDemoZip} disabled={zipLoading} className="w-auto">
             {zipLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" /> {zipProgress}

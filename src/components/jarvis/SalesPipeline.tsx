@@ -16,7 +16,7 @@ const PIPELINE_COLUMNS = [
 
 export function SalesPipeline({ leads }: { leads: Lead[] }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-4 lg:grid-cols-2">
+    <div className="grid gap-4 grid-cols-4">
       {PIPELINE_COLUMNS.map((status) => {
         const columnLeads = leads.filter((l) => l.status === status);
         return (

@@ -108,7 +108,7 @@ export function PilotRequestForm({
 
   if (success) {
     return (
-      <div className="flex flex-col items-center gap-3 py-6 text-center sm:py-8">
+      <div className="flex flex-col items-center gap-3 text-center py-8">
         <CheckCircle2 className="h-10 w-10 text-emerald-500" />
         <p className="font-medium text-slate-900">Vielen Dank für Ihre Anfrage!</p>
         {!warning && (
@@ -120,13 +120,13 @@ export function PilotRequestForm({
           </div>
         )}
         {warning && (
-          <div className="mt-4 flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
-            <a href={buildMailtoHref(form)} className="inline-flex w-full sm:w-auto">
+          <div className="mt-4 flex w-full gap-2 flex-row justify-center">
+            <a href={buildMailtoHref(form)} className="inline-flex w-auto">
               <Button type="button" variant="outline" className="w-full">
                 <Mail className="h-4 w-4" /> Manuell per E-Mail senden
               </Button>
             </a>
-            <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setSuccess(false)}>
+            <Button variant="ghost" className="w-auto" onClick={() => setSuccess(false)}>
               Schließen
             </Button>
           </div>
@@ -137,7 +137,7 @@ export function PilotRequestForm({
 
   const fields = (
     <>
-      <div className={cn(isModal ? "space-y-0" : "grid gap-4 sm:grid-cols-2")}>
+      <div className={cn(isModal ? "space-y-0" : "grid gap-4 grid-cols-2")}>
         <FormField className={fieldSpacing}>
           <Label htmlFor="pilot-name">Name *</Label>
           <Input
@@ -158,7 +158,7 @@ export function PilotRequestForm({
         </FormField>
       </div>
 
-      <div className={cn(isModal ? "space-y-0" : "grid gap-4 sm:grid-cols-2")}>
+      <div className={cn(isModal ? "space-y-0" : "grid gap-4 grid-cols-2")}>
         <FormField className={fieldSpacing}>
           <Label htmlFor="pilot-email">E-Mail *</Label>
           <Input
@@ -193,7 +193,7 @@ export function PilotRequestForm({
         <Textarea
           id="pilot-message"
           rows={isModal ? 4 : 6}
-          className={cn("w-full", isModal ? "min-h-[100px] md:min-h-[120px]" : "min-h-[140px]")}
+          className={cn("w-full", isModal ? "min-h-[100px] min-h-[120px]" : "min-h-[140px]")}
           value={form.message}
           onChange={(e) => setForm({ ...form, message: e.target.value })}
           placeholder="Kurz beschreiben, was Sie mit dem Pilot erreichen möchten…"
@@ -223,7 +223,7 @@ export function PilotRequestForm({
     return (
       <form onSubmit={handleSubmit} className="flex min-h-0 flex-col">
         <div className="min-h-0">{fields}</div>
-        <div className="sticky bottom-0 z-10 -mx-4 mt-2 border-t border-slate-100 bg-white px-4 pb-1 pt-3 md:-mx-6 md:px-6">
+        <div className="sticky bottom-0 z-10 -mx-4 mt-2 border-t border-slate-100 bg-white pb-1 pt-3 -mx-6 px-6">
           {submitSection}
         </div>
       </form>

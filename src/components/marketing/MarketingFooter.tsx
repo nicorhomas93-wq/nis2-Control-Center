@@ -5,7 +5,7 @@ export function MarketingFooter() {
   return (
     <footer className="border-t border-slate-200 bg-white py-10">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-6 flex-row items-center justify-between">
           <div>
             <p className="font-semibold text-slate-900">TKND NIS2 Control Center</p>
             <p className="mt-1 text-sm text-slate-500">

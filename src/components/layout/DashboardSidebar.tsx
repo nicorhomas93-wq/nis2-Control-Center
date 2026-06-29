@@ -12,13 +12,11 @@ import {
   FolderArchive,
   LayoutDashboard,
   LogOut,
-  Menu,
   Settings,
   Shield,
   ShieldAlert,
   ShieldCheck,
   Users,
-  X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { canAccessJarvis } from "@/lib/jarvis/access";
@@ -43,7 +41,6 @@ const navItems = [
 export function DashboardSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [showJarvis, setShowJarvis] = useState(false);
   const [showMandanten, setShowMandanten] = useState(false);
 
@@ -84,10 +81,10 @@ export function DashboardSidebar() {
     router.refresh();
   }
 
-  const sidebar = (
-    <>
+  return (
+    <aside className="no-print flex w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-900 text-white">
       <div className="border-b border-slate-800 px-6 py-5">
-        <Link href="/dashboard" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
+        <Link href="/dashboard" className="flex items-center gap-2">
           <Shield className="h-6 w-6 text-brand-400" />
           <div>
             <p className="text-sm font-bold leading-tight">TKND</p>
@@ -103,7 +100,6 @@ export function DashboardSidebar() {
             <Link
               key={href}
               href={href}
-              onClick={() => setMobileOpen(false)}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active
@@ -127,41 +123,6 @@ export function DashboardSidebar() {
           Abmelden
         </button>
       </div>
-    </>
-  );
-
-  return (
-    <>
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="no-print fixed left-4 top-4 z-40 rounded-lg bg-slate-900 p-2 text-white lg:hidden"
-        aria-label="Menü öffnen"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
-      <aside
-        className={cn(
-          "no-print fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-slate-900 text-white transition-transform lg:static lg:translate-x-0",
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        <button
-          onClick={() => setMobileOpen(false)}
-          className="absolute right-3 top-5 rounded p-1 text-slate-400 hover:text-white lg:hidden"
-          aria-label="Menü schließen"
-        >
-          <X className="h-5 w-5" />
-        </button>
-        {sidebar}
-      </aside>
-    </>
+    </aside>
   );
 }

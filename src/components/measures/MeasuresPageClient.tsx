@@ -108,7 +108,7 @@ export function MeasuresPageClient({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 grid-cols-3">
         {(["open", "in_progress", "completed"] as MeasureStatus[]).map(
           (status) => (
             <Card key={status}>
@@ -156,7 +156,7 @@ export function MeasuresPageClient({
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 grid-cols-2">
                 <div>
                   <Label htmlFor="priority">Priorität</Label>
                   <Select

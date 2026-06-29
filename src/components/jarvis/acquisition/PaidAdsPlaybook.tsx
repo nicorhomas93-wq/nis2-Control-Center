@@ -18,7 +18,7 @@ export function PaidAdsPlaybook() {
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <h3 className="font-semibold text-slate-900">Google Ads — Search (High Intent)</h3>
         <p className="mt-1 text-xs text-slate-500">Landing: /check · CTA: Jetzt prüfen</p>
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="mt-4 grid gap-4 grid-cols-2">
           <div>
             <p className="text-xs font-medium uppercase text-slate-500">Headlines (10)</p>
             <ul className="mt-2 space-y-1 text-sm">

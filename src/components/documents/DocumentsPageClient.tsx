@@ -88,7 +88,7 @@ export function DocumentsPageClient({
 
       {!profileComplete && (
         <Card className="border-brand-200 bg-brand-50">
-          <CardContent className="flex flex-col items-start justify-between gap-4 pt-6 sm:flex-row sm:items-center">
+          <CardContent className="flex justify-between gap-4 pt-6 flex-row items-center">
             <div className="flex items-start gap-3">
               <Building2 className="mt-0.5 h-5 w-5 text-brand-600" />
               <div>
@@ -130,7 +130,7 @@ export function DocumentsPageClient({
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-3">
         {DOCUMENT_TYPES.map((docType) => {
           const existing = getLatestDoc(docType.id);
           const isLoading = loadingType === docType.id;

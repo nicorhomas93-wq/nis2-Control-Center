@@ -13,7 +13,7 @@ export function ContentIdeasList({ ideas }: { ideas: ContentIdea[] }) {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 grid-cols-2">
       {ideas.map((idea) => (
         <Card key={idea.id}>
           <CardHeader className="pb-2">
