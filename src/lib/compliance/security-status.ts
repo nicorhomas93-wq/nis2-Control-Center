@@ -1,17 +1,24 @@
-import { calculateAuditFolderScore, getMissingAuditDocumentTypes } from "@/lib/audit/audit-folders";
-import { getDocumentTypeLabel } from "@/lib/nis2/document-types";
+import { getMissingAuditDocumentTypes } from "@/lib/audit/audit-folders";
+import { calculateAuditReadiness } from "@/lib/compliance/audit-readiness";
 import {
   daysOverdue,
   isWorkComplete,
+  isInProgress,
   normalizeCriticality,
   resolveObligationStatus,
 } from "@/lib/compliance/obligations";
+import {
+  deriveRiskProblemTitle,
+  isPlaceholderValue,
+} from "@/lib/compliance/risk-display";
 import type {
+  AuditReadinessResult,
   ScoreDriver,
   SecurityLevel,
   SecurityStatusResult,
 } from "@/lib/compliance/types";
 import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
+import { getDocumentTypeLabel } from "@/lib/nis2/document-types";
 
 function securityLevelFromScore(score: number): SecurityLevel {
   if (score >= 80) return "stable";
@@ -19,11 +26,33 @@ function securityLevelFromScore(score: number): SecurityLevel {
   return "critical";
 }
 
-function addDriver(
-  drivers: ScoreDriver[],
-  driver: ScoreDriver
-): void {
+function severityLabel(level: string): string {
+  switch (level) {
+    case "critical":
+      return "Kritisch";
+    case "high":
+      return "Hoch";
+    case "medium":
+      return "Mittel";
+    default:
+      return "Niedrig";
+  }
+}
+
+function addDriver(drivers: ScoreDriver[], driver: ScoreDriver): void {
+  if (drivers.some((d) => d.id === driver.id)) return;
   drivers.push(driver);
+}
+
+function riskOpenImpact(risk: Risk): { impact: number; severity: string } {
+  const crit = normalizeCriticality(risk.criticality);
+  if (crit === "critical" || risk.risk_level === "high") {
+    return { impact: crit === "critical" ? 15 : 10, severity: "Hoch" };
+  }
+  if (risk.risk_level === "medium") {
+    return { impact: 5, severity: "Mittel" };
+  }
+  return { impact: 0, severity: "Niedrig" };
 }
 
 export function calculateSecurityStatus(input: {
@@ -36,46 +65,46 @@ export function calculateSecurityStatus(input: {
   const drivers: ScoreDriver[] = [];
   let score = 100;
 
-  const audit = calculateAuditFolderScore(input.documents);
-  const missingTypes = getMissingAuditDocumentTypes(input.documents);
-
   for (const risk of input.risks) {
-    if (isWorkComplete(risk.risk_level)) continue;
-    const level = risk.risk_level;
-    if (level === "high") {
-      const impact = 12;
-      score -= impact;
-      addDriver(drivers, {
-        id: `risk-${risk.id}`,
-        label: `Kritisches Risiko: ${risk.asset}`,
-        impact,
-        category: "risks",
-      });
-    } else if (level === "medium") {
-      const impact = 5;
-      score -= impact;
-      addDriver(drivers, {
-        id: `risk-${risk.id}`,
-        label: `Risiko: ${risk.asset}`,
-        impact,
-        category: "risks",
-      });
-    }
+    if (risk.risk_level === "low") continue;
+
+    const { impact, severity } = riskOpenImpact(risk);
+    if (impact <= 0) continue;
+
+    score -= impact;
+    const title = deriveRiskProblemTitle(risk);
+    addDriver(drivers, {
+      id: `risk-open-${risk.id}`,
+      title,
+      asset: isPlaceholderValue(risk.asset) ? "Nicht zugeordnet" : risk.asset,
+      severity,
+      impact,
+      recommendation:
+        isPlaceholderValue(risk.measure)
+          ? "Risikomaßnahme definieren, umsetzen und im Audit-Ordner dokumentieren"
+          : risk.measure!,
+      category: "risks",
+      label: title,
+    });
 
     const obligation = resolveObligationStatus({
-      status: risk.risk_level === "low" ? "completed" : "open",
+      status: "open",
       deadline: risk.deadline,
       criticality: risk.criticality,
       isMandatory: risk.is_mandatory,
     });
     if (obligation === "overdue" || obligation === "critically_overdue") {
-      const impact = obligation === "critically_overdue" ? 15 : 8;
-      score -= impact;
+      const odImpact = 10;
+      score -= odImpact;
       addDriver(drivers, {
-        id: `risk-od-${risk.id}`,
-        label: `Überfälliges Risiko: ${risk.asset}`,
-        impact,
+        id: `risk-overdue-${risk.id}`,
+        title: `Risikomaßnahme überfällig: ${title}`,
+        asset: risk.asset,
+        severity: "Hoch",
+        impact: odImpact,
+        recommendation: "Frist einhalten oder Maßnahme abschließen und Nachweis hinterlegen",
         category: "obligations",
+        label: `Risikomaßnahme überfällig: ${title}`,
       });
     }
   }
@@ -91,166 +120,152 @@ export function calculateSecurityStatus(input: {
     });
 
     if (obligation === "overdue" || obligation === "critically_overdue") {
-      const impact = obligation === "critically_overdue" ? 14 : 10;
+      const impact = 10;
       score -= impact;
       const days = daysOverdue(measure.deadline);
       addDriver(drivers, {
-        id: `measure-${measure.id}`,
-        label: `Überfällige Maßnahme: ${measure.title}${days > 0 ? ` (${days} T.)` : ""}`,
+        id: `measure-overdue-${measure.id}`,
+        title: `Überfällige Maßnahme: ${measure.title}`,
+        asset: measure.responsible ?? "Organisation",
+        severity: obligation === "critically_overdue" ? "Kritisch" : "Hoch",
         impact,
+        recommendation: `Maßnahme umsetzen${days > 0 ? ` — ${days} Tage überfällig` : ""}`,
         category: "measures",
+        label: `Überfällige Maßnahme: ${measure.title}`,
       });
     } else if (normalizeCriticality(measure.criticality ?? measure.priority) === "critical") {
-      const impact = 8;
+      const impact = 7;
       score -= impact;
       addDriver(drivers, {
         id: `measure-crit-${measure.id}`,
-        label: `Kritische Maßnahme offen: ${measure.title}`,
+        title: measure.title,
+        asset: measure.responsible ?? "Organisation",
+        severity: "Hoch",
         impact,
+        recommendation: measure.target_state ?? "Kritische Maßnahme priorisiert abschließen",
         category: "measures",
-      });
-    } else if (measure.is_mandatory) {
-      const impact = 5;
-      score -= impact;
-      addDriver(drivers, {
-        id: `measure-man-${measure.id}`,
-        label: `Pflichtmaßnahme offen: ${measure.title}`,
-        impact,
-        category: "obligations",
+        label: measure.title,
       });
     }
   }
 
   for (const incident of input.incidents) {
     if (isWorkComplete(incident.status)) continue;
-    const impact = incident.status === "investigating" ? 8 : 12;
-    score -= impact;
-    addDriver(drivers, {
-      id: `incident-${incident.id}`,
-      label: `Offener Vorfall: ${incident.title}`,
-      impact,
-      category: "incidents",
-    });
 
-    const obligation = resolveObligationStatus({
-      status: incident.status,
-      deadline: incident.deadline,
-      criticality: incident.criticality,
-      isMandatory: incident.is_mandatory,
-    });
-    if (obligation === "overdue" || obligation === "critically_overdue") {
-      score -= 10;
+    if (incident.status === "open") {
+      const impact = 15;
+      score -= impact;
       addDriver(drivers, {
-        id: `incident-od-${incident.id}`,
-        label: `Vorfall-Dokumentation überfällig: ${incident.title}`,
-        impact: 10,
+        id: `incident-open-${incident.id}`,
+        title: `Offener Sicherheitsvorfall: ${incident.title}`,
+        asset: incident.responsible ?? "Incident-Response",
+        severity: "Kritisch",
+        impact,
+        recommendation: "Vorfall dokumentieren, bewerten und Meldepflicht prüfen",
         category: "incidents",
+        label: `Offener Vorfall: ${incident.title}`,
+      });
+    } else if (isInProgress(incident.status)) {
+      const impact = 10;
+      score -= impact;
+      addDriver(drivers, {
+        id: `incident-progress-${incident.id}`,
+        title: `Unvollständiger Vorfall-Workflow: ${incident.title}`,
+        asset: incident.responsible ?? "Incident-Response",
+        severity: "Hoch",
+        impact,
+        recommendation: "Dokumentation vervollständigen und Abschluss im System markieren",
+        category: "incidents",
+        label: `Vorfall in Bearbeitung: ${incident.title}`,
       });
     }
   }
 
-  for (const docType of missingTypes.slice(0, 5)) {
-    const impact = 4;
+  const missingTypes = getMissingAuditDocumentTypes(input.documents);
+  for (const docType of missingTypes) {
+    const impact = 5;
     score -= impact;
     addDriver(drivers, {
       id: `doc-missing-${docType}`,
-      label: `Pflichtdokument fehlt: ${getDocumentTypeLabel(docType)}`,
+      title: `Fehlender Nachweis: ${getDocumentTypeLabel(docType)}`,
+      asset: "Audit-Ordner",
+      severity: "Hoch",
       impact,
+      recommendation: `Dokument „${getDocumentTypeLabel(docType)}“ erstellen und im Audit-Ordner ablegen`,
       category: "documents",
-    });
-  }
-
-  if (missingTypes.length > 5) {
-    const extra = (missingTypes.length - 5) * 3;
-    score -= extra;
-    addDriver(drivers, {
-      id: "doc-missing-more",
-      label: `Weitere ${missingTypes.length - 5} Audit-Dokumente fehlen`,
-      impact: extra,
-      category: "documents",
+      label: `Fehlender Nachweis: ${getDocumentTypeLabel(docType)}`,
     });
   }
 
   for (const doc of input.documents) {
     if (!doc.deadline) continue;
     if (new Date(doc.deadline) < new Date()) {
-      const impact = doc.is_mandatory ? 7 : 3;
+      const impact = 8;
       score -= impact;
       addDriver(drivers, {
         id: `doc-exp-${doc.id}`,
-        label: `Dokument abgelaufen: ${doc.title}`,
+        title: `Abgelaufenes Dokument: ${doc.title}`,
+        asset: doc.title,
+        severity: "Hoch",
         impact,
+        recommendation: "Dokument überarbeiten, freigeben und neues Gültigkeitsdatum setzen",
         category: "documents",
+        label: `Abgelaufenes Dokument: ${doc.title}`,
       });
     }
   }
 
   if (!input.company?.nis2_status || input.company.nis2_status === "unbekannt") {
-    score -= 10;
+    score -= 5;
     addDriver(drivers, {
       id: "assessment-missing",
-      label: "Betroffenheitscheck nicht abgeschlossen",
-      impact: 10,
+      title: "Betroffenheitscheck nicht abgeschlossen",
+      asset: "Unternehmen",
+      severity: "Mittel",
+      impact: 5,
+      recommendation: "NIS2-Betroffenheit prüfen und Ergebnis dokumentieren",
       category: "assessment",
+      label: "Betroffenheitscheck nicht abgeschlossen",
     });
   }
 
   score = Math.max(0, Math.min(100, score));
   const level = securityLevelFromScore(score);
-
   drivers.sort((a, b) => b.impact - a.impact);
 
-  const topDrivers = drivers.slice(0, 5);
-  const summary = buildSummary(level, topDrivers, input);
+  const auditReadiness = calculateAuditReadiness(input);
+  const summary = buildSummary(level, drivers, score);
 
   return {
     score,
     level,
     summary,
     drivers: drivers.slice(0, 20),
-    auditReadinessPercent: audit.percent,
+    auditReadiness,
+    auditReadinessPercent: auditReadiness.percent,
   };
 }
 
 function buildSummary(
   level: SecurityLevel,
-  topDrivers: ScoreDriver[],
-  input: {
-    measures: Measure[];
-    risks: Risk[];
-    incidents: Incident[];
-  }
+  drivers: ScoreDriver[],
+  score: number
 ): string {
-  const criticalRisks = input.risks.filter((r) => r.risk_level === "high").length;
-  const overdueMeasures = input.measures.filter((m) => {
-    const o = resolveObligationStatus({
-      status: m.status,
-      deadline: m.deadline,
-      criticality: m.criticality ?? m.priority,
-      isMandatory: m.is_mandatory,
-    });
-    return o === "overdue" || o === "critically_overdue";
-  }).length;
-  const openIncidents = input.incidents.filter((i) => !isWorkComplete(i.status)).length;
-
   if (level === "stable") {
-    return "Ihr Sicherheitsstatus ist aktuell stabil. Pflegen Sie Nachweise und Maßnahmen planmäßig.";
+    return `Ihr Sicherheitsstatus ist stabil (${score}/100). Pflegen Sie Nachweise und Maßnahmen planmäßig.`;
   }
 
-  if (topDrivers.length === 0) {
-    return "Aktuell besteht Handlungsbedarf. Prüfen Sie Risiken, Maßnahmen und Audit-Ordner.";
+  const top = drivers[0];
+  if (!top) {
+    return `Aktueller Score: ${score}/100 — Handlungsbedarf in Risiken, Maßnahmen oder Nachweisen.`;
   }
 
-  const parts: string[] = [];
-  if (criticalRisks > 0) parts.push(`${criticalRisks} kritische${criticalRisks === 1 ? "s" : ""} Risiko${criticalRisks === 1 ? "" : "en"}`);
-  if (overdueMeasures > 0) parts.push(`${overdueMeasures} überfällige Maßnahme${overdueMeasures === 1 ? "" : "n"}`);
-  if (openIncidents > 0) parts.push(`${openIncidents} offene${openIncidents === 1 ? "r" : ""} Sicherheitsvorfall${openIncidents === 1 ? "" : "e"}`);
+  const prefix =
+    level === "critical"
+      ? "Kritischer Sicherheitsstatus"
+      : "Erhöhter Handlungsbedarf";
 
-  if (parts.length === 0) {
-    return `Aktuell besteht erhöhter Handlungsbedarf: ${topDrivers[0]?.label ?? "offene Punkte prüfen"}.`;
-  }
-
-  return `Aktuell besteht erhöhter Handlungsbedarf wegen ${parts.join(" und ")}.`;
+  return `${prefix} (${score}/100): ${top.title}. Empfehlung: ${top.recommendation}`;
 }
 
 export function securityLevelBadgeClass(level: SecurityLevel): string {
@@ -274,3 +289,5 @@ export function securityLevelBarClass(level: SecurityLevel): string {
       return "bg-red-500";
   }
 }
+
+export { severityLabel };

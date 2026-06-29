@@ -6,9 +6,13 @@ import {
   normalizeCriticality,
   resolveObligationStatus,
 } from "@/lib/compliance/obligations";
+import {
+  deriveRiskProblemTitle,
+  displayRiskField,
+  RISK_FIELD_FALLBACKS,
+} from "@/lib/compliance/risk-display";
 import type { CriticalityLevel, NextStepAction } from "@/lib/compliance/types";
 import type { Document, Incident, Measure, Risk } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
 
 function priorityWeight(p: CriticalityLevel): number {
   switch (p) {
@@ -42,15 +46,13 @@ export function buildNextSteps(input: {
     const priority = normalizeCriticality(measure.criticality ?? measure.priority);
     const overdueDays = daysOverdue(measure.deadline);
 
-    let reason = "Maßnahme noch offen";
+    let reason = "Offene Maßnahme mit Audit-Relevanz";
     if (obligation === "critically_overdue") {
-      reason = `Kritisch überfällig${overdueDays > 0 ? ` seit ${overdueDays} Tagen` : ""}`;
+      reason = `Kritisch überfällig — Score und Audit-Bereitschaft werden belastet${overdueDays > 0 ? ` (${overdueDays} Tage)` : ""}`;
     } else if (obligation === "overdue") {
-      reason = `Überfällig${overdueDays > 0 ? ` seit ${overdueDays} Tagen` : ""}`;
+      reason = `Frist überschritten${overdueDays > 0 ? ` seit ${overdueDays} Tagen` : ""} — Nachweis fehlt`;
     } else if (measure.is_mandatory) {
-      reason = "Pflichtmaßnahme — Audit-relevant";
-    } else if (priority === "critical") {
-      reason = "Kritische Priorität";
+      reason = "Pflichtmaßnahme — für Audit-Bereitschaft erforderlich";
     }
 
     actions.push({
@@ -60,6 +62,10 @@ export function buildNextSteps(input: {
       priority,
       deadline: measure.deadline ?? null,
       href: "/measures",
+      asset: measure.responsible ?? "Organisation",
+      recommendation:
+        measure.target_state ??
+        "Maßnahme umsetzen, Verantwortlichkeit bestätigen und Status auf erledigt setzen",
       sortScore:
         priorityWeight(priority) +
         (obligation === "critically_overdue" ? 50 : obligation === "overdue" ? 30 : 0) +
@@ -69,7 +75,8 @@ export function buildNextSteps(input: {
 
   for (const risk of input.risks) {
     if (risk.risk_level === "low") continue;
-    const priority: CriticalityLevel = risk.risk_level === "high" ? "critical" : "high";
+    const priority: CriticalityLevel =
+      risk.risk_level === "high" ? "critical" : "high";
     const obligation = resolveObligationStatus({
       status: "open",
       deadline: risk.deadline,
@@ -77,17 +84,25 @@ export function buildNextSteps(input: {
       isMandatory: risk.is_mandatory,
     });
 
+    const measureText = displayRiskField(risk.measure, RISK_FIELD_FALLBACKS.measure);
+    const title = deriveRiskProblemTitle(risk);
+
     actions.push({
       id: `risk-${risk.id}`,
-      title: `Risiko ${risk.asset} absichern`,
+      title,
       reason:
         obligation === "overdue" || obligation === "critically_overdue"
-          ? `Risiko-Maßnahme überfällig (${risk.threat})`
-          : `Hohes Risiko: ${risk.threat}`,
+          ? `Risikomaßnahme überfällig — ${displayRiskField(risk.threat, RISK_FIELD_FALLBACKS.threat)}`
+          : `Offenes ${risk.risk_level === "high" ? "hohes" : "mittleres"} Risiko: ${displayRiskField(risk.threat, RISK_FIELD_FALLBACKS.threat)}`,
       priority,
       deadline: risk.deadline ?? null,
       href: "/risks",
-      sortScore: priorityWeight(priority) + (risk.risk_level === "high" ? 25 : 10),
+      asset: displayRiskField(risk.asset, RISK_FIELD_FALLBACKS.asset),
+      recommendation: measureText,
+      sortScore:
+        priorityWeight(priority) +
+        (risk.risk_level === "high" ? 25 : 10) +
+        (obligation === "overdue" ? 20 : 0),
     });
   }
 
@@ -103,29 +118,35 @@ export function buildNextSteps(input: {
 
     actions.push({
       id: `incident-${incident.id}`,
-      title: `Vorfall dokumentieren: ${incident.title}`,
+      title: `Incident vom ${new Date(incident.created_at).toLocaleDateString("de-DE")} dokumentieren`,
       reason:
         obligation === "overdue" || obligation === "critically_overdue"
-          ? "Nachweispflicht offen — Frist überschritten"
+          ? "Nachweispflicht offen — Melde- und Dokumentationsfrist überschritten"
           : incident.status === "investigating"
-            ? "Untersuchung läuft — Dokumentation vervollständigen"
-            : "Sicherheitsvorfall erfordert Dokumentation",
+            ? "Untersuchung läuft — Abschluss und Nachweis im Audit-Ordner fehlen"
+            : "Sicherheitsvorfall erfordert vollständige Dokumentation",
       priority,
       deadline: incident.deadline ?? null,
       href: "/incidents",
+      asset: incident.title,
+      recommendation:
+        "Vorfallbericht vervollständigen, Verantwortliche benennen und Status auf erledigt setzen",
       sortScore: priorityWeight(priority) + 35,
     });
   }
 
   const missing = getMissingAuditDocumentTypes(input.documents);
   for (const docType of missing.slice(0, 3)) {
+    const label = getDocumentTypeLabel(docType);
     actions.push({
       id: `doc-${docType}`,
-      title: `${getDocumentTypeLabel(docType)} erstellen`,
-      reason: "Pflichtdokument fehlt im Audit-Ordner",
+      title: `${label} erstellen`,
+      reason: "Pflichtdokument fehlt im Audit-Ordner — Audit-Bereitschaft wird reduziert",
       priority: "high",
       deadline: null,
       href: "/documents",
+      asset: "Audit-Ordner",
+      recommendation: `Dokument generieren, prüfen und als Nachweis im Audit-Ordner ablegen`,
       sortScore: 55,
     });
   }
@@ -134,6 +155,10 @@ export function buildNextSteps(input: {
 }
 
 export function formatStepDeadline(deadline: string | null): string {
-  if (!deadline) return "Keine Frist";
-  return formatDate(deadline);
+  if (!deadline) return "Frist noch nicht gesetzt";
+  return new Date(deadline).toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }

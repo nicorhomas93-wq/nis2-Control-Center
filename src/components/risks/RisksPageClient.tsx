@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Risk } from "@/lib/types";
+import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -10,6 +11,7 @@ import { Select } from "@/components/ui/Select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { resolveObligationStatus } from "@/lib/compliance/obligations";
+import { displayRiskField, RISK_FIELD_FALLBACKS } from "@/lib/compliance/risk-display";
 import { OBLIGATION_STATUS_LABELS } from "@/lib/compliance/types";
 import { Loader2, Sparkles } from "lucide-react";
 
@@ -59,13 +61,7 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
 
   async function updateRisk(
     id: string,
-    fields: {
-      is_mandatory?: boolean;
-      criticality?: string;
-      deadline?: string | null;
-      responsible?: string;
-      escalation_level?: number;
-    }
+    fields: Record<string, unknown>
   ) {
     const res = await fetch("/api/risks", {
       method: "PATCH",
@@ -74,7 +70,7 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
     });
     if (!res.ok) return;
     setRisks((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...fields } : r))
+      prev.map((r) => (r.id === id ? { ...r, ...fields } as Risk : r))
     );
     setEditingId(null);
     router.refresh();
@@ -91,8 +87,9 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
         </CardHeader>
         <CardContent>
           <p className="mb-4 text-sm text-slate-600">
-            Generieren Sie eine strukturierte Risikoanalyse auf Basis Ihrer Unternehmensdaten.
-            Kritische Risiken werden automatisch als Pflichtaufgaben mit Frist hinterlegt.
+            Strukturierte Risikoanalyse mit konkreten Assets, Bedrohungen, Schwachstellen und
+            Maßnahmen — abgeleitet aus Ihrem Unternehmensprofil. Kritische Risiken werden als
+            Pflichtaufgaben mit Frist hinterlegt.
           </p>
           <Button onClick={generateAnalysis} disabled={loading}>
             {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Wird generiert...</> : "Risikoanalyse generieren"}
@@ -105,16 +102,20 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
         <Card>
           <CardHeader><CardTitle>Risikomatrix</CardTitle></CardHeader>
           <CardContent className="overflow-x-auto p-0">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-slate-500">
-                  <th className="px-6 py-3 font-medium">Asset</th>
-                  <th className="px-6 py-3 font-medium">Bedrohung</th>
-                  <th className="px-6 py-3 font-medium">Risiko</th>
-                  <th className="px-6 py-3 font-medium">Maßnahme</th>
-                  <th className="px-6 py-3 font-medium">Pflicht / Frist</th>
-                  <th className="px-6 py-3 font-medium">Pflichtstatus</th>
-                  <th className="px-6 py-3 font-medium">Aktion</th>
+                  <th className="px-4 py-3 font-medium">Asset</th>
+                  <th className="px-4 py-3 font-medium">Bedrohung</th>
+                  <th className="px-4 py-3 font-medium">Schwachstelle</th>
+                  <th className="px-4 py-3 font-medium">Risiko</th>
+                  <th className="px-4 py-3 font-medium">Maßnahme</th>
+                  <th className="px-4 py-3 font-medium">Pflicht</th>
+                  <th className="px-4 py-3 font-medium">Frist</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Verantwortlich</th>
+                  <th className="px-4 py-3 font-medium">Business Impact</th>
+                  <th className="px-4 py-3 font-medium">Aktion</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -133,29 +134,46 @@ export function RisksPageClient({ companyId, initialRisks }: RisksPageClientProp
                         : "bg-slate-100 text-slate-700";
 
                   return (
-                    <tr key={r.id}>
-                      <td className="px-6 py-4 font-medium text-slate-900">{r.asset}</td>
-                      <td className="px-6 py-4 text-slate-600">{r.threat}</td>
-                      <td className="px-6 py-4">
+                    <tr key={r.id} className="align-top">
+                      <td className="px-4 py-4 font-medium text-slate-900">
+                        {displayRiskField(r.asset, RISK_FIELD_FALLBACKS.asset)}
+                      </td>
+                      <td className="px-4 py-4 text-slate-600">
+                        {displayRiskField(r.threat, RISK_FIELD_FALLBACKS.threat)}
+                      </td>
+                      <td className="px-4 py-4 text-slate-600">
+                        {displayRiskField(r.vulnerability, RISK_FIELD_FALLBACKS.vulnerability)}
+                      </td>
+                      <td className="px-4 py-4">
                         <Badge className={LEVEL_COLORS[r.risk_level]}>{LEVEL_LABELS[r.risk_level]}</Badge>
                       </td>
-                      <td className="px-6 py-4 text-slate-600">{r.measure ?? "–"}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4 text-slate-600">
+                        {displayRiskField(r.measure, RISK_FIELD_FALLBACKS.measure)}
+                      </td>
+                      <td className="px-4 py-4">
                         {r.is_mandatory ? (
-                          <Badge className="bg-indigo-100 text-indigo-800">Pflicht</Badge>
+                          <Badge className="bg-indigo-100 text-indigo-800">Ja</Badge>
                         ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                        {r.deadline && (
-                          <p className="mt-1 text-xs text-slate-500">{r.deadline.slice(0, 10)}</p>
+                          <span className="text-slate-500">Nein</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4 text-slate-600">
+                        {r.deadline
+                          ? formatDate(r.deadline)
+                          : RISK_FIELD_FALLBACKS.deadline}
+                      </td>
+                      <td className="px-4 py-4">
                         <Badge className={obligationClass}>
                           {OBLIGATION_STATUS_LABELS[obligation]}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4 text-slate-600">
+                        {displayRiskField(r.responsible, RISK_FIELD_FALLBACKS.responsible)}
+                      </td>
+                      <td className="max-w-[200px] px-4 py-4 text-xs text-slate-600">
+                        {displayRiskField(r.business_impact, RISK_FIELD_FALLBACKS.businessImpact)}
+                      </td>
+                      <td className="px-4 py-4">
                         <Button size="sm" variant="outline" onClick={() => setEditingId(r.id)}>
                           Bearbeiten
                         </Button>
@@ -210,12 +228,16 @@ function RiskObligationEditor({
   const [criticality, setCriticality] = useState(risk.criticality ?? "medium");
   const [deadline, setDeadline] = useState(risk.deadline?.slice(0, 10) ?? "");
   const [responsible, setResponsible] = useState(risk.responsible ?? "");
+  const [vulnerability, setVulnerability] = useState(risk.vulnerability ?? "");
+  const [businessImpact, setBusinessImpact] = useState(risk.business_impact ?? "");
   const [escalationLevel, setEscalationLevel] = useState(String(risk.escalation_level ?? 0));
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Pflichtfelder: {risk.asset}</CardTitle>
+        <CardTitle className="text-base">
+          Pflichtfelder: {displayRiskField(risk.asset, RISK_FIELD_FALLBACKS.asset)}
+        </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="flex items-center gap-2">
@@ -244,6 +266,14 @@ function RiskObligationEditor({
           <Label>Verantwortlich</Label>
           <Input value={responsible} onChange={(e) => setResponsible(e.target.value)} />
         </div>
+        <div className="sm:col-span-2">
+          <Label>Schwachstelle</Label>
+          <Input value={vulnerability} onChange={(e) => setVulnerability(e.target.value)} />
+        </div>
+        <div className="sm:col-span-2 lg:col-span-3">
+          <Label>Business Impact (Kurztext)</Label>
+          <Input value={businessImpact} onChange={(e) => setBusinessImpact(e.target.value)} />
+        </div>
         <div>
           <Label>Eskalationsstufe</Label>
           <Input
@@ -262,6 +292,8 @@ function RiskObligationEditor({
                 criticality,
                 deadline: deadline || null,
                 responsible: responsible || null,
+                vulnerability: vulnerability || null,
+                business_impact: businessImpact || null,
                 escalation_level: Number(escalationLevel) || 0,
               })
             }

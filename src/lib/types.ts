@@ -142,6 +142,8 @@ export interface Risk {
   threat: string;
   risk_level: RiskLevel;
   measure: string | null;
+  vulnerability?: string | null;
+  business_impact?: string | null;
   analysis_content: string | null;
   is_mandatory?: boolean;
   criticality?: string | null;

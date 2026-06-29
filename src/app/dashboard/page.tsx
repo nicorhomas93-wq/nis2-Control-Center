@@ -146,7 +146,7 @@ export default async function DashboardPage({
           level={securityStatus.level}
           summary={securityStatus.summary}
           drivers={securityStatus.drivers}
-          auditReadinessPercent={securityStatus.auditReadinessPercent}
+          auditReadiness={securityStatus.auditReadiness}
           history={securityHistory}
         />
       )}

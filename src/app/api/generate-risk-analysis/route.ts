@@ -7,37 +7,8 @@ import {
   generateFallbackRiskAnalysis,
   generateWithAI,
 } from "@/lib/ai/generate";
-import type { RiskLevel } from "@/lib/types";
+import { buildQualityRiskRows } from "@/lib/compliance/risk-rows";
 import { syncCompanySecurityScore } from "@/lib/compliance/sync";
-
-function obligationDefaultsForRisk(level: RiskLevel) {
-  const deadline = new Date();
-  const days = level === "high" ? 30 : level === "medium" ? 90 : 180;
-  deadline.setDate(deadline.getDate() + days);
-  return {
-    is_mandatory: level === "high",
-    criticality: level === "high" ? "critical" : level === "medium" ? "high" : "medium",
-    deadline: deadline.toISOString(),
-    escalation_level: 0,
-  };
-}
-
-function parseRisksFromAnalysis(content: string, companyId: string) {
-  const lines = content.split("\n").filter((l) => l.includes("|") && !l.startsWith("---") && !l.toLowerCase().includes("asset"));
-  return lines.slice(0, 6).map((line) => {
-    const parts = line.split("|").map((p) => p.trim());
-    const level = (parts[2]?.toLowerCase().includes("hoch") ? "high" : parts[2]?.toLowerCase().includes("niedrig") ? "low" : "medium") as RiskLevel;
-    return {
-      company_id: companyId,
-      asset: parts[0] || "IT-System",
-      threat: parts[1] || "Unbekannte Bedrohung",
-      risk_level: level,
-      measure: parts[3] || null,
-      analysis_content: content,
-      ...obligationDefaultsForRisk(level),
-    };
-  });
-}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -56,7 +27,7 @@ export async function POST(request: Request) {
 
   await supabase.from("risks").delete().eq("company_id", companyId);
 
-  const riskRows = parseRisksFromAnalysis(analysis, companyId);
+  const riskRows = buildQualityRiskRows(company, analysis);
   const { data: risks, error } = await supabase.from("risks").insert(riskRows).select();
 
   if (error) {

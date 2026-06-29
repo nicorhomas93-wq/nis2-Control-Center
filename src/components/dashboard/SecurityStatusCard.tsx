@@ -8,6 +8,7 @@ import {
 } from "@/lib/compliance/security-status";
 import {
   SECURITY_LEVEL_LABELS,
+  type AuditReadinessResult,
   type ScoreDriver,
   type SecurityLevel,
   type SecurityScoreSnapshot,
@@ -18,7 +19,7 @@ interface SecurityStatusCardProps {
   level: SecurityLevel;
   summary: string;
   drivers: ScoreDriver[];
-  auditReadinessPercent: number;
+  auditReadiness: AuditReadinessResult;
   history: SecurityScoreSnapshot[];
 }
 
@@ -27,7 +28,7 @@ export function SecurityStatusCard({
   level,
   summary,
   drivers,
-  auditReadinessPercent,
+  auditReadiness,
   history,
 }: SecurityStatusCardProps) {
   const topDrivers = drivers.slice(0, 5);
@@ -65,8 +66,9 @@ export function SecurityStatusCard({
               />
             </div>
             <p className="mt-2 text-sm">
-              Audit-Bereitschaft: <strong>{auditReadinessPercent}%</strong>
+              Audit-Bereitschaft: <strong>{auditReadiness.percent}%</strong> – {auditReadiness.label}
             </p>
+            <p className="mt-1 text-xs opacity-80">{auditReadiness.summary}</p>
           </div>
         </div>
 
@@ -95,14 +97,30 @@ export function SecurityStatusCard({
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide opacity-70">
               Was zieht den Score runter? (Top 5)
             </p>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-3 text-sm">
               {topDrivers.map((d) => (
                 <li
                   key={d.id}
-                  className="flex items-center justify-between gap-3 rounded-lg bg-white/50 px-3 py-2"
+                  className="rounded-lg bg-white/50 px-4 py-3"
                 >
-                  <span>{d.label}</span>
-                  <span className="shrink-0 font-semibold tabular-nums">−{d.impact}</span>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="font-semibold">{d.title}</p>
+                    <span className="shrink-0 font-semibold tabular-nums">−{d.impact} Punkte</span>
+                  </div>
+                  <dl className="mt-2 grid gap-1 text-xs opacity-90 sm:grid-cols-2">
+                    <div>
+                      <dt className="inline font-medium">Asset: </dt>
+                      <dd className="inline">{d.asset}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline font-medium">Schweregrad: </dt>
+                      <dd className="inline">{d.severity}</dd>
+                    </div>
+                  </dl>
+                  <p className="mt-2 text-xs">
+                    <span className="font-medium">Empfehlung: </span>
+                    {d.recommendation}
+                  </p>
                 </li>
               ))}
             </ul>

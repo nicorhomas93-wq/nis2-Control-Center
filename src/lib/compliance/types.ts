@@ -19,9 +19,23 @@ export interface ObligationFields {
 
 export interface ScoreDriver {
   id: string;
-  label: string;
+  title: string;
+  asset: string;
+  severity: string;
   impact: number;
+  recommendation: string;
   category: string;
+  /** @deprecated Nutze title — bleibt für Abwärtskompatibilität */
+  label: string;
+}
+
+export type AuditReadinessLevel = "ready" | "partial" | "not_ready";
+
+export interface AuditReadinessResult {
+  percent: number;
+  level: AuditReadinessLevel;
+  label: string;
+  summary: string;
 }
 
 export interface SecurityStatusResult {
@@ -29,6 +43,8 @@ export interface SecurityStatusResult {
   level: SecurityLevel;
   summary: string;
   drivers: ScoreDriver[];
+  auditReadiness: AuditReadinessResult;
+  /** @deprecated Nutze auditReadiness.percent */
   auditReadinessPercent: number;
 }
 
@@ -46,6 +62,8 @@ export interface NextStepAction {
   deadline: string | null;
   href: string;
   sortScore: number;
+  recommendation?: string;
+  asset?: string;
 }
 
 export const SECURITY_LEVEL_LABELS: Record<SecurityLevel, string> = {

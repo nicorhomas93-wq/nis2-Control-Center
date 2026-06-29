@@ -29,8 +29,7 @@ export function NextStepsCard({ steps }: { steps: NextStepAction[] }) {
           <CardTitle>Das solltest du jetzt tun</CardTitle>
         </div>
         <p className="text-sm text-slate-500">
-          Die fünf wichtigsten nächsten Schritte — priorisiert nach Kritikalität, Frist und
-          Audit-Relevanz.
+          Konkrete nächste Schritte — priorisiert nach Kritikalität, Frist und Audit-Relevanz.
         </p>
       </CardHeader>
       <CardContent>
@@ -53,6 +52,14 @@ export function NextStepsCard({ steps }: { steps: NextStepAction[] }) {
                     </Badge>
                   </div>
                   <p className="text-sm text-slate-600">{step.reason}</p>
+                  {step.asset && (
+                    <p className="mt-1 text-xs text-slate-500">Betroffenes Asset: {step.asset}</p>
+                  )}
+                  {step.recommendation && (
+                    <p className="mt-1 text-xs text-brand-700">
+                      Empfehlung: {step.recommendation}
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-slate-400">
                     Frist: {formatStepDeadline(step.deadline)}
                   </p>

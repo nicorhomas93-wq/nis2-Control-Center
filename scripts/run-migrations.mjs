@@ -45,6 +45,7 @@ const ORDER = [
   "add_b2b_outreach_web_presence.sql",
   "add_customer_messages.sql",
   "add_compliance_engine.sql",
+  "add_risk_quality_fields.sql",
 ];
 
 const url = process.env.DATABASE_URL;

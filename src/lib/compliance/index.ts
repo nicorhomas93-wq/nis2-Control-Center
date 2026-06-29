@@ -8,3 +8,15 @@ export {
   loadSecurityScoreHistory,
 } from "./sync";
 export { buildComplianceWarnings } from "./warnings";
+export { calculateAuditReadiness, AUDIT_READINESS_LABELS } from "./audit-readiness";
+export {
+  buildQualityRiskRows,
+  buildRiskTemplates,
+  parseRisksFromAnalysis,
+} from "./risk-rows";
+export {
+  displayRiskField,
+  deriveRiskProblemTitle,
+  RISK_FIELD_FALLBACKS,
+  isPlaceholderValue,
+} from "./risk-display";
