@@ -28,9 +28,16 @@ import { redirect } from "next/navigation";
 function buildRecentActivity(
   assessments: Nis2Assessment[],
   documents: Document[],
-  measures: Measure[]
+  measures: Measure[],
+  complianceEvents: { id: string; title: string; details: string | null; created_at: string }[] = []
 ): ActivityItem[] {
   const items: ActivityItem[] = [
+    ...complianceEvents.map((e) => ({
+      id: `e-${e.id}`,
+      action: e.title,
+      details: e.details,
+      created_at: e.created_at,
+    })),
     ...assessments.map((a) => ({
       id: `a-${a.id}`,
       action: "Betroffenheitscheck durchgeführt",
@@ -77,15 +84,22 @@ export default async function DashboardPage({
   let assessments: Nis2Assessment[] = [];
   let lastAuditExport: string | null = null;
   let securityHistory: Awaited<ReturnType<typeof loadSecurityScoreHistory>> = [];
+  let complianceEvents: { id: string; title: string; details: string | null; created_at: string }[] = [];
 
   if (company) {
-    const [docRes, measRes, risksRes, incidentsRes, assessRes, auditRes] = await Promise.all([
+    const [docRes, measRes, risksRes, incidentsRes, assessRes, auditRes, eventsRes] = await Promise.all([
       supabase.from("documents").select("*").eq("company_id", company.id).order("created_at", { ascending: false }),
       supabase.from("measures").select("*").eq("company_id", company.id),
       supabase.from("risks").select("*").eq("company_id", company.id),
       supabase.from("incidents").select("*").eq("company_id", company.id),
       supabase.from("nis2_assessments").select("*").eq("company_id", company.id).order("created_at", { ascending: false }).limit(5),
       supabase.from("audit_exports").select("created_at").eq("company_id", company.id).order("created_at", { ascending: false }).limit(1),
+      supabase
+        .from("compliance_events")
+        .select("id, title, details, created_at")
+        .eq("company_id", company.id)
+        .order("created_at", { ascending: false })
+        .limit(10),
     ]);
     docs = (docRes.data ?? []) as Document[];
     meas = (measRes.data ?? []) as Measure[];
@@ -93,6 +107,7 @@ export default async function DashboardPage({
     incidents = (incidentsRes.data ?? []) as Incident[];
     assessments = (assessRes.data ?? []) as Nis2Assessment[];
     lastAuditExport = auditRes.data?.[0]?.created_at ?? null;
+    complianceEvents = (eventsRes.data ?? []) as typeof complianceEvents;
 
     await syncCompanySecurityScore(supabase, company.id);
     securityHistory = await loadSecurityScoreHistory(supabase, company.id);
@@ -122,7 +137,7 @@ export default async function DashboardPage({
   const openMeasures = meas.filter((m) => m.status !== "completed").length;
   const score = calculateComplianceScore(company, docs, meas);
   const auditScore = calculateAuditFolderScore(docs);
-  const activities = buildRecentActivity(assessments, docs, meas);
+  const activities = buildRecentActivity(assessments, docs, meas, complianceEvents);
   const missingCount = auditScore.total - auditScore.present;
 
   return (

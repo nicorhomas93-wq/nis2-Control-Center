@@ -47,6 +47,7 @@ const ORDER = [
   "add_compliance_engine.sql",
   "add_risk_quality_fields.sql",
   "add_company_assets.sql",
+  "add_compliance_events.sql",
 ];
 
 const url = process.env.DATABASE_URL;

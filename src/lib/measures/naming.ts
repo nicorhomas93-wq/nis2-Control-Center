@@ -2,7 +2,10 @@ const PROBLEM_WORD_PATTERN =
   /\b(fehlend(?:e|er|es|en)?|unzureichend(?:e|er|es|en)?|mangelnd(?:e|er|es|en)?)\b/i;
 
 export const MEASURE_PROBLEM_WARNING =
-  "Maßnahme ist kein konkreter Handlungsschritt. Bitte formulieren Sie eine umsetzbare Aktion.";
+  "Diese Eingabe beschreibt ein Problem, keine Maßnahme. Bitte formulieren Sie eine konkrete Handlung.";
+
+/** @deprecated Alias — gleicher Text wie MEASURE_PROBLEM_WARNING */
+export const RISK_ASSIST_MEASURE_WARNING = MEASURE_PROBLEM_WARNING;
 
 export function validateMeasureTitle(title: string): {
   valid: boolean;

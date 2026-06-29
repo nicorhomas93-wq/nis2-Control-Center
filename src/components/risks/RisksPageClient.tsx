@@ -5,18 +5,15 @@ import { useRouter } from "next/navigation";
 import type { CompanyAsset, Risk } from "@/lib/types";
 import { resolveRiskAsset } from "@/lib/assets/resolve";
 import { ASSET_CATEGORY_LABELS } from "@/lib/assets/types";
-import { AssetPicker } from "@/components/assets/AssetPicker";
+import { RiskAssistModal } from "@/components/risks/RiskAssistModal";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
-import { Select } from "@/components/ui/Select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { resolveObligationStatus } from "@/lib/compliance/obligations";
 import { displayRiskField, RISK_FIELD_FALLBACKS } from "@/lib/compliance/risk-display";
 import { OBLIGATION_STATUS_LABELS } from "@/lib/compliance/types";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, Wand2 } from "lucide-react";
 
 const LEVEL_COLORS = {
   high: "bg-red-100 text-red-800",
@@ -71,18 +68,9 @@ export function RisksPageClient({
     router.refresh();
   }
 
-  async function updateRisk(
-    id: string,
-    fields: Record<string, unknown>
-  ) {
-    const res = await fetch("/api/risks", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...fields }),
-    });
-    if (!res.ok) return;
+  async function handleAssistSaved(id: string, fields: Partial<Risk>) {
     setRisks((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...fields } as Risk : r))
+      prev.map((r) => (r.id === id ? { ...r, ...fields } : r))
     );
     setEditingId(null);
     router.refresh();
@@ -223,6 +211,7 @@ export function RisksPageClient({
                       </td>
                       <td className="px-4 py-4">
                         <Button size="sm" variant="outline" onClick={() => setEditingId(r.id)}>
+                          <Wand2 className="h-3.5 w-3.5" />
                           Bearbeiten
                         </Button>
                       </td>
@@ -236,13 +225,13 @@ export function RisksPageClient({
       )}
 
       {editingId && (
-        <RiskObligationEditor
+        <RiskAssistModal
           companyId={companyId}
           risk={risks.find((r) => r.id === editingId)!}
           assets={assets}
           onAssetsChange={setAssets}
-          onSave={updateRisk}
-          onCancel={() => setEditingId(null)}
+          onSaved={(fields) => handleAssistSaved(editingId, fields)}
+          onClose={() => setEditingId(null)}
         />
       )}
 
@@ -263,116 +252,5 @@ export function RisksPageClient({
         </Card>
       )}
     </div>
-  );
-}
-
-function RiskObligationEditor({
-  companyId,
-  risk,
-  assets,
-  onAssetsChange,
-  onSave,
-  onCancel,
-}: {
-  companyId: string;
-  risk: Risk;
-  assets: CompanyAsset[];
-  onAssetsChange: (assets: CompanyAsset[]) => void;
-  onSave: (id: string, fields: Record<string, unknown>) => void;
-  onCancel: () => void;
-}) {
-  const [assetId, setAssetId] = useState(risk.asset_id ?? null);
-  const [isMandatory, setIsMandatory] = useState(Boolean(risk.is_mandatory));
-  const [criticality, setCriticality] = useState(risk.criticality ?? "medium");
-  const [deadline, setDeadline] = useState(risk.deadline?.slice(0, 10) ?? "");
-  const [responsible, setResponsible] = useState(risk.responsible ?? "");
-  const [vulnerability, setVulnerability] = useState(risk.vulnerability ?? "");
-  const [businessImpact, setBusinessImpact] = useState(risk.business_impact ?? "");
-  const [escalationLevel, setEscalationLevel] = useState(String(risk.escalation_level ?? 0));
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">
-          Pflichtfelder: {resolveRiskAsset(risk, assets).name}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="sm:col-span-2 lg:col-span-3">
-          <AssetPicker
-            companyId={companyId}
-            assets={assets}
-            value={assetId}
-            onChange={(id) => setAssetId(id)}
-            onAssetsChange={onAssetsChange}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={isMandatory}
-            onChange={(e) => setIsMandatory(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300"
-          />
-          <Label>Pflichtaufgabe</Label>
-        </div>
-        <div>
-          <Label>Kritikalität</Label>
-          <Select value={criticality} onChange={(e) => setCriticality(e.target.value)}>
-            <option value="low">Niedrig</option>
-            <option value="medium">Mittel</option>
-            <option value="high">Hoch</option>
-            <option value="critical">Kritisch</option>
-          </Select>
-        </div>
-        <div>
-          <Label>Deadline</Label>
-          <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-        </div>
-        <div>
-          <Label>Verantwortlich</Label>
-          <Input value={responsible} onChange={(e) => setResponsible(e.target.value)} />
-        </div>
-        <div className="sm:col-span-2">
-          <Label>Schwachstelle</Label>
-          <Input value={vulnerability} onChange={(e) => setVulnerability(e.target.value)} />
-        </div>
-        <div className="sm:col-span-2 lg:col-span-3">
-          <Label>Business Impact (Kurztext)</Label>
-          <Input value={businessImpact} onChange={(e) => setBusinessImpact(e.target.value)} />
-        </div>
-        <div>
-          <Label>Eskalationsstufe</Label>
-          <Input
-            type="number"
-            min={0}
-            max={5}
-            value={escalationLevel}
-            onChange={(e) => setEscalationLevel(e.target.value)}
-          />
-        </div>
-        <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-3">
-          <Button
-            onClick={() =>
-              onSave(risk.id, {
-                asset_id: assetId,
-                is_mandatory: isMandatory,
-                criticality,
-                deadline: deadline || null,
-                responsible: responsible || null,
-                vulnerability: vulnerability || null,
-                business_impact: businessImpact || null,
-                escalation_level: Number(escalationLevel) || 0,
-              })
-            }
-          >
-            Speichern
-          </Button>
-          <Button variant="outline" onClick={onCancel}>
-            Abbrechen
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
