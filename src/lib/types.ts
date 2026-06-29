@@ -154,6 +154,7 @@ export interface Risk {
   escalation_level?: number | null;
   responsible?: string | null;
   asset_id?: string | null;
+  treatment_status?: "open" | "treated" | "reduced" | null;
   created_at: string;
   updated_at: string;
 }

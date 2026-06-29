@@ -1,8 +1,37 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyCompanyOwnership } from "@/lib/company";
-import { syncCompanySecurityScore } from "@/lib/compliance/sync";
+import { getMissingAuditDocumentTypes } from "@/lib/audit/audit-folders";
+import { calculateSecurityStatus } from "@/lib/compliance/security-status";
+import { reconcileMeasureCompliance } from "@/lib/compliance/measure-risk-link";
+import { buildScoreFeedbackMessage } from "@/lib/compliance/score-feedback";
+import { isWorkComplete } from "@/lib/compliance/obligations";
+import {
+  loadCompanyComplianceData,
+  syncAndReturnSecurityStatus,
+} from "@/lib/compliance/sync";
 import { getDbErrorMessage, isMissingTableError } from "@/lib/supabase/db-error";
+import type { Measure } from "@/lib/types";
+
+async function buildComplianceResponse(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  companyId: string,
+  beforeScore: number,
+  context: {
+    measureCompleted?: boolean;
+    missingEvidence?: boolean;
+    hasOpenMandatoryMeasures?: boolean;
+  }
+) {
+  const securityStatus = await syncAndReturnSecurityStatus(supabase, companyId);
+  const scoreDelta = securityStatus.score - beforeScore;
+
+  return {
+    securityStatus,
+    scoreDelta,
+    feedbackMessage: buildScoreFeedbackMessage(scoreDelta, context),
+  };
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -28,6 +57,9 @@ export async function POST(request: Request) {
   const company = await verifyCompanyOwnership(user.id, companyId);
   if (!company) return NextResponse.json({ error: "Unternehmen nicht gefunden" }, { status: 404 });
 
+  const beforeData = await loadCompanyComplianceData(supabase, companyId);
+  const beforeStatus = calculateSecurityStatus(beforeData);
+
   const { data: measure, error } = await supabase.from("measures").insert({
     company_id: companyId,
     title,
@@ -51,9 +83,26 @@ export async function POST(request: Request) {
     );
   }
 
-  await syncCompanySecurityScore(supabase, companyId);
+  const updatedRisk = await reconcileMeasureCompliance(supabase, measure.id, companyId);
 
-  return NextResponse.json({ measure });
+  await supabase.from("compliance_events").insert({
+    company_id: companyId,
+    event_type: "measure_created",
+    title: "Maßnahme erfasst",
+    details: measure.title,
+    risk_id: measure.risk_id ?? updatedRisk?.id ?? null,
+    measure_id: measure.id,
+  });
+
+  const compliance = await buildComplianceResponse(supabase, companyId, beforeStatus.score, {
+    missingEvidence: getMissingAuditDocumentTypes(beforeData.documents).length > 0,
+  });
+
+  return NextResponse.json({
+    measure,
+    risk: updatedRisk,
+    ...compliance,
+  });
 }
 
 export async function PATCH(request: Request) {
@@ -64,11 +113,14 @@ export async function PATCH(request: Request) {
   const body = await request.json();
   const { id, status, is_mandatory, criticality, deadline, escalation_level, responsible } = body;
 
-  const { data: measure } = await supabase.from("measures").select("id, company_id").eq("id", id).single();
-  if (!measure) return NextResponse.json({ error: "Maßnahme nicht gefunden" }, { status: 404 });
+  const { data: existing } = await supabase.from("measures").select("*").eq("id", id).single();
+  if (!existing) return NextResponse.json({ error: "Maßnahme nicht gefunden" }, { status: 404 });
 
-  const company = await verifyCompanyOwnership(user.id, measure.company_id);
+  const company = await verifyCompanyOwnership(user.id, existing.company_id);
   if (!company) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 403 });
+
+  const beforeData = await loadCompanyComplianceData(supabase, existing.company_id);
+  const beforeStatus = calculateSecurityStatus(beforeData);
 
   const updates: Record<string, unknown> = {};
   if (status !== undefined) updates.status = status;
@@ -78,10 +130,48 @@ export async function PATCH(request: Request) {
   if (escalation_level !== undefined) updates.escalation_level = escalation_level;
   if (responsible !== undefined) updates.responsible = responsible;
 
-  const { error } = await supabase.from("measures").update(updates).eq("id", id);
+  const { data: measure, error } = await supabase
+    .from("measures")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+
   if (error) return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
 
-  await syncCompanySecurityScore(supabase, measure.company_id);
+  const updatedRisk = await reconcileMeasureCompliance(supabase, id, existing.company_id);
+  const measureRow = measure as Measure;
+  const measureCompleted = status === "completed";
 
-  return NextResponse.json({ success: true });
+  const afterData = await loadCompanyComplianceData(supabase, existing.company_id);
+  const hasOpenMandatoryMeasures = afterData.measures.some(
+    (m) => m.is_mandatory && !isWorkComplete(m.status)
+  );
+
+  const eventTitle = measureCompleted
+    ? `Maßnahme erledigt: ${measureRow.title}`
+    : "Maßnahme aktualisiert";
+
+  await supabase.from("compliance_events").insert({
+    company_id: existing.company_id,
+    event_type: measureCompleted ? "measure_completed" : "measure_updated",
+    title: eventTitle,
+    details: measureRow.title,
+    risk_id: measureRow.risk_id ?? updatedRisk?.id ?? null,
+    measure_id: measureRow.id,
+  });
+
+  const compliance = await buildComplianceResponse(supabase, existing.company_id, beforeStatus.score, {
+    measureCompleted,
+    missingEvidence: getMissingAuditDocumentTypes(afterData.documents).length > 0,
+    hasOpenMandatoryMeasures,
+  });
+
+  return NextResponse.json({
+    success: true,
+    measure: measureRow,
+    risk: updatedRisk,
+    unlinkedRisk: !measureRow.risk_id && !updatedRisk,
+    ...compliance,
+  });
 }

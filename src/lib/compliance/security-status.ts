@@ -8,6 +8,7 @@ import {
   resolveObligationStatus,
 } from "@/lib/compliance/obligations";
 import { deriveRiskProblemTitle, isPlaceholderValue } from "@/lib/compliance/risk-display";
+import { isRiskTreated, riskOpenImpact } from "@/lib/compliance/risk-treatment";
 import { resolveRiskAsset } from "@/lib/assets/resolve";
 import type {
   AuditReadinessResult,
@@ -24,33 +25,9 @@ function securityLevelFromScore(score: number): SecurityLevel {
   return "critical";
 }
 
-function severityLabel(level: string): string {
-  switch (level) {
-    case "critical":
-      return "Kritisch";
-    case "high":
-      return "Hoch";
-    case "medium":
-      return "Mittel";
-    default:
-      return "Niedrig";
-  }
-}
-
 function addDriver(drivers: ScoreDriver[], driver: ScoreDriver): void {
   if (drivers.some((d) => d.id === driver.id)) return;
   drivers.push(driver);
-}
-
-function riskOpenImpact(risk: Risk): { impact: number; severity: string } {
-  const crit = normalizeCriticality(risk.criticality);
-  if (crit === "critical" || risk.risk_level === "high") {
-    return { impact: crit === "critical" ? 15 : 10, severity: "Hoch" };
-  }
-  if (risk.risk_level === "medium") {
-    return { impact: 5, severity: "Mittel" };
-  }
-  return { impact: 0, severity: "Niedrig" };
 }
 
 export function calculateSecurityStatus(input: {
@@ -64,11 +41,10 @@ export function calculateSecurityStatus(input: {
   let score = 100;
 
   for (const risk of input.risks) {
-    if (risk.risk_level === "low") continue;
+    const openImpact = riskOpenImpact(risk, input.measures);
+    if (!openImpact) continue;
 
-    const { impact, severity } = riskOpenImpact(risk);
-    if (impact <= 0) continue;
-
+    const { impact, severity } = openImpact;
     score -= impact;
     const title = deriveRiskProblemTitle(risk);
     addDriver(drivers, {
@@ -77,10 +53,9 @@ export function calculateSecurityStatus(input: {
       asset: resolveRiskAsset(risk, []).name,
       severity,
       impact,
-      recommendation:
-        isPlaceholderValue(risk.measure)
-          ? "Risikomaßnahme definieren, umsetzen und im Audit-Ordner dokumentieren"
-          : risk.measure!,
+      recommendation: isPlaceholderValue(risk.measure)
+        ? "Risikomaßnahme definieren, umsetzen und im Audit-Ordner dokumentieren"
+        : risk.measure!,
       category: "risks",
       label: title,
     });
@@ -117,6 +92,10 @@ export function calculateSecurityStatus(input: {
       isMandatory: measure.is_mandatory,
     });
 
+    const crit = normalizeCriticality(measure.criticality ?? measure.priority);
+    const isHigh =
+      crit === "high" || crit === "critical" || measure.priority === "high";
+
     if (obligation === "overdue" || obligation === "critically_overdue") {
       const impact = 10;
       score -= impact;
@@ -131,16 +110,16 @@ export function calculateSecurityStatus(input: {
         category: "measures",
         label: `Überfällige Maßnahme: ${measure.title}`,
       });
-    } else if (normalizeCriticality(measure.criticality ?? measure.priority) === "critical") {
+    } else if (isHigh) {
       const impact = 7;
       score -= impact;
       addDriver(drivers, {
-        id: `measure-crit-${measure.id}`,
+        id: `measure-high-${measure.id}`,
         title: measure.title,
         asset: measure.responsible ?? "Organisation",
         severity: "Hoch",
         impact,
-        recommendation: measure.target_state ?? "Kritische Maßnahme priorisiert abschließen",
+        recommendation: measure.target_state ?? "Maßnahme priorisiert abschließen",
         category: "measures",
         label: measure.title,
       });
@@ -231,7 +210,7 @@ export function calculateSecurityStatus(input: {
   const level = securityLevelFromScore(score);
   drivers.sort((a, b) => b.impact - a.impact);
 
-  const auditReadiness = calculateAuditReadiness(input);
+  const auditReadiness = calculateAuditReadiness(input, score);
   const summary = buildSummary(level, drivers, score);
 
   return {
@@ -288,4 +267,15 @@ export function securityLevelBarClass(level: SecurityLevel): string {
   }
 }
 
-export { severityLabel };
+export function severityLabel(level: string): string {
+  switch (level) {
+    case "critical":
+      return "Kritisch";
+    case "high":
+      return "Hoch";
+    case "medium":
+      return "Mittel";
+    default:
+      return "Niedrig";
+  }
+}

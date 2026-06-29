@@ -7,6 +7,7 @@ import {
   normalizeCriticality,
 } from "@/lib/compliance/obligations";
 import { isPlaceholderValue } from "@/lib/compliance/risk-display";
+import { isRiskTreated } from "@/lib/compliance/risk-treatment";
 import type { Document, Incident, Measure, Risk } from "@/lib/types";
 
 export const AUDIT_READINESS_LABELS: Record<AuditReadinessLevel, string> = {
@@ -21,12 +22,15 @@ function levelFromPercent(percent: number): AuditReadinessLevel {
   return "not_ready";
 }
 
-export function calculateAuditReadiness(input: {
-  documents: Document[];
-  measures: Measure[];
-  risks: Risk[];
-  incidents: Incident[];
-}): AuditReadinessResult {
+export function calculateAuditReadiness(
+  input: {
+    documents: Document[];
+    measures: Measure[];
+    risks: Risk[];
+    incidents: Incident[];
+  },
+  securityScore?: number
+): AuditReadinessResult {
   let score = 100;
   const reasons: string[] = [];
 
@@ -96,15 +100,15 @@ export function calculateAuditReadiness(input: {
     );
   }
 
-  let risksWithoutMeasure = 0;
+  let untreatedHighRisks = 0;
   let risksWithoutImpact = 0;
   let risksWithoutResponsible = 0;
 
   for (const risk of input.risks) {
-    if (risk.risk_level === "low") continue;
+    if (risk.risk_level === "low" || isRiskTreated(risk, input.measures)) continue;
 
+    untreatedHighRisks += 1;
     if (isPlaceholderValue(risk.measure)) {
-      risksWithoutMeasure += 1;
       score -= 10;
     }
     if (isPlaceholderValue(risk.business_impact)) {
@@ -117,9 +121,9 @@ export function calculateAuditReadiness(input: {
     }
   }
 
-  if (risksWithoutMeasure > 0) {
+  if (untreatedHighRisks > 0) {
     reasons.push(
-      `${risksWithoutMeasure} hohes Risiko ohne definierte Maßnahme`
+      `${untreatedHighRisks} unbehandeltes Risiko${untreatedHighRisks === 1 ? "" : "en"}`
     );
   }
   if (risksWithoutImpact > 0) {
@@ -144,27 +148,33 @@ export function calculateAuditReadiness(input: {
     openMandatoryMeasures > 0 ||
     overdueMandatoryMeasures > 0 ||
     criticalMandatoryOpen > 0 ||
-    risksWithoutMeasure > 0 ||
+    untreatedHighRisks > 0 ||
     input.incidents.some((i) => !isWorkComplete(i.status));
 
   score = Math.max(0, Math.min(100, score));
 
-  if (!hasOpenIssues && input.risks.length > 0 && missingTypes.length === 0) {
-    score = 100;
-  } else if (hasOpenIssues && score > 99) {
-    score = 99;
+  if (hasOpenIssues) {
+    score = Math.min(score, 84);
+  }
+
+  if (securityScore !== undefined && securityScore < 80) {
+    score = Math.min(score, 79);
   }
 
   const level = levelFromPercent(score);
   const uniqueReasons = [...new Set(reasons)].slice(0, 4);
 
   let summary: string;
-  if (level === "ready") {
+  if (level === "ready" && !hasOpenIssues) {
     summary = "Alle Pflichtnachweise, Risiken und Maßnahmen sind vollständig dokumentiert.";
   } else if (uniqueReasons.length === 0) {
     summary = "Prüfen Sie Audit-Ordner, Maßnahmen und Risikobewertungen.";
   } else {
     summary = `Grund: ${uniqueReasons.join(", ")}.`;
+  }
+
+  if (securityScore !== undefined && securityScore < 80 && level === "ready") {
+    summary = `Security Score ${securityScore}/100 — Audit-Bereitschaft ist auf „teilweise auditbereit“ begrenzt.`;
   }
 
   if (missingTypes.length > 0 && uniqueReasons.length < 4) {

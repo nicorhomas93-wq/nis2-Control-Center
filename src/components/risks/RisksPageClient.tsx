@@ -50,6 +50,7 @@ export function RisksPageClient({
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   async function generateAnalysis() {
     setLoading(true);
@@ -84,11 +85,17 @@ export function RisksPageClient({
     if (result.measure) {
       setMeasureByRiskId((prev) => ({ ...prev, [id]: result.measure! }));
     }
+    if (result.feedbackMessage) setFeedback(result.feedbackMessage);
     setEditingId(null);
   }
 
   return (
     <div className="space-y-6">
+      {feedback && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          {feedback}
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

@@ -34,6 +34,8 @@ export interface RiskAssistSaveResult {
   risk: Risk;
   measure: Measure | null;
   workflowStatus: "open" | "in_progress" | "completed";
+  feedbackMessage?: string;
+  scoreDelta?: number;
 }
 
 interface RiskAssistModalProps {
@@ -211,6 +213,8 @@ export function RiskAssistModal({
         companyId,
         securityStatus: data.securityStatus as SecurityStatusResult,
         eventTitle: data.eventTitle,
+        scoreDelta: data.scoreDelta,
+        feedbackMessage: data.feedbackMessage,
       });
     }
 
@@ -218,6 +222,8 @@ export function RiskAssistModal({
       risk: savedRisk,
       measure: savedMeasure,
       workflowStatus: finalStatus,
+      feedbackMessage: data.feedbackMessage,
+      scoreDelta: data.scoreDelta,
     });
 
     if (data.redirectTo) {

@@ -6,6 +6,8 @@ export interface ComplianceUpdatedDetail {
   companyId: string;
   securityStatus: SecurityStatusResult;
   eventTitle?: string;
+  scoreDelta?: number;
+  feedbackMessage?: string;
 }
 
 export function emitComplianceUpdated(detail: ComplianceUpdatedDetail): void {

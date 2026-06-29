@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyCompanyOwnership } from "@/lib/company";
-import { syncAndReturnSecurityStatus } from "@/lib/compliance/sync";
+import { loadCompanyComplianceData, syncAndReturnSecurityStatus } from "@/lib/compliance/sync";
+import { reconcileRiskTreatment } from "@/lib/compliance/measure-risk-link";
+import { calculateSecurityStatus } from "@/lib/compliance/security-status";
+import { buildScoreFeedbackMessage } from "@/lib/compliance/score-feedback";
+import { getMissingAuditDocumentTypes } from "@/lib/audit/audit-folders";
+import { isWorkComplete } from "@/lib/compliance/obligations";
 import {
   buildMeasureSuggestions,
   buildRiskAssistPrefill,
@@ -109,6 +114,9 @@ export async function POST(request: Request) {
 
   const company = await verifyCompanyOwnership(user.id, companyId);
   if (!company) return NextResponse.json({ error: "Unternehmen nicht gefunden" }, { status: 404 });
+
+  const beforeData = await loadCompanyComplianceData(supabase, companyId);
+  const beforeStatus = calculateSecurityStatus(beforeData);
 
   const { data: risk } = await supabase.from("risks").select("*").eq("id", riskId).single();
   if (!risk) return NextResponse.json({ error: "Risiko nicht gefunden" }, { status: 404 });
@@ -245,14 +253,28 @@ export async function POST(request: Request) {
     measure_id: measure?.id ?? null,
   });
 
+  const reconciledRisk = await reconcileRiskTreatment(supabase, riskId);
   const securityStatus = await syncAndReturnSecurityStatus(supabase, companyId);
+  const scoreDelta = securityStatus.score - beforeStatus.score;
+  const measureCompleted =
+    measureStatus === "completed" || action === "save_and_complete";
+  const afterData = await loadCompanyComplianceData(supabase, companyId);
+  const hasOpenMandatoryMeasures = afterData.measures.some(
+    (m) => m.is_mandatory && !isWorkComplete(m.status)
+  );
 
   return NextResponse.json({
     success: true,
-    risk: updatedRisk,
+    risk: reconciledRisk ?? updatedRisk,
     measure,
     eventTitle,
     securityStatus,
+    scoreDelta,
+    feedbackMessage: buildScoreFeedbackMessage(scoreDelta, {
+      measureCompleted,
+      missingEvidence: getMissingAuditDocumentTypes(afterData.documents).length > 0,
+      hasOpenMandatoryMeasures,
+    }),
     redirectTo:
       action === "upload_evidence"
         ? "/documents"

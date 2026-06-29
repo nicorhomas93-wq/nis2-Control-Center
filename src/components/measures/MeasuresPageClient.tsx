@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { emitComplianceUpdated } from "@/lib/compliance/client-sync";
+import type { SecurityStatusResult } from "@/lib/compliance/types";
 import type { CompanyAsset, Measure, MeasurePriority, MeasureStatus, Risk } from "@/lib/types";
 import { validateMeasureTitle } from "@/lib/measures/naming";
 import { Button } from "@/components/ui/Button";
@@ -52,10 +53,10 @@ export function MeasuresPageClient({
   initialRisks,
   initialAssets,
 }: MeasuresPageClientProps) {
-  const router = useRouter();
   const [measures, setMeasures] = useState(initialMeasures);
   const [risks] = useState(initialRisks);
   const [assets] = useState(initialAssets);
+  const [feedback, setFeedback] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -121,6 +122,15 @@ export function MeasuresPageClient({
     const data = await res.json();
     if (res.ok) {
       setMeasures((prev) => [data.measure, ...prev]);
+      if (data.securityStatus) {
+        emitComplianceUpdated({
+          companyId,
+          securityStatus: data.securityStatus as SecurityStatusResult,
+          scoreDelta: data.scoreDelta,
+          feedbackMessage: data.feedbackMessage,
+        });
+      }
+      if (data.feedbackMessage) setFeedback(data.feedbackMessage);
       setTitle("");
       setDescription("");
       setResponsible("");
@@ -131,7 +141,6 @@ export function MeasuresPageClient({
       setSelectedRiskId("");
       setTitleWarning(null);
       setShowForm(false);
-      router.refresh();
     }
     setSaving(false);
   }
@@ -143,11 +152,27 @@ export function MeasuresPageClient({
       body: JSON.stringify({ id, status }),
     });
 
+    const data = await res.json();
     if (res.ok) {
       setMeasures((prev) =>
         prev.map((m) => (m.id === id ? { ...m, status } : m))
       );
-      router.refresh();
+      if (data.securityStatus) {
+        emitComplianceUpdated({
+          companyId,
+          securityStatus: data.securityStatus as SecurityStatusResult,
+          scoreDelta: data.scoreDelta,
+          feedbackMessage: data.feedbackMessage,
+          eventTitle: data.measure?.status === "completed" ? "Maßnahme erledigt" : undefined,
+        });
+      }
+      if (data.feedbackMessage) setFeedback(data.feedbackMessage);
+      if (data.unlinkedRisk) {
+        setFeedback(
+          (prev) =>
+            `${prev ?? data.feedbackMessage ?? ""} Hinweis: Diese Maßnahme ist keinem Risiko zugeordnet.`.trim()
+        );
+      }
     }
   }
 
@@ -159,6 +184,11 @@ export function MeasuresPageClient({
 
   return (
     <div className="space-y-6">
+      {feedback && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          {feedback}
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-3">
         {(["open", "in_progress", "completed"] as MeasureStatus[]).map(
           (status) => (
@@ -366,6 +396,11 @@ export function MeasuresPageClient({
                         {m.target_state && (
                           <p className="mt-1 text-xs text-brand-600">
                             Ziel: {m.target_state}
+                          </p>
+                        )}
+                        {!m.risk_id && (
+                          <p className="mt-1 text-xs text-amber-700">
+                            Diese Maßnahme ist keinem Risiko zugeordnet.
                           </p>
                         )}
                       </td>

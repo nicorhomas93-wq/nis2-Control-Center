@@ -5,8 +5,11 @@ export { resolveObligationStatus, daysOverdue } from "./obligations";
 export {
   loadCompanyComplianceData,
   syncCompanySecurityScore,
+  syncAndReturnSecurityStatus,
   loadSecurityScoreHistory,
 } from "./sync";
+export { isRiskTreated, riskOpenImpact, RISK_TREATMENT_LABELS } from "./risk-treatment";
+export { buildScoreFeedbackMessage } from "./score-feedback";
 export { buildComplianceWarnings } from "./warnings";
 export { calculateAuditReadiness, AUDIT_READINESS_LABELS } from "./audit-readiness";
 export {
