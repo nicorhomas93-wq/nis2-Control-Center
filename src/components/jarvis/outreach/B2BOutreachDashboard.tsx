@@ -35,6 +35,8 @@ import {
 import type { OutreachQuotaInfo } from "@/lib/jarvis/outreach/processor";
 import type { B2BOutreachLead, B2BOutreachStatus } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
+import { SendCustomerMessageButton } from "@/components/jarvis/customer-message/SendCustomerMessageButton";
+import { customerMessageTargetFromB2BLead } from "@/lib/jarvis/customer-message/targets";
 
 interface B2BOutreachDashboardProps {
   leads: B2BOutreachLead[];
@@ -568,6 +570,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                 )}
 
                 <div className="flex flex-wrap gap-2">
+                  <SendCustomerMessageButton target={customerMessageTargetFromB2BLead(lead)} />
                   {lead.status === "new" && (
                     <Button
                       size="sm"

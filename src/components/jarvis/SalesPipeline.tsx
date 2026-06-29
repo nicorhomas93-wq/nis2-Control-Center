@@ -1,6 +1,10 @@
+"use client";
+
 import { Badge } from "@/components/ui/Badge";
 import { LEAD_STATUS_LABELS } from "@/lib/jarvis/constants";
 import { getLeadScoreCategory, getLeadScoreCategoryColor } from "@/lib/jarvis/lead-scoring";
+import { SendCustomerMessageButton } from "@/components/jarvis/customer-message/SendCustomerMessageButton";
+import { customerMessageTargetFromLead } from "@/lib/jarvis/customer-message/targets";
 import type { Lead } from "@/lib/types";
 
 const PIPELINE_COLUMNS = [
@@ -16,7 +20,7 @@ const PIPELINE_COLUMNS = [
 
 export function SalesPipeline({ leads }: { leads: Lead[] }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
       {PIPELINE_COLUMNS.map((status) => {
         const columnLeads = leads.filter((l) => l.status === status);
         return (
@@ -50,6 +54,13 @@ export function SalesPipeline({ leads }: { leads: Lead[] }) {
                         <Badge className={getLeadScoreCategoryColor(category)}>
                           {category}
                         </Badge>
+                      </div>
+                      <div className="mt-3">
+                        <SendCustomerMessageButton
+                          target={customerMessageTargetFromLead(lead)}
+                          variant="ghost"
+                          className="w-full justify-center"
+                        />
                       </div>
                     </div>
                   );

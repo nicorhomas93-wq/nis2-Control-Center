@@ -43,6 +43,7 @@ const ORDER = [
   "add_b2b_outreach_nis2_score.sql",
   "add_b2b_outreach_location.sql",
   "add_b2b_outreach_web_presence.sql",
+  "add_customer_messages.sql",
 ];
 
 const url = process.env.DATABASE_URL;

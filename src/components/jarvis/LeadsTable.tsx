@@ -1,9 +1,15 @@
+"use client";
+
 import { Badge } from "@/components/ui/Badge";
+import {
+  LEAD_STATUS_LABELS,
+} from "@/lib/jarvis/constants";
 import {
   calculateLeadScore,
   getLeadScoreCategoryColor,
 } from "@/lib/jarvis/lead-scoring";
-import { LEAD_STATUS_LABELS } from "@/lib/jarvis/constants";
+import { SendCustomerMessageButton } from "@/components/jarvis/customer-message/SendCustomerMessageButton";
+import { customerMessageTargetFromLead } from "@/lib/jarvis/customer-message/targets";
 import type { Lead } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -37,7 +43,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] text-left text-sm">
+      <table className="w-full min-w-[820px] text-left text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-slate-500">
             <th className="py-3 pr-4 font-medium">Unternehmen</th>
@@ -45,7 +51,8 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
             <th className="py-3 pr-4 font-medium">Status</th>
             <th className="py-3 pr-4 font-medium">Score</th>
             <th className="py-3 pr-4 font-medium">Quelle</th>
-            <th className="py-3 font-medium">Erstellt</th>
+            <th className="py-3 pr-4 font-medium">Erstellt</th>
+            <th className="py-3 font-medium">Aktion</th>
           </tr>
         </thead>
         <tbody>
@@ -67,7 +74,10 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                 <LeadScoreBadge lead={lead} />
               </td>
               <td className="py-3 pr-4 text-slate-600">{lead.source ?? "—"}</td>
-              <td className="py-3 text-slate-500">{formatDate(lead.created_at)}</td>
+              <td className="py-3 pr-4 text-slate-500">{formatDate(lead.created_at)}</td>
+              <td className="py-3">
+                <SendCustomerMessageButton target={customerMessageTargetFromLead(lead)} />
+              </td>
             </tr>
           ))}
         </tbody>
