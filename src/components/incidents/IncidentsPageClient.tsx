@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import type { Incident, IncidentStatus } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -62,19 +63,9 @@ export function IncidentsPageClient({ companyId, initialIncidents }: IncidentsPa
     router.refresh();
   }
 
-  async function updateIncident(id: string, fields: Record<string, unknown>) {
-    const res = await fetch("/api/incidents", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...fields }),
-    });
-    if (!res.ok) return;
-    setIncidents((prev) =>
-      prev.map((inc) => (inc.id === id ? { ...inc, ...fields } as Incident : inc))
-    );
-    if (selected?.id === id) {
-      setSelected((prev) => (prev ? { ...prev, ...fields } as Incident : prev));
-    }
+  function handleIncidentSaved(updated: Incident) {
+    setIncidents((prev) => prev.map((inc) => (inc.id === updated.id ? updated : inc)));
+    setSelected(updated);
     router.refresh();
   }
 
@@ -145,7 +136,7 @@ export function IncidentsPageClient({ companyId, initialIncidents }: IncidentsPa
             <CardHeader><CardTitle>{selected?.title ?? "Bericht"}</CardTitle></CardHeader>
             <CardContent className="space-y-6">
               {selected && (
-                <IncidentObligationPanel incident={selected} onUpdate={updateIncident} />
+                <IncidentObligationPanel incident={selected} onSaved={handleIncidentSaved} />
               )}
               {selected?.report_content ? (
                 <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{selected.report_content}</div>
@@ -170,23 +161,74 @@ export function IncidentsPageClient({ companyId, initialIncidents }: IncidentsPa
 
 function IncidentObligationPanel({
   incident,
-  onUpdate,
+  onSaved,
 }: {
   incident: Incident;
-  onUpdate: (id: string, fields: Record<string, unknown>) => void;
+  onSaved: (incident: Incident) => void;
 }) {
   const [status, setStatus] = useState<IncidentStatus>(incident.status);
-  const [criticality, setCriticality] = useState(incident.criticality ?? "high");
-  const [deadline, setDeadline] = useState(incident.deadline?.slice(0, 16) ?? "");
-  const [responsible, setResponsible] = useState(incident.responsible ?? "");
+  const [priority, setPriority] = useState(incident.criticality ?? "high");
+  const [dueDate, setDueDate] = useState(incident.deadline?.slice(0, 16) ?? "");
+  const [assignedTo, setAssignedTo] = useState(incident.responsible ?? "");
   const [escalationLevel, setEscalationLevel] = useState(String(incident.escalation_level ?? 0));
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(
+    null
+  );
+
+  useEffect(() => {
+    setStatus(incident.status);
+    setPriority(incident.criticality ?? "high");
+    setDueDate(incident.deadline?.slice(0, 16) ?? "");
+    setAssignedTo(incident.responsible ?? "");
+    setEscalationLevel(String(incident.escalation_level ?? 0));
+    setFeedback(null);
+  }, [
+    incident.id,
+    incident.status,
+    incident.criticality,
+    incident.deadline,
+    incident.responsible,
+    incident.escalation_level,
+  ]);
 
   const obligation = resolveObligationStatus({
     status,
-    deadline: deadline || incident.deadline,
-    criticality,
+    deadline: dueDate || incident.deadline,
+    criticality: priority,
     isMandatory: incident.is_mandatory,
   });
+
+  async function handleSave() {
+    setSaving(true);
+    setFeedback(null);
+
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("incidents")
+      .update({
+        status,
+        criticality: priority,
+        deadline: dueDate ? new Date(dueDate).toISOString() : null,
+        responsible: assignedTo.trim() || null,
+        escalation_level: Number(escalationLevel) || 0,
+      })
+      .eq("id", incident.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Incident save failed:", error);
+      setFeedback({ type: "error", text: "Fehler beim Speichern" });
+      setSaving(false);
+      return;
+    }
+
+    console.log("Incident saved:", data);
+    setFeedback({ type: "success", text: "Gespeichert" });
+    onSaved(data as Incident);
+    setSaving(false);
+  }
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -198,8 +240,12 @@ function IncidentObligationPanel({
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Label>Bearbeitungsstatus</Label>
-          <Select value={status} onChange={(e) => setStatus(e.target.value as IncidentStatus)}>
+          <Label htmlFor={`incident-status-${incident.id}`}>Bearbeitungsstatus</Label>
+          <Select
+            id={`incident-status-${incident.id}`}
+            value={status}
+            onChange={(e) => setStatus(e.target.value as IncidentStatus)}
+          >
             <option value="open">Offen</option>
             <option value="investigating">In Bearbeitung</option>
             <option value="resolved">Erledigt</option>
@@ -207,8 +253,12 @@ function IncidentObligationPanel({
           </Select>
         </div>
         <div>
-          <Label>Kritikalität</Label>
-          <Select value={criticality} onChange={(e) => setCriticality(e.target.value)}>
+          <Label htmlFor={`incident-priority-${incident.id}`}>Priorität</Label>
+          <Select
+            id={`incident-priority-${incident.id}`}
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+          >
             <option value="low">Niedrig</option>
             <option value="medium">Mittel</option>
             <option value="high">Hoch</option>
@@ -216,20 +266,26 @@ function IncidentObligationPanel({
           </Select>
         </div>
         <div>
-          <Label>Dokumentationsfrist</Label>
+          <Label htmlFor={`incident-due-date-${incident.id}`}>Fälligkeitsdatum</Label>
           <Input
+            id={`incident-due-date-${incident.id}`}
             type="datetime-local"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
           />
         </div>
         <div>
-          <Label>Verantwortlich</Label>
-          <Input value={responsible} onChange={(e) => setResponsible(e.target.value)} />
+          <Label htmlFor={`incident-assigned-to-${incident.id}`}>Zugewiesen an</Label>
+          <Input
+            id={`incident-assigned-to-${incident.id}`}
+            value={assignedTo}
+            onChange={(e) => setAssignedTo(e.target.value)}
+          />
         </div>
         <div>
-          <Label>Eskalationsstufe</Label>
+          <Label htmlFor={`incident-escalation-${incident.id}`}>Eskalationsstufe</Label>
           <Input
+            id={`incident-escalation-${incident.id}`}
             type="number"
             min={0}
             max={5}
@@ -238,21 +294,25 @@ function IncidentObligationPanel({
           />
         </div>
       </div>
-      <Button
-        size="sm"
-        className="mt-3"
-        onClick={() =>
-          onUpdate(incident.id, {
-            status,
-            criticality,
-            deadline: deadline ? new Date(deadline).toISOString() : null,
-            responsible: responsible || null,
-            escalation_level: Number(escalationLevel) || 0,
-          })
-        }
-      >
-        Status speichern
-      </Button>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Button size="sm" onClick={handleSave} disabled={saving}>
+          {saving ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Wird gespeichert…
+            </>
+          ) : (
+            "Status speichern"
+          )}
+        </Button>
+        {feedback && (
+          <p
+            className={`text-sm ${feedback.type === "success" ? "text-emerald-700" : "text-red-700"}`}
+            role="alert"
+          >
+            {feedback.text}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
