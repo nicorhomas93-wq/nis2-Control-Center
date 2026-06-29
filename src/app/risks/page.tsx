@@ -5,7 +5,7 @@ import { ActiveMandantBanner } from "@/components/consultant/ActiveMandantBanner
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceCompany } from "@/lib/company";
 import { ensureSuggestedAssets } from "@/lib/assets/sync";
-import type { CompanyAsset, Risk } from "@/lib/types";
+import type { CompanyAsset, Measure, Risk } from "@/lib/types";
 import { redirect } from "next/navigation";
 
 export default async function RisksPage() {
@@ -18,14 +18,23 @@ export default async function RisksPage() {
 
   let risks: Risk[] = [];
   let assets: CompanyAsset[] = [];
+  let measures: Measure[] = [];
   if (company) {
     assets = await ensureSuggestedAssets(supabase, company.id, company);
-    const { data } = await supabase
-      .from("risks")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("created_at", { ascending: false });
-    risks = (data ?? []) as Risk[];
+    const [risksRes, measuresRes] = await Promise.all([
+      supabase
+        .from("risks")
+        .select("*")
+        .eq("company_id", company.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("measures")
+        .select("*")
+        .eq("company_id", company.id)
+        .not("risk_id", "is", null),
+    ]);
+    risks = (risksRes.data ?? []) as Risk[];
+    measures = (measuresRes.data ?? []) as Measure[];
   }
 
   return (
@@ -41,6 +50,7 @@ export default async function RisksPage() {
           companyId={company.id}
           initialRisks={risks}
           initialAssets={assets}
+          initialMeasures={measures}
         />
       )}
     </DashboardShell>

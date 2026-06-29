@@ -34,6 +34,13 @@ export async function syncCompanySecurityScore(
   supabase: SupabaseClient,
   companyId: string
 ): Promise<void> {
+  await syncAndReturnSecurityStatus(supabase, companyId);
+}
+
+export async function syncAndReturnSecurityStatus(
+  supabase: SupabaseClient,
+  companyId: string
+) {
   const data = await loadCompanyComplianceData(supabase, companyId);
   const status = calculateSecurityStatus(data);
   const today = new Date().toISOString().slice(0, 10);
@@ -51,6 +58,8 @@ export async function syncCompanySecurityScore(
     },
     { onConflict: "company_id,recorded_at" }
   );
+
+  return status;
 }
 
 export async function loadSecurityScoreHistory(

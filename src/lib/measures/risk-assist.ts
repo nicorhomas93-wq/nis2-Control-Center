@@ -8,6 +8,17 @@ import {
   suggestMeasureFromRisk,
 } from "@/lib/measures/suggestions";
 
+export const RESPONSIBLE_OPTIONS = [
+  "IT / IT-Leitung",
+  "HR / Management",
+  "Datenschutz / IT-Leitung",
+  "Einkauf / Management",
+  "Geschäftsführung",
+  "Compliance / ISB",
+] as const;
+
+export type ResponsibleOption = (typeof RESPONSIBLE_OPTIONS)[number];
+
 function matchContext(text: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(text));
 }
@@ -244,18 +255,35 @@ export interface RiskAssistPrefill {
   responsible: string;
   isMandatory: boolean;
   criticality: string;
+  threat: string;
+  riskLevel: RiskLevel;
+  workflowStatus: "open" | "in_progress" | "completed";
 }
 
 export function buildRiskAssistPrefill(
   risk: Risk,
-  assets: CompanyAsset[]
+  assets: CompanyAsset[],
+  linkedMeasure?: { title: string; status: string } | null
 ): RiskAssistPrefill {
   const suggestions = buildMeasureSuggestions(risk, assets);
   const resolved = resolveRiskAsset(risk, assets);
   const primary = suggestions[0];
+  const measureTitle =
+    linkedMeasure?.title?.trim() ||
+    risk.measure?.trim() ||
+    primary?.title ||
+    "";
+
+  const workflowStatus =
+    linkedMeasure?.status === "completed" ||
+    linkedMeasure?.status === "in_progress"
+      ? linkedMeasure.status
+      : risk.risk_level === "low"
+        ? "completed"
+        : "open";
 
   return {
-    measure: primary?.title ?? "",
+    measure: measureTitle,
     deadline: risk.deadline?.slice(0, 10) ?? inferDeadlineForRiskLevel(risk.risk_level),
     responsible:
       risk.responsible?.trim() ||
@@ -264,5 +292,8 @@ export function buildRiskAssistPrefill(
     criticality:
       risk.criticality ??
       (risk.risk_level === "high" ? "critical" : risk.risk_level === "medium" ? "high" : "medium"),
+    threat: risk.threat ?? "",
+    riskLevel: risk.risk_level,
+    workflowStatus,
   };
 }

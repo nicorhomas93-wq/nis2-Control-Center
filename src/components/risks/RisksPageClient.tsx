@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CompanyAsset, Risk } from "@/lib/types";
+import type { CompanyAsset, Measure, Risk } from "@/lib/types";
 import { resolveRiskAsset } from "@/lib/assets/resolve";
 import { ASSET_CATEGORY_LABELS } from "@/lib/assets/types";
-import { RiskAssistModal } from "@/components/risks/RiskAssistModal";
+import { RiskAssistModal, type RiskAssistSaveResult } from "@/components/risks/RiskAssistModal";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -27,16 +27,25 @@ interface RisksPageClientProps {
   companyId: string;
   initialRisks: Risk[];
   initialAssets: CompanyAsset[];
+  initialMeasures: Measure[];
 }
 
 export function RisksPageClient({
   companyId,
   initialRisks,
   initialAssets,
+  initialMeasures,
 }: RisksPageClientProps) {
   const router = useRouter();
   const [risks, setRisks] = useState(initialRisks);
   const [assets, setAssets] = useState(initialAssets);
+  const [measureByRiskId, setMeasureByRiskId] = useState<Record<string, Measure>>(() => {
+    const map: Record<string, Measure> = {};
+    for (const m of initialMeasures) {
+      if (m.risk_id && !map[m.risk_id]) map[m.risk_id] = m;
+    }
+    return map;
+  });
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,12 +77,14 @@ export function RisksPageClient({
     router.refresh();
   }
 
-  async function handleAssistSaved(id: string, fields: Partial<Risk>) {
+  function handleAssistSaved(id: string, result: RiskAssistSaveResult) {
     setRisks((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...fields } : r))
+      prev.map((r) => (r.id === id ? { ...r, ...result.risk } : r))
     );
+    if (result.measure) {
+      setMeasureByRiskId((prev) => ({ ...prev, [id]: result.measure! }));
+    }
     setEditingId(null);
-    router.refresh();
   }
 
   return (
@@ -149,8 +160,11 @@ export function RisksPageClient({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {risks.map((r) => {
+                  const linkedMeasure = measureByRiskId[r.id];
                   const obligation = resolveObligationStatus({
-                    status: r.risk_level === "low" ? "completed" : "open",
+                    status:
+                      linkedMeasure?.status ??
+                      (r.risk_level === "low" ? "completed" : "open"),
                     deadline: r.deadline,
                     criticality: r.criticality,
                     isMandatory: r.is_mandatory,
@@ -230,7 +244,7 @@ export function RisksPageClient({
           risk={risks.find((r) => r.id === editingId)!}
           assets={assets}
           onAssetsChange={setAssets}
-          onSaved={(fields) => handleAssistSaved(editingId, fields)}
+          onSaved={(result) => handleAssistSaved(editingId, result)}
           onClose={() => setEditingId(null)}
         />
       )}

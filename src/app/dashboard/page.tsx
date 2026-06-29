@@ -2,7 +2,7 @@ import { DashboardShell } from "@/components/layout/DashboardShell";
 import { DashboardActions } from "@/components/dashboard/DashboardActions";
 import { NextStepsCard } from "@/components/dashboard/NextStepsCard";
 import { ComplianceWarningsBanner } from "@/components/dashboard/ComplianceWarningsBanner";
-import { SecurityStatusCard } from "@/components/dashboard/SecurityStatusCard";
+import { SecurityStatusCardClient } from "@/components/dashboard/SecurityStatusCardClient";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { BillingStatusBanner } from "@/components/billing/BillingStatusBanner";
 import { ActiveMandantBanner } from "@/components/consultant/ActiveMandantBanner";
@@ -156,7 +156,8 @@ export default async function DashboardPage({
       <BillingStatusBanner company={ownCompany} platformOwner={platformOwner} />
 
       {company && (
-        <SecurityStatusCard
+        <SecurityStatusCardClient
+          companyId={company.id}
           score={securityStatus.score}
           level={securityStatus.level}
           summary={securityStatus.summary}
