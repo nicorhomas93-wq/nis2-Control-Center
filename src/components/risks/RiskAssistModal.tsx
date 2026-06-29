@@ -212,6 +212,7 @@ export function RiskAssistModal({
       emitComplianceUpdated({
         companyId,
         securityStatus: data.securityStatus as SecurityStatusResult,
+        nextSteps: data.nextSteps,
         eventTitle: data.eventTitle,
         scoreDelta: data.scoreDelta,
         feedbackMessage: data.feedbackMessage,

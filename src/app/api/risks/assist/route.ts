@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyCompanyOwnership } from "@/lib/company";
-import { loadCompanyComplianceData, syncAndReturnSecurityStatus } from "@/lib/compliance/sync";
+import { loadCompanyComplianceData, syncAndReturnComplianceSnapshot } from "@/lib/compliance/sync";
 import { reconcileRiskTreatment } from "@/lib/compliance/measure-risk-link";
 import { calculateSecurityStatus } from "@/lib/compliance/security-status";
 import { buildScoreFeedbackMessage } from "@/lib/compliance/score-feedback";
@@ -254,8 +254,8 @@ export async function POST(request: Request) {
   });
 
   const reconciledRisk = await reconcileRiskTreatment(supabase, riskId);
-  const securityStatus = await syncAndReturnSecurityStatus(supabase, companyId);
-  const scoreDelta = securityStatus.score - beforeStatus.score;
+  const snapshot = await syncAndReturnComplianceSnapshot(supabase, companyId);
+  const scoreDelta = snapshot.securityStatus.score - beforeStatus.score;
   const measureCompleted =
     measureStatus === "completed" || action === "save_and_complete";
   const afterData = await loadCompanyComplianceData(supabase, companyId);
@@ -268,7 +268,8 @@ export async function POST(request: Request) {
     risk: reconciledRisk ?? updatedRisk,
     measure,
     eventTitle,
-    securityStatus,
+    securityStatus: snapshot.securityStatus,
+    nextSteps: snapshot.nextSteps,
     scoreDelta,
     feedbackMessage: buildScoreFeedbackMessage(scoreDelta, {
       measureCompleted,

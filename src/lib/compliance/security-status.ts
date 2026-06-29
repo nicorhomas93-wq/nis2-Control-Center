@@ -123,6 +123,19 @@ export function calculateSecurityStatus(input: {
         category: "measures",
         label: measure.title,
       });
+    } else if (measure.is_mandatory) {
+      const impact = 5;
+      score -= impact;
+      addDriver(drivers, {
+        id: `measure-mandatory-${measure.id}`,
+        title: `Offene Pflichtmaßnahme: ${measure.title}`,
+        asset: measure.responsible ?? "Organisation",
+        severity: "Mittel",
+        impact,
+        recommendation: measure.target_state ?? "Pflichtmaßnahme abschließen und dokumentieren",
+        category: "measures",
+        label: `Offene Pflichtmaßnahme: ${measure.title}`,
+      });
     }
   }
 
@@ -207,17 +220,25 @@ export function calculateSecurityStatus(input: {
   }
 
   score = Math.max(0, Math.min(100, score));
-  const level = securityLevelFromScore(score);
   drivers.sort((a, b) => b.impact - a.impact);
 
+  const activeDrivers = drivers.filter((d) => d.impact > 0);
+  if (activeDrivers.length > 0 && score >= 100) {
+    score = 99;
+  }
+  if (activeDrivers.length === 0) {
+    score = 100;
+  }
+
   const auditReadiness = calculateAuditReadiness(input, score);
-  const summary = buildSummary(level, drivers, score);
+  const finalLevel = securityLevelFromScore(score);
+  const summary = buildSummary(finalLevel, activeDrivers, score);
 
   return {
     score,
-    level,
+    level: finalLevel,
     summary,
-    drivers: drivers.slice(0, 20),
+    drivers: activeDrivers.slice(0, 20),
     auditReadiness,
     auditReadinessPercent: auditReadiness.percent,
   };

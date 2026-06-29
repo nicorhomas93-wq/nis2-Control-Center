@@ -126,6 +126,7 @@ export function MeasuresPageClient({
         emitComplianceUpdated({
           companyId,
           securityStatus: data.securityStatus as SecurityStatusResult,
+          nextSteps: data.nextSteps,
           scoreDelta: data.scoreDelta,
           feedbackMessage: data.feedbackMessage,
         });
@@ -161,6 +162,7 @@ export function MeasuresPageClient({
         emitComplianceUpdated({
           companyId,
           securityStatus: data.securityStatus as SecurityStatusResult,
+          nextSteps: data.nextSteps,
           scoreDelta: data.scoreDelta,
           feedbackMessage: data.feedbackMessage,
           eventTitle: data.measure?.status === "completed" ? "Maßnahme erledigt" : undefined,

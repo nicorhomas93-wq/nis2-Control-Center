@@ -34,9 +34,14 @@ export function NextStepsCard({ steps }: { steps: NextStepAction[] }) {
       </CardHeader>
       <CardContent>
         {steps.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Aktuell keine dringenden Aufgaben. Ihr Compliance-Status ist auf Kurs.
-          </p>
+          <div className="space-y-2 text-sm text-slate-600">
+            <p className="font-medium text-emerald-800">
+              Tolle Arbeit – aktuell sind keine kritischen nächsten Schritte offen.
+            </p>
+            <p className="text-slate-500">
+              Bitte prüfen Sie regelmäßig Nachweise, Dokumente und Maßnahmen.
+            </p>
+          </div>
         ) : (
           <ul className="space-y-4">
             {steps.map((step) => (

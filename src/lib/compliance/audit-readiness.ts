@@ -149,16 +149,23 @@ export function calculateAuditReadiness(
     overdueMandatoryMeasures > 0 ||
     criticalMandatoryOpen > 0 ||
     untreatedHighRisks > 0 ||
+    risksWithoutImpact > 0 ||
+    risksWithoutResponsible > 0 ||
+    input.documents.some((d) => d.deadline && new Date(d.deadline) < new Date()) ||
     input.incidents.some((i) => !isWorkComplete(i.status));
 
   score = Math.max(0, Math.min(100, score));
 
   if (hasOpenIssues) {
-    score = Math.min(score, 84);
+    score = Math.min(score, 99);
   }
 
   if (securityScore !== undefined && securityScore < 80) {
     score = Math.min(score, 79);
+  }
+
+  if (securityScore !== undefined && securityScore < 100 && score >= 100) {
+    score = 99;
   }
 
   const level = levelFromPercent(score);

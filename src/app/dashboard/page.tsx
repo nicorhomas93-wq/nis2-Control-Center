@@ -1,6 +1,6 @@
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { DashboardActions } from "@/components/dashboard/DashboardActions";
-import { NextStepsCard } from "@/components/dashboard/NextStepsCard";
+import { NextStepsCardClient } from "@/components/dashboard/NextStepsCardClient";
 import { ComplianceWarningsBanner } from "@/components/dashboard/ComplianceWarningsBanner";
 import { SecurityStatusCardClient } from "@/components/dashboard/SecurityStatusCardClient";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
@@ -11,7 +11,7 @@ import { getWorkspaceCompany, isCompanyProfileComplete, getOrCreateProfile } fro
 import { isPlatformOwner } from "@/lib/jarvis/access";
 import { calculateAuditFolderScore } from "@/lib/audit/audit-folders";
 import { calculateComplianceScore } from "@/lib/nis2/compliance-score";
-import { buildNextSteps, calculateSecurityStatus } from "@/lib/compliance";
+import { buildComplianceSnapshot } from "@/lib/compliance/snapshot";
 import { buildComplianceWarnings } from "@/lib/compliance/warnings";
 import { loadSecurityScoreHistory, syncCompanySecurityScore } from "@/lib/compliance/sync";
 import { getNis2StatusColor, getNis2StatusLabel } from "@/lib/nis2/betroffenheit";
@@ -113,19 +113,15 @@ export default async function DashboardPage({
     securityHistory = await loadSecurityScoreHistory(supabase, company.id);
   }
 
-  const securityStatus = calculateSecurityStatus({
+  const complianceSnapshot = buildComplianceSnapshot({
     company,
     documents: docs,
     measures: meas,
     risks,
     incidents,
   });
-  const nextSteps = buildNextSteps({
-    documents: docs,
-    measures: meas,
-    risks,
-    incidents,
-  });
+  const securityStatus = complianceSnapshot.securityStatus;
+  const nextSteps = complianceSnapshot.nextSteps;
   const complianceWarnings = buildComplianceWarnings({
     documents: docs,
     measures: meas,
@@ -169,7 +165,9 @@ export default async function DashboardPage({
 
       {company && <ComplianceWarningsBanner warnings={complianceWarnings} />}
 
-      {company && <NextStepsCard steps={nextSteps} />}
+      {company && (
+        <NextStepsCardClient companyId={company.id} initialSteps={nextSteps} />
+      )}
 
       {showFunnelWelcome && company && (
         <FunnelWelcomeBanner

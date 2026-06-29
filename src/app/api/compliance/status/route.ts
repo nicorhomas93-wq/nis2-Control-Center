@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyCompanyOwnership } from "@/lib/company";
 import {
   loadSecurityScoreHistory,
-  syncAndReturnSecurityStatus,
+  syncAndReturnComplianceSnapshot,
 } from "@/lib/compliance/sync";
 
 export async function GET(request: Request) {
@@ -22,8 +22,12 @@ export async function GET(request: Request) {
   const company = await verifyCompanyOwnership(user.id, companyId);
   if (!company) return NextResponse.json({ error: "Unternehmen nicht gefunden" }, { status: 404 });
 
-  const securityStatus = await syncAndReturnSecurityStatus(supabase, companyId);
+  const snapshot = await syncAndReturnComplianceSnapshot(supabase, companyId);
   const history = await loadSecurityScoreHistory(supabase, companyId);
 
-  return NextResponse.json({ securityStatus, history });
+  return NextResponse.json({
+    securityStatus: snapshot.securityStatus,
+    nextSteps: snapshot.nextSteps,
+    history,
+  });
 }

@@ -8,7 +8,7 @@ import { buildScoreFeedbackMessage } from "@/lib/compliance/score-feedback";
 import { isWorkComplete } from "@/lib/compliance/obligations";
 import {
   loadCompanyComplianceData,
-  syncAndReturnSecurityStatus,
+  syncAndReturnComplianceSnapshot,
 } from "@/lib/compliance/sync";
 import { getDbErrorMessage, isMissingTableError } from "@/lib/supabase/db-error";
 import type { Measure } from "@/lib/types";
@@ -23,11 +23,12 @@ async function buildComplianceResponse(
     hasOpenMandatoryMeasures?: boolean;
   }
 ) {
-  const securityStatus = await syncAndReturnSecurityStatus(supabase, companyId);
-  const scoreDelta = securityStatus.score - beforeScore;
+  const snapshot = await syncAndReturnComplianceSnapshot(supabase, companyId);
+  const scoreDelta = snapshot.securityStatus.score - beforeScore;
 
   return {
-    securityStatus,
+    securityStatus: snapshot.securityStatus,
+    nextSteps: snapshot.nextSteps,
     scoreDelta,
     feedbackMessage: buildScoreFeedbackMessage(scoreDelta, context),
   };

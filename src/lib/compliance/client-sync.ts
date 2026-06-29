@@ -1,10 +1,11 @@
-import type { SecurityStatusResult } from "@/lib/compliance/types";
+import type { NextStepAction, SecurityStatusResult } from "@/lib/compliance/types";
 
 export const COMPLIANCE_UPDATED_EVENT = "tknd:compliance-updated";
 
 export interface ComplianceUpdatedDetail {
   companyId: string;
   securityStatus: SecurityStatusResult;
+  nextSteps?: NextStepAction[];
   eventTitle?: string;
   scoreDelta?: number;
   feedbackMessage?: string;

@@ -9,11 +9,11 @@ import {
 import {
   deriveRiskProblemTitle,
   displayRiskField,
-  isPlaceholderValue,
   RISK_FIELD_FALLBACKS,
 } from "@/lib/compliance/risk-display";
+import { isRiskTreated } from "@/lib/compliance/risk-treatment";
 import { resolveRiskAsset } from "@/lib/assets/resolve";
-import type { CriticalityLevel, NextStepAction } from "@/lib/compliance/types";
+import type { CriticalityLevel, NextStepAction, SecurityStatusResult } from "@/lib/compliance/types";
 import type { Document, Incident, Measure, Risk } from "@/lib/types";
 
 function priorityWeight(p: CriticalityLevel): number {
@@ -29,18 +29,46 @@ function priorityWeight(p: CriticalityLevel): number {
   }
 }
 
-export function buildNextSteps(input: {
-  documents: Document[];
-  measures: Measure[];
-  risks: Risk[];
-  incidents: Incident[];
-  assets?: import("@/lib/assets/types").CompanyAsset[];
-}): NextStepAction[] {
+function isActiveRisk(risk: Risk, measures: Measure[]): boolean {
+  if (risk.risk_level === "low") return false;
+  if (risk.treatment_status === "treated" || risk.treatment_status === "reduced") return false;
+  return !isRiskTreated(risk, measures);
+}
+
+export function buildNextSteps(
+  input: {
+    documents: Document[];
+    measures: Measure[];
+    risks: Risk[];
+    incidents: Incident[];
+    assets?: import("@/lib/assets/types").CompanyAsset[];
+  },
+  securityStatus?: SecurityStatusResult
+): NextStepAction[] {
+  if (
+    securityStatus &&
+    securityStatus.score >= 100 &&
+    securityStatus.auditReadiness.percent >= 100 &&
+    securityStatus.drivers.length === 0
+  ) {
+    return [];
+  }
+
   const assets = input.assets ?? [];
   const actions: NextStepAction[] = [];
+  const driverIds = new Set(securityStatus?.drivers.map((d) => d.id) ?? []);
 
   for (const measure of input.measures) {
     if (isWorkComplete(measure.status)) continue;
+
+    if (securityStatus && driverIds.size > 0) {
+      const hasDriver =
+        driverIds.has(`measure-overdue-${measure.id}`) ||
+        driverIds.has(`measure-high-${measure.id}`) ||
+        driverIds.has(`measure-mandatory-${measure.id}`);
+      if (!hasDriver) continue;
+    }
+
     const obligation = resolveObligationStatus({
       status: measure.status,
       deadline: measure.deadline,
@@ -78,9 +106,18 @@ export function buildNextSteps(input: {
   }
 
   for (const risk of input.risks) {
-    if (risk.risk_level === "low") continue;
+    if (!isActiveRisk(risk, input.measures)) continue;
+
+    if (securityStatus && driverIds.size > 0) {
+      const hasDriver =
+        driverIds.has(`risk-open-${risk.id}`) || driverIds.has(`risk-overdue-${risk.id}`);
+      if (!hasDriver) continue;
+    }
+
     const priority: CriticalityLevel =
-      risk.risk_level === "high" ? "critical" : "high";
+      normalizeCriticality(risk.criticality) === "critical" || risk.risk_level === "high"
+        ? "critical"
+        : "high";
     const obligation = resolveObligationStatus({
       status: "open",
       deadline: risk.deadline,
@@ -112,6 +149,14 @@ export function buildNextSteps(input: {
 
   for (const incident of input.incidents) {
     if (isWorkComplete(incident.status)) continue;
+
+    if (securityStatus && driverIds.size > 0) {
+      const hasDriver =
+        driverIds.has(`incident-open-${incident.id}`) ||
+        driverIds.has(`incident-progress-${incident.id}`);
+      if (!hasDriver) continue;
+    }
+
     const priority = normalizeCriticality(incident.criticality ?? "high");
     const obligation = resolveObligationStatus({
       status: incident.status,
@@ -141,6 +186,10 @@ export function buildNextSteps(input: {
 
   const missing = getMissingAuditDocumentTypes(input.documents);
   for (const docType of missing.slice(0, 3)) {
+    if (securityStatus && driverIds.size > 0 && !driverIds.has(`doc-missing-${docType}`)) {
+      continue;
+    }
+
     const label = getDocumentTypeLabel(docType);
     actions.push({
       id: `doc-${docType}`,
@@ -153,6 +202,10 @@ export function buildNextSteps(input: {
       recommendation: `Dokument generieren, prüfen und als Nachweis im Audit-Ordner ablegen`,
       sortScore: 55,
     });
+  }
+
+  if (securityStatus && securityStatus.score >= 100 && securityStatus.auditReadiness.percent >= 100) {
+    return [];
   }
 
   return actions.sort((a, b) => b.sortScore - a.sortScore).slice(0, 5);
