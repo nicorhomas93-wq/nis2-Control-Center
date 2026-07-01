@@ -4,6 +4,12 @@ import type { NextStepAction, SecurityStatusResult } from "@/lib/compliance/type
 import type { TaskItem } from "@/lib/tasks/types";
 import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
 import { calculateDataQuality } from "@/lib/compliance/data-quality";
+import {
+  buildOnboardingStepViews,
+  filterNextStepsForOnboarding,
+} from "@/lib/onboarding/evaluate";
+import type { OnboardingDataInput } from "@/lib/onboarding/evaluate";
+import type { CompanyAsset } from "@/lib/assets/types";
 
 export interface ComplianceDataInput {
   company: Company | null;
@@ -12,6 +18,11 @@ export interface ComplianceDataInput {
   risks: Risk[];
   incidents: Incident[];
   tasks?: TaskItem[];
+  assets?: CompanyAsset[];
+  onboarding?: Pick<
+    OnboardingDataInput,
+    "evidenceCount" | "assessmentCount" | "auditExportCount" | "teamMemberCount"
+  >;
 }
 
 export interface ComplianceSnapshot {
@@ -30,16 +41,32 @@ export function buildComplianceSnapshot(input: ComplianceDataInput): ComplianceS
     tasks: input.tasks,
   });
   const securityStatus = calculateSecurityStatus(input);
-  const nextSteps = buildNextSteps(
+  let nextSteps = buildNextSteps(
     {
       documents: input.documents,
       measures: input.measures,
       risks: input.risks,
       incidents: input.incidents,
       tasks: input.tasks,
+      assets: input.assets,
     },
     securityStatus
   );
+
+  if (input.onboarding) {
+    const onboardingSteps = buildOnboardingStepViews({
+      company: input.company,
+      documents: input.documents,
+      measures: input.measures,
+      risks: input.risks,
+      assets: input.assets ?? [],
+      evidenceCount: input.onboarding.evidenceCount,
+      assessmentCount: input.onboarding.assessmentCount,
+      auditExportCount: input.onboarding.auditExportCount,
+      teamMemberCount: input.onboarding.teamMemberCount,
+    });
+    nextSteps = filterNextStepsForOnboarding(nextSteps, onboardingSteps);
+  }
 
   return { securityStatus, nextSteps, dataQuality };
 }

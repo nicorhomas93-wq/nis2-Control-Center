@@ -3,6 +3,8 @@ import { buildComplianceSnapshot } from "@/lib/compliance/snapshot";
 import type { SecurityScoreSnapshot } from "@/lib/compliance/types";
 import { loadCompanyTasks } from "@/lib/tasks/service";
 import type { TaskItem } from "@/lib/tasks/types";
+import type { CompanyAsset } from "@/lib/assets/types";
+import { loadOnboardingData } from "@/lib/onboarding/resolve";
 import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
 
 export async function loadCompanyComplianceData(
@@ -15,14 +17,23 @@ export async function loadCompanyComplianceData(
   risks: Risk[];
   incidents: Incident[];
   tasks: TaskItem[];
+  assets: CompanyAsset[];
+  onboarding: {
+    evidenceCount: number;
+    assessmentCount: number;
+    auditExportCount: number;
+    teamMemberCount: number;
+  };
 }> {
-  const [companyRes, documentsRes, measuresRes, risksRes, incidentsRes, tasks] = await Promise.all([
+  const [companyRes, documentsRes, measuresRes, risksRes, incidentsRes, tasks, onboardingData] =
+    await Promise.all([
     supabase.from("companies").select("*").eq("id", companyId).maybeSingle(),
     supabase.from("documents").select("*").eq("company_id", companyId),
     supabase.from("measures").select("*").eq("company_id", companyId),
     supabase.from("risks").select("*").eq("company_id", companyId),
     supabase.from("incidents").select("*").eq("company_id", companyId),
     loadCompanyTasks(supabase, companyId),
+    loadOnboardingData(supabase, companyId),
   ]);
 
   return {
@@ -32,6 +43,13 @@ export async function loadCompanyComplianceData(
     risks: (risksRes.data ?? []) as Risk[],
     incidents: (incidentsRes.data ?? []) as Incident[],
     tasks,
+    assets: onboardingData.assets,
+    onboarding: {
+      evidenceCount: onboardingData.evidenceCount,
+      assessmentCount: onboardingData.assessmentCount,
+      auditExportCount: onboardingData.auditExportCount,
+      teamMemberCount: onboardingData.teamMemberCount,
+    },
   };
 }
 
@@ -54,6 +72,8 @@ export async function syncAndReturnComplianceSnapshot(
     risks: data.risks,
     incidents: data.incidents,
     tasks: data.tasks,
+    assets: data.assets,
+    onboarding: data.onboarding,
   });
   const status = snapshot.securityStatus;
   const today = new Date().toISOString().slice(0, 10);

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireCompanyPermission } from "@/lib/team/access";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
-import { ONBOARDING_STEPS, computeOnboardingPercent } from "@/lib/onboarding/steps";
+import { resolveOnboardingState } from "@/lib/onboarding/resolve";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -18,21 +18,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const { data, error } = await supabase
-    .from("onboarding_progress")
-    .select("*")
-    .eq("company_id", companyId);
-
-  if (error) return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
-
-  const rows = data ?? [];
-  const { percent, incomplete } = computeOnboardingPercent(rows);
-  const steps = ONBOARDING_STEPS.map((s) => {
-    const row = rows.find((r) => r.step_key === s.key);
-    return { ...s, status: row?.status ?? "pending", completedAt: row?.completed_at ?? null };
-  });
-
-  return NextResponse.json({ steps, percent, incomplete });
+  try {
+    const state = await resolveOnboardingState(supabase, companyId);
+    return NextResponse.json({
+      steps: state.steps,
+      percent: state.percent,
+      incomplete: state.incomplete,
+      completedCount: state.completedCount,
+      isComplete: state.isComplete,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Onboarding konnte nicht geladen werden";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -63,7 +61,7 @@ export async function POST(request: Request) {
         status: status ?? "in_progress",
         completed_by: completed ? user.id : null,
         completed_at: completed ? now : null,
-        data_json: stepData ?? {},
+        data_json: { ...(stepData ?? {}), manual: true },
         updated_at: now,
       },
       { onConflict: "company_id,step_key" }
@@ -72,5 +70,7 @@ export async function POST(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
-  return NextResponse.json({ progress: data });
+
+  const state = await resolveOnboardingState(supabase, companyId);
+  return NextResponse.json({ progress: data, ...state });
 }

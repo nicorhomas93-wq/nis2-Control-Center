@@ -14,6 +14,7 @@ import { calculateComplianceScore } from "@/lib/nis2/compliance-score";
 import { buildComplianceSnapshot } from "@/lib/compliance/snapshot";
 import { TaskDashboardCards } from "@/components/dashboard/TaskDashboardCards";
 import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
+import { loadOnboardingData } from "@/lib/onboarding/resolve";
 import { loadCompanyTasks, countOpenTasks } from "@/lib/tasks/service";
 import { isTaskOpen } from "@/lib/tasks/types";
 import type { TaskItem } from "@/lib/tasks/types";
@@ -92,9 +93,10 @@ export default async function DashboardPage({
   let securityHistory: Awaited<ReturnType<typeof loadSecurityScoreHistory>> = [];
   let complianceEvents: { id: string; title: string; details: string | null; created_at: string }[] = [];
   let tasks: TaskItem[] = [];
+  let onboardingMeta: Awaited<ReturnType<typeof loadOnboardingData>> | null = null;
 
   if (company) {
-    const [docRes, measRes, risksRes, incidentsRes, assessRes, auditRes, eventsRes, loadedTasks] = await Promise.all([
+    const [docRes, measRes, risksRes, incidentsRes, assessRes, auditRes, eventsRes, loadedTasks, onboardingData] = await Promise.all([
       activeOnly(
         supabase
           .from("documents")
@@ -130,6 +132,7 @@ export default async function DashboardPage({
           .limit(10)
       ),
       loadCompanyTasks(supabase, company.id),
+      loadOnboardingData(supabase, company.id),
     ]);
     docs = (docRes.data ?? []) as Document[];
     meas = (measRes.data ?? []) as Measure[];
@@ -139,6 +142,7 @@ export default async function DashboardPage({
     lastAuditExport = auditRes.data?.[0]?.created_at ?? null;
     complianceEvents = (eventsRes.data ?? []) as typeof complianceEvents;
     tasks = loadedTasks;
+    onboardingMeta = onboardingData;
 
     await syncCompanySecurityScore(supabase, company.id);
     securityHistory = await loadSecurityScoreHistory(supabase, company.id);
@@ -151,6 +155,15 @@ export default async function DashboardPage({
     risks,
     incidents,
     tasks,
+    assets: onboardingMeta?.assets,
+    onboarding: onboardingMeta
+      ? {
+          evidenceCount: onboardingMeta.evidenceCount,
+          assessmentCount: onboardingMeta.assessmentCount,
+          auditExportCount: onboardingMeta.auditExportCount,
+          teamMemberCount: onboardingMeta.teamMemberCount,
+        }
+      : undefined,
   });
   const securityStatus = complianceSnapshot.securityStatus;
   const nextSteps = complianceSnapshot.nextSteps;
