@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Incident } from "@/lib/types";
 import {
-  formStateToPayload,
   incidentToFormState,
   INCIDENT_PRIORITY_OPTIONS,
   INCIDENT_STATUS_LABELS,
@@ -12,6 +11,7 @@ import {
   type IncidentFormState,
 } from "@/lib/incidents/types";
 import { validateIncidentClosure, getIncidentClosureWarnings } from "@/lib/incidents/completion";
+import { saveIncidentToApi } from "@/lib/incidents/client-save";
 import { buildGeneratedDocuments } from "@/lib/incidents/artifacts";
 import {
   CONTAINMENT_ACTION_TITLES,
@@ -34,6 +34,7 @@ import { FileText, Loader2 } from "lucide-react";
 
 interface IncidentDetailEditorProps {
   incident: Incident;
+  companyId: string;
   companyName?: string;
   onSaved: (incident: Incident) => void;
 }
@@ -57,6 +58,7 @@ function SectionCard({
 
 export function IncidentDetailEditor({
   incident,
+  companyId,
   companyName,
   onSaved,
 }: IncidentDetailEditorProps) {
@@ -95,6 +97,15 @@ export function IncidentDetailEditor({
     setValidationErrors([]);
     setClosureWarnings([]);
 
+    if (!incident?.id) {
+      setFeedback({
+        type: "error",
+        text: "Speichern fehlgeschlagen: Keine Vorfall-ID — bitte Vorfall zuerst anlegen.",
+      });
+      setSaving(false);
+      return;
+    }
+
     if (form.status === "completed") {
       const validation = validateIncidentClosure(form);
       if (!validation.valid) {
@@ -109,54 +120,33 @@ export function IncidentDetailEditor({
       setClosureWarnings(getIncidentClosureWarnings(form));
     }
 
-    const payload = { id: incident.id, ...formStateToPayload(form) };
-    console.log("Incident save payload:", payload);
+    const result = await saveIncidentToApi({
+      incidentId: incident.id,
+      companyId,
+      form,
+    });
 
-    try {
-      const res = await fetch("/api/incidents", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        console.error("Incident save failed:", data);
-        const errors = Array.isArray(data.validation_errors) ? data.validation_errors : [];
-        const message =
-          errors.length > 0
-            ? errors.join(" ")
-            : typeof data.error === "string"
-              ? data.error
-              : "Speichern fehlgeschlagen";
-        setValidationErrors(errors);
-        setFeedback({ type: "error", text: message });
-        setSaving(false);
-        return;
-      }
-
-      console.log("Incident saved:", data.incident);
-      const successText = data.warning
-        ? `Vorfall gespeichert. Hinweis: ${data.warning}`
-        : "Vorfall gespeichert";
-      setFeedback({ type: "success", text: successText });
-      onSaved(data.incident as Incident);
-      router.refresh();
-    } catch (error) {
-      console.error("Incident save failed:", error);
-      setFeedback({
-        type: "error",
-        text: error instanceof Error ? error.message : "Speichern fehlgeschlagen",
-      });
-    } finally {
+    if (!result.ok) {
+      setValidationErrors(result.validationErrors ?? []);
+      setFeedback({ type: "error", text: result.errorMessage ?? "Speichern fehlgeschlagen" });
       setSaving(false);
+      return;
     }
+
+    const successText = result.warning
+      ? `Vorfall gespeichert. Hinweis: ${result.warning}`
+      : "Vorfall gespeichert";
+    setFeedback({ type: "success", text: successText });
+    if (result.incident) onSaved(result.incident);
+    router.refresh();
+    setSaving(false);
   }
 
   async function handleGenerateArtifacts() {
     setGenerating(true);
     setFeedback(null);
 
+    try {
     const docs = buildGeneratedDocuments(incident, form, companyName);
     const management = docs.find((d) => d.type === "management_report")?.content ?? "";
     const audit = docs.find((d) => d.type === "audit_report")?.content ?? "";
@@ -168,43 +158,44 @@ export function IncidentDetailEditor({
       employeeLetterText: letter || form.employeeLetterText,
     });
 
-    const payload = {
-      id: incident.id,
-      ...formStateToPayload({
+    const result = await saveIncidentToApi({
+      incidentId: incident.id,
+      companyId,
+      form: {
         ...form,
         managementReportText: management,
         auditReportText: audit,
         employeeLetterText: letter || form.employeeLetterText,
-      }),
-      generated_documents: docs,
-    };
+      },
+      extraFields: { generated_documents: docs },
+    });
 
-    try {
-      const res = await fetch("/api/incidents", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+    if (!result.ok) {
+      setFeedback({
+        type: "error",
+        text: result.errorMessage ?? "Dokumente konnten nicht gespeichert werden.",
       });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Artifact generation failed:", data);
-        const message =
-          typeof data.error === "string" ? data.error : "Dokumente konnten nicht gespeichert werden.";
-        setFeedback({ type: "error", text: message });
-        setGenerating(false);
-        return;
-      }
-      console.log("Incident artifacts generated:", data.incident);
-      setFeedback({ type: "success", text: "Dokumente erzeugt und gespeichert" });
-      onSaved(data.incident as Incident);
-      router.refresh();
-    } catch (error) {
-      console.error("Artifact generation failed:", error);
-      setFeedback({ type: "error", text: "Speichern fehlgeschlagen" });
-    } finally {
       setGenerating(false);
+      return;
     }
+
+    console.log("Incident artifacts generated:", result.incident);
+    setFeedback({ type: "success", text: "Dokumente erzeugt und gespeichert" });
+    if (result.incident) onSaved(result.incident);
+    router.refresh();
+  } catch (error) {
+    console.error("Artifact generation failed:", error);
+    setFeedback({
+      type: "error",
+      text:
+        error instanceof Error
+          ? `Speichern fehlgeschlagen: ${error.message}`
+          : "Speichern fehlgeschlagen: Dokumente konnten nicht gespeichert werden.",
+    });
+  } finally {
+    setGenerating(false);
   }
+}
 
   return (
     <div className="space-y-4">
@@ -276,7 +267,7 @@ export function IncidentDetailEditor({
           </div>
         </div>
         <div className="mt-3">
-          <Button size="sm" onClick={handleSave} disabled={saving || generating}>
+          <Button type="button" size="sm" onClick={handleSave} disabled={saving || generating}>
             {saving ? (
               <>
                 <Loader2 className="h-3 w-3 animate-spin" /> Speichere...
@@ -495,7 +486,7 @@ export function IncidentDetailEditor({
       </SectionCard>
 
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <Button onClick={handleSave} disabled={saving || generating}>
+        <Button type="button" onClick={handleSave} disabled={saving || generating}>
           {saving ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" /> Speichere...

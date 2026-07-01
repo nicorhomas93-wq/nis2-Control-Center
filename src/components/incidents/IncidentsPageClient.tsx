@@ -169,6 +169,7 @@ export function IncidentsPageClient({
                   <CardContent>
                     <IncidentDetailEditor
                       incident={selected}
+                      companyId={companyId}
                       companyName={companyName}
                       onSaved={handleIncidentSaved}
                     />

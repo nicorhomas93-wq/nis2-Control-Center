@@ -29,7 +29,7 @@ export const DB_SETUP_HINT =
   "Bitte führen Sie supabase/setup-complete.sql im Supabase SQL Editor aus. Bei bestehender Datenbank reicht supabase/migrations/patch-existing-db.sql.";
 
 export function getDbErrorMessage(
-  error: { code?: string; message?: string } | null
+  error: { code?: string; message?: string; details?: string; hint?: string } | null
 ): string {
   if (isMissingTableError(error)) {
     return `Datenbanktabellen fehlen. ${DB_SETUP_HINT}`;
@@ -37,5 +37,10 @@ export function getDbErrorMessage(
   if (isMissingColumnError(error)) {
     return `Datenbankschema veraltet. ${DB_SETUP_HINT}`;
   }
-  return error?.message ?? "Ein Datenbankfehler ist aufgetreten.";
+  const parts: string[] = [];
+  if (error?.message) parts.push(error.message);
+  if (error?.details) parts.push(error.details);
+  if (error?.hint) parts.push(`Hinweis: ${error.hint}`);
+  if (error?.code) parts.push(`Code: ${error.code}`);
+  return parts.join(" — ") || "Ein Datenbankfehler ist aufgetreten.";
 }
