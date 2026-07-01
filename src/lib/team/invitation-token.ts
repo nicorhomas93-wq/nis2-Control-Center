@@ -173,6 +173,27 @@ type AcceptResult =
   | { ok: true }
   | { ok: false; error: string; code?: "email_mismatch" | "expired" | "not_found" };
 
+async function removeOrphanShellCompany(userId: string, joinedCompanyId: string): Promise<void> {
+  const admin = createAdminClient();
+  if (!admin) return;
+
+  const { data: owned } = await admin
+    .from("companies")
+    .select("id, company_name, industry")
+    .eq("user_id", userId)
+    .eq("is_mandant", false)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!owned || owned.id === joinedCompanyId) return;
+  if (owned.company_name?.trim() || owned.industry?.trim()) return;
+
+  await admin
+    .from("companies")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", owned.id);
+}
+
 async function acceptInvitationAdmin(options: {
   invitation: InvitationByToken;
   userId: string;
@@ -258,6 +279,8 @@ async function acceptInvitationAdmin(options: {
     .from("profiles")
     .update({ last_active_at: new Date().toISOString() })
     .eq("id", options.userId);
+
+  await removeOrphanShellCompany(options.userId, options.invitation.company_id);
 
   return { ok: true };
 }

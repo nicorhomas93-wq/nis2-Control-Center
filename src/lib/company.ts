@@ -4,6 +4,46 @@ import { getDbErrorMessage, isMissingTableError } from "@/lib/supabase/db-error"
 import { resolveWorkspaceCompany } from "@/lib/consultant/mandanten";
 import { activeOnly } from "@/lib/supabase/soft-delete";
 
+function isEmptyShellCompany(company: Company): boolean {
+  return !company.company_name?.trim() && !company.industry?.trim();
+}
+
+function normalizeJoinedCompany(raw: unknown): Company | null {
+  const company = (Array.isArray(raw) ? raw[0] : raw) as Company | null | undefined;
+  if (!company || company.deleted_at) return null;
+  return company;
+}
+
+async function fetchOwnedCompany(userId: string): Promise<Company | null> {
+  const supabase = await createClient();
+  const { data, error } = await activeOnly(
+    supabase
+      .from("companies")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("is_mandant", false)
+  ).maybeSingle();
+
+  if (error && isMissingTableError(error)) return null;
+  if (error || !data) return null;
+  return data as Company;
+}
+
+async function fetchTeamCompany(userId: string): Promise<Company | null> {
+  const supabase = await createClient();
+  const { data: membership, error } = await supabase
+    .from("company_members")
+    .select("company_id, companies(*)")
+    .eq("user_id", userId)
+    .eq("active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error && isMissingTableError(error)) return null;
+  return normalizeJoinedCompany(membership?.companies);
+}
+
 export async function getOrCreateProfile(
   userId: string,
   email?: string
@@ -36,49 +76,19 @@ export async function getOrCreateCompany(
 ): Promise<{ company: Company | null; missingTable: boolean; error: string | null }> {
   const supabase = await createClient();
 
-  const { data: existing, error: fetchError } = await activeOnly(
-    supabase
-      .from("companies")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("is_mandant", false)
-  ).maybeSingle();
+  const owned = await fetchOwnedCompany(userId);
+  const team = await fetchTeamCompany(userId);
 
-  if (fetchError && isMissingTableError(fetchError)) {
-    return { company: null, missingTable: true, error: getDbErrorMessage(fetchError) };
+  if (owned && !isEmptyShellCompany(owned)) {
+    return { company: owned, missingTable: false, error: null };
   }
 
-  if (fetchError) {
-    return {
-      company: null,
-      missingTable: false,
-      error: getDbErrorMessage(fetchError),
-    };
+  if (team) {
+    return { company: team, missingTable: false, error: null };
   }
 
-  if (existing) {
-    return { company: existing as Company, missingTable: false, error: null };
-  }
-
-  const { data: membership, error: memberError } = await supabase
-    .from("company_members")
-    .select("company_id, companies(*)")
-    .eq("user_id", userId)
-    .eq("active", true)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (memberError && isMissingTableError(memberError)) {
-    return { company: null, missingTable: true, error: getDbErrorMessage(memberError) };
-  }
-
-  const teamCompanyRaw = membership?.companies;
-  const teamCompany = (
-    Array.isArray(teamCompanyRaw) ? teamCompanyRaw[0] : teamCompanyRaw
-  ) as Company | null | undefined;
-  if (teamCompany && !teamCompany.deleted_at) {
-    return { company: teamCompany, missingTable: false, error: null };
+  if (owned) {
+    return { company: owned, missingTable: false, error: null };
   }
 
   const { data: created, error: createError } = await supabase
@@ -120,10 +130,14 @@ export async function getWorkspaceCompany(
     };
   }
 
-  const workspace = await resolveWorkspaceCompany(userId, base.company);
+  const owned = await fetchOwnedCompany(userId);
+  const ownForMandant =
+    owned && !isEmptyShellCompany(owned) ? owned : base.company;
+
+  const workspace = await resolveWorkspaceCompany(userId, ownForMandant);
   return {
     company: workspace.company,
-    ownCompany: base.company,
+    ownCompany: owned ?? base.company,
     missingTable: base.missingTable,
     error: base.error,
     isViewingMandant: workspace.isViewingMandant,

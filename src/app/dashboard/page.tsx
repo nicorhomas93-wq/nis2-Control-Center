@@ -80,7 +80,7 @@ export default async function DashboardPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { company, ownCompany, missingTable, isViewingMandant } = await getWorkspaceCompany(user.id);
+  const { company, missingTable, isViewingMandant } = await getWorkspaceCompany(user.id);
   const profile = await getOrCreateProfile(user.id, user.email);
   const platformOwner = isPlatformOwner(user.email, profile?.role);
 
@@ -212,7 +212,7 @@ export default async function DashboardPage({
         </p>
       </div>
 
-      <BillingStatusBanner company={ownCompany} platformOwner={platformOwner} />
+      <BillingStatusBanner company={company} platformOwner={platformOwner} />
 
       {company && (
         <div className="mb-6">
