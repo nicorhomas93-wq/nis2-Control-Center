@@ -5,6 +5,23 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+function formatCreateUserError(error: { message?: string; code?: string; status?: number } | null): string {
+  const message = error?.message?.trim() ?? "";
+  const lower = message.toLowerCase();
+
+  if (lower.includes("database error saving new user") || lower.includes("handle_new_user")) {
+    return "Datenbankfehler beim Anlegen des Nutzers. Der Profil-Trigger in Supabase muss repariert werden (Migration fix_handle_new_user_trigger).";
+  }
+
+  if (lower.includes("password") && lower.includes("weak")) {
+    return "Passwort zu schwach. Bitte mindestens 8 Zeichen mit Buchstaben und Zahlen verwenden.";
+  }
+
+  if (message) return message;
+  if (error?.code) return `Nutzer konnte nicht erstellt werden (${error.code}).`;
+  return "Nutzer konnte nicht erstellt werden.";
+}
+
 async function findUserByEmail(
   admin: NonNullable<ReturnType<typeof createAdminClient>>,
   email: string
@@ -28,6 +45,23 @@ async function findUserByEmail(
   return null;
 }
 
+async function ensureProfile(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  userId: string,
+  email: string
+) {
+  await admin.from("profiles").upsert(
+    {
+      id: userId,
+      email,
+      plan: "pilot",
+      role: "user",
+      status: "active",
+    },
+    { onConflict: "id" }
+  );
+}
+
 export async function registerInviteUser(options: {
   token: string;
   email: string;
@@ -44,8 +78,8 @@ export async function registerInviteUser(options: {
     return { ok: false, error: "Einladung ungültig." };
   }
 
-  if (!email || !password || password.length < 6) {
-    return { ok: false, error: "E-Mail und Passwort (mindestens 6 Zeichen) erforderlich." };
+  if (!email || !password || password.length < 8) {
+    return { ok: false, error: "E-Mail und Passwort (mindestens 8 Zeichen) erforderlich." };
   }
 
   const invitation = await getInvitationByToken(token);
@@ -68,7 +102,7 @@ export async function registerInviteUser(options: {
   if (!admin) {
     return {
       ok: false,
-      error: "Server-Konfiguration unvollständig (SUPABASE_SERVICE_ROLE_KEY fehlt).",
+      error: "Server-Konfiguration unvollständig (SUPABASE_SERVICE_ROLE_KEY fehlt auf Vercel).",
     };
   }
 
@@ -76,13 +110,11 @@ export async function registerInviteUser(options: {
     email,
     password,
     email_confirm: true,
+    user_metadata: { invited_via: "team_invitation" },
   });
 
   if (!createError && created.user) {
-    await admin.from("profiles").upsert(
-      { id: created.user.id, email },
-      { onConflict: "id" }
-    );
+    await ensureProfile(admin, created.user.id, email);
     return { ok: true, created: true };
   }
 
@@ -95,7 +127,7 @@ export async function registerInviteUser(options: {
   if (!alreadyExists) {
     return {
       ok: false,
-      error: createError?.message ?? "Konto konnte nicht erstellt werden.",
+      error: formatCreateUserError(createError),
     };
   }
 
@@ -116,12 +148,12 @@ export async function registerInviteUser(options: {
   if (updateError) {
     return {
       ok: false,
-      error: "Konto existiert bereits. Bitte melden Sie sich mit Ihrem Passwort an.",
+      error: formatCreateUserError(updateError),
       suggestLogin: true,
     };
   }
 
-  await admin.from("profiles").upsert({ id: existing.id, email }, { onConflict: "id" });
+  await ensureProfile(admin, existing.id, email);
 
   return { ok: true, created: false };
 }

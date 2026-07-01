@@ -270,8 +270,8 @@ export function AuthForm({ mode, redirectTo, invitedEmail }: AuthFormProps) {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mindestens 6 Zeichen"
-                  minLength={6}
+                  placeholder="Mindestens 8 Zeichen empfohlen"
+                  minLength={8}
                   required
                 />
               </div>
