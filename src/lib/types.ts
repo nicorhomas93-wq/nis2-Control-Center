@@ -6,6 +6,18 @@ import type {
 
 export type { DetectedWebsiteType, WebPresenceEvidence, WebPresenceStatus };
 export type { CompanyAsset, AssetCategory, AssetCriticality } from "@/lib/assets/types";
+export type {
+  CompanyVendor,
+  VendorEvidence,
+  VendorAssessment,
+  VendorWithDetails,
+  VendorDashboardStats,
+  VendorCriticality,
+  VendorRiskLevel,
+  VendorEvidenceType,
+  VendorEvidenceStatus,
+  VendorQuestionnaireAnswers,
+} from "@/lib/vendors/types";
 
 export type Nis2Status =
   | "unbekannt"

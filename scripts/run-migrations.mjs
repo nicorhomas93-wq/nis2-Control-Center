@@ -59,6 +59,7 @@ const ORDER = [
   "fix_handle_new_user_trigger.sql",
   "fix_profiles_missing_plan_role.sql",
   "add_team_data_access_rls.sql",
+  "add_company_vendors.sql",
 ];
 
 const url = process.env.DATABASE_URL;

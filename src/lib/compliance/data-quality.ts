@@ -1,8 +1,10 @@
 import type { Company, Document, Measure, Risk } from "@/lib/types";
+import type { VendorWithDetails } from "@/lib/vendors/types";
 import { isPlaceholderValue, deriveRiskProblemTitle } from "@/lib/compliance/risk-display";
 import { isWorkComplete } from "@/lib/compliance/obligations";
 import type { TaskItem } from "@/lib/tasks/types";
 import { isTaskOpen } from "@/lib/tasks/types";
+import { countMissingEvidence, isReviewDue } from "@/lib/vendors/scoring";
 
 export type DataQualityStatus =
   | "confirmed_with_evidence"
@@ -45,6 +47,7 @@ export function calculateDataQuality(input: {
   measures: Measure[];
   documents: Document[];
   tasks?: TaskItem[];
+  vendors?: VendorWithDetails[];
 }): DataQualityResult {
   const checks: DataQualityCheck[] = [];
   const hints: string[] = [];
@@ -124,6 +127,66 @@ export function calculateDataQuality(input: {
     input.tasks?.filter(
       (t) => t.evidence_required && isTaskOpen(t.status) && t.status === "waiting_evidence"
     ).length ?? 0;
+
+  const vendors = input.vendors ?? [];
+  let vendorMissingEvidence = 0;
+  let vendorReviewsDue = 0;
+
+  if (vendors.length === 0) {
+    checks.push({
+      checkKey: "vendor_inventory",
+      status: "missing",
+      qualityLevel: "medium",
+      reason: "Keine Lieferanten erfasst",
+      relatedType: "vendor",
+    });
+    hints.push("Lieferanteninventar fehlt für Audit-Ordner 08.");
+  } else {
+    checks.push({
+      checkKey: "vendor_inventory",
+      status: "confirmed",
+      qualityLevel: "medium",
+      reason: `${vendors.length} Lieferant${vendors.length === 1 ? "" : "en"} erfasst`,
+      relatedType: "vendor",
+    });
+
+    for (const vendor of vendors) {
+      const missing = countMissingEvidence(vendor.evidence, vendor.criticality);
+      if (missing > 0) {
+        vendorMissingEvidence += missing;
+        checks.push({
+          checkKey: `vendor-evidence-${vendor.id}`,
+          status: "missing",
+          qualityLevel: vendor.criticality === "critical" || vendor.criticality === "high" ? "high" : "medium",
+          reason: `Lieferant „${vendor.name}": ${missing} fehlende Nachweise`,
+          relatedType: "vendor",
+          relatedId: vendor.id,
+        });
+      }
+      if (isReviewDue(vendor.next_review_at)) {
+        vendorReviewsDue += 1;
+        checks.push({
+          checkKey: `vendor-review-${vendor.id}`,
+          status: "missing",
+          qualityLevel: "medium",
+          reason: `Lieferantenbewertung fällig: ${vendor.name}`,
+          relatedType: "vendor",
+          relatedId: vendor.id,
+        });
+      }
+    }
+  }
+
+  if (vendorMissingEvidence > 0) {
+    hints.push(
+      `${vendorMissingEvidence} Lieferanten-Nachweis${vendorMissingEvidence === 1 ? "" : "e"} fehlen.`
+    );
+  }
+  if (vendorReviewsDue > 0) {
+    hints.push(
+      `${vendorReviewsDue} Lieferantenbewertung${vendorReviewsDue === 1 ? "" : "en"} fällig.`
+    );
+  }
 
   if (unconfirmedRisks > 0) {
     hints.push(

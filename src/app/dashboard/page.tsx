@@ -23,13 +23,14 @@ import { loadSecurityScoreHistory, syncCompanySecurityScore } from "@/lib/compli
 import { activeOnly } from "@/lib/supabase/soft-delete";
 import { getNis2StatusColor, getNis2StatusLabel } from "@/lib/nis2/betroffenheit";
 import { formatDate } from "@/lib/utils";
-import type { ActivityItem, Document, Incident, Measure, Nis2Assessment, Risk } from "@/lib/types";
+import type { ActivityItem, Document, Incident, Measure, Nis2Assessment, Risk, VendorWithDetails } from "@/lib/types";
 import Link from "next/link";
 import { ArrowRight, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { FunnelWelcomeBanner } from "@/components/funnel/FunnelWelcomeBanner";
+import { loadVendorsWithDetails, buildVendorDashboardStats } from "@/lib/vendors/service";
 import { redirect } from "next/navigation";
 
 function buildRecentActivity(
@@ -94,9 +95,11 @@ export default async function DashboardPage({
   let complianceEvents: { id: string; title: string; details: string | null; created_at: string }[] = [];
   let tasks: TaskItem[] = [];
   let onboardingMeta: Awaited<ReturnType<typeof loadOnboardingData>> | null = null;
+  let vendors: VendorWithDetails[] = [];
+  let vendorStats = buildVendorDashboardStats([]);
 
   if (company) {
-    const [docRes, measRes, risksRes, incidentsRes, assessRes, auditRes, eventsRes, loadedTasks, onboardingData] = await Promise.all([
+    const [docRes, measRes, risksRes, incidentsRes, assessRes, auditRes, eventsRes, loadedTasks, onboardingData, loadedVendors] = await Promise.all([
       activeOnly(
         supabase
           .from("documents")
@@ -133,6 +136,7 @@ export default async function DashboardPage({
       ),
       loadCompanyTasks(supabase, company.id),
       loadOnboardingData(supabase, company.id),
+      loadVendorsWithDetails(supabase, company.id).catch(() => []),
     ]);
     docs = (docRes.data ?? []) as Document[];
     meas = (measRes.data ?? []) as Measure[];
@@ -143,6 +147,8 @@ export default async function DashboardPage({
     complianceEvents = (eventsRes.data ?? []) as typeof complianceEvents;
     tasks = loadedTasks;
     onboardingMeta = onboardingData;
+    vendors = loadedVendors;
+    vendorStats = buildVendorDashboardStats(vendors);
 
     await syncCompanySecurityScore(supabase, company.id);
     securityHistory = await loadSecurityScoreHistory(supabase, company.id);
@@ -156,6 +162,7 @@ export default async function DashboardPage({
     incidents,
     tasks,
     assets: onboardingMeta?.assets,
+    vendors,
     onboarding: onboardingMeta
       ? {
           evidenceCount: onboardingMeta.evidenceCount,
@@ -349,6 +356,45 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       </div>
+
+      {company && (
+        <Card className="mb-8">
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-base">Lieferanten</CardTitle>
+              <p className="mt-1 text-sm text-slate-500">
+                Audit-Ordner 08_Lieferantenbewertung · Ø Score {vendorStats.averageScore}%
+              </p>
+            </div>
+            <Link href="/lieferanten">
+              <Button variant="outline" size="sm">
+                Verwalten
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="text-sm text-slate-500">Lieferanten gesamt</p>
+                <p className="text-2xl font-bold">{vendorStats.totalVendors}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Kritische Lieferanten</p>
+                <p className="text-2xl font-bold text-orange-700">{vendorStats.criticalVendors}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Fehlende Nachweise</p>
+                <p className="text-2xl font-bold text-red-700">{vendorStats.missingEvidenceCount}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Bewertungen fällig</p>
+                <p className="text-2xl font-bold text-amber-700">{vendorStats.reviewsDueCount}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <Card>
