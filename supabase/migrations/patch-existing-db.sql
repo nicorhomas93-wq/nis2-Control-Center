@@ -45,3 +45,5 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'pilot';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
 
 CREATE INDEX IF NOT EXISTS idx_pilot_requests_created_at ON pilot_requests(created_at DESC);
+
+-- Incident Response: node scripts/run-migrations.mjs (add_incident_response_fields.sql)

@@ -11,7 +11,7 @@ import {
   INCIDENT_STATUS_OPTIONS,
   type IncidentFormState,
 } from "@/lib/incidents/types";
-import { validateIncidentCompletion } from "@/lib/incidents/completion";
+import { validateIncidentClosure, getIncidentClosureWarnings } from "@/lib/incidents/completion";
 import { buildGeneratedDocuments } from "@/lib/incidents/artifacts";
 import {
   CONTAINMENT_ACTION_TITLES,
@@ -69,10 +69,13 @@ export function IncidentDetailEditor({
   );
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
+  const [closureWarnings, setClosureWarnings] = useState<string[]>([]);
+
   useEffect(() => {
     setForm(incidentToFormState(incident));
     setFeedback(null);
     setValidationErrors([]);
+    setClosureWarnings([]);
   }, [incident]);
 
   function patchForm(patch: Partial<IncidentFormState>) {
@@ -90,18 +93,20 @@ export function IncidentDetailEditor({
     setSaving(true);
     setFeedback(null);
     setValidationErrors([]);
+    setClosureWarnings([]);
 
     if (form.status === "completed") {
-      const validation = validateIncidentCompletion(form);
+      const validation = validateIncidentClosure(form);
       if (!validation.valid) {
         setValidationErrors(validation.errors);
         setFeedback({
           type: "error",
-          text: "Speichern fehlgeschlagen — Pflichtangaben für Abschluss unvollständig.",
+          text: validation.errors.join(" "),
         });
         setSaving(false);
         return;
       }
+      setClosureWarnings(getIncidentClosureWarnings(form));
     }
 
     const payload = { id: incident.id, ...formStateToPayload(form) };
@@ -117,26 +122,32 @@ export function IncidentDetailEditor({
 
       if (!res.ok) {
         console.error("Incident save failed:", data);
+        const errors = Array.isArray(data.validation_errors) ? data.validation_errors : [];
         const message =
-          data.validation_errors?.join(" ") ||
-          data.error ||
-          "Speichern fehlgeschlagen";
-        setValidationErrors(data.validation_errors ?? []);
-        setFeedback({
-          type: "error",
-          text: message.includes("Berechtigung") ? message : "Speichern fehlgeschlagen",
-        });
+          errors.length > 0
+            ? errors.join(" ")
+            : typeof data.error === "string"
+              ? data.error
+              : "Speichern fehlgeschlagen";
+        setValidationErrors(errors);
+        setFeedback({ type: "error", text: message });
         setSaving(false);
         return;
       }
 
       console.log("Incident saved:", data.incident);
-      setFeedback({ type: "success", text: "Vorfall gespeichert" });
+      const successText = data.warning
+        ? `Vorfall gespeichert. Hinweis: ${data.warning}`
+        : "Vorfall gespeichert";
+      setFeedback({ type: "success", text: successText });
       onSaved(data.incident as Incident);
       router.refresh();
     } catch (error) {
       console.error("Incident save failed:", error);
-      setFeedback({ type: "error", text: "Speichern fehlgeschlagen" });
+      setFeedback({
+        type: "error",
+        text: error instanceof Error ? error.message : "Speichern fehlgeschlagen",
+      });
     } finally {
       setSaving(false);
     }
@@ -177,7 +188,9 @@ export function IncidentDetailEditor({
       const data = await res.json();
       if (!res.ok) {
         console.error("Artifact generation failed:", data);
-        setFeedback({ type: "error", text: "Speichern fehlgeschlagen" });
+        const message =
+          typeof data.error === "string" ? data.error : "Dokumente konnten nicht gespeichert werden.";
+        setFeedback({ type: "error", text: message });
         setGenerating(false);
         return;
       }
@@ -502,11 +515,22 @@ export function IncidentDetailEditor({
       </div>
 
       {validationErrors.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <p className="font-medium">Für Abschluss fehlen noch:</p>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          <p className="font-medium">Bitte korrigieren:</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {validationErrors.map((err) => (
               <li key={err}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {closureWarnings.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-medium">Hinweis für vollständige Dokumentation:</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {closureWarnings.map((warn) => (
+              <li key={warn}>{warn}</li>
             ))}
           </ul>
         </div>

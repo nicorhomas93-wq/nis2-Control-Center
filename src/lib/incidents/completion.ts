@@ -5,42 +5,25 @@ export interface IncidentCompletionResult {
   errors: string[];
 }
 
-function completedCount(actions: IncidentFormState["containmentActions"]): number {
-  return actions.filter((a) => a.status === "completed").length;
-}
-
-export function validateIncidentCompletion(form: IncidentFormState): IncidentCompletionResult {
+/** Pflichtfelder nur beim Status „Abgeschlossen“. */
+export function validateIncidentClosure(form: IncidentFormState): IncidentCompletionResult {
   const errors: string[] = [];
 
-  if (!form.incidentSummary.trim()) {
-    errors.push("Kurzbeschreibung ist erforderlich.");
-  }
-  if (!form.rootCause.trim()) {
-    errors.push("Ursache / Root Cause ist erforderlich.");
-  }
-  if (!form.affectedSystems.trim()) {
-    errors.push("Betroffene Systeme müssen dokumentiert sein.");
-  }
-  if (!form.estimatedImpact.trim()) {
-    errors.push("Geschätzte Auswirkung muss dokumentiert sein.");
-  }
-  if (completedCount(form.containmentActions) < 3) {
-    errors.push("Mindestens 3 Sofortmaßnahmen müssen abgeschlossen sein.");
-  }
-  if (completedCount(form.correctiveActions) < 2) {
-    errors.push("Mindestens 2 Korrekturmaßnahmen müssen abgeschlossen sein.");
-  }
   if (!form.completionNotes.trim()) {
-    errors.push("Abschlussnotizen sind erforderlich.");
+    errors.push("Bitte Abschlussnotizen eintragen.");
   }
-  if (form.employeeLetterRequired) {
-    if (!form.employeeRecipientName.trim()) {
-      errors.push("Empfängername für Mitarbeiterschreiben fehlt.");
-    }
-    if (!form.employeeLetterText.trim()) {
-      errors.push("Mitarbeiterschreiben muss erstellt oder eingefügt sein.");
-    }
+  if (!form.completedBy.trim() && !form.assignedTo.trim()) {
+    errors.push("Bitte abgeschlossene Person eintragen.");
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+/** Empfohlene Felder — blockieren keinen Zwischenspeicher. */
+export function getIncidentClosureWarnings(form: IncidentFormState): string[] {
+  const warnings: string[] = [];
+  if (!form.incidentSummary.trim()) warnings.push("Kurzbeschreibung fehlt noch.");
+  if (!form.affectedSystems.trim()) warnings.push("Betroffene Systeme sind noch nicht dokumentiert.");
+  if (!form.evidenceLinks.trim()) warnings.push("Nachweise / Links sind noch nicht hinterlegt.");
+  return warnings;
 }

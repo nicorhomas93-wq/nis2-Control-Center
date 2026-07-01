@@ -139,8 +139,14 @@ export function incidentToFormState(incident: Incident): IncidentFormState {
   };
 }
 
-export function formStateToPayload(form: IncidentFormState): Record<string, unknown> {
+export function formStateToPayload(
+  form: IncidentFormState,
+  options?: { completedByFallback?: string | null }
+): Record<string, unknown> {
   const isCompleted = form.status === "completed";
+  const completedBy =
+    form.completedBy.trim() || form.assignedTo.trim() || options?.completedByFallback?.trim() || null;
+
   return {
     status: form.status,
     criticality: form.priority,
@@ -165,7 +171,7 @@ export function formStateToPayload(form: IncidentFormState): Record<string, unkn
     management_report_text: form.managementReportText.trim() || null,
     audit_report_text: form.auditReportText.trim() || null,
     completion_notes: form.completionNotes.trim() || null,
-    completed_by: isCompleted ? form.completedBy.trim() || null : null,
+    completed_by: isCompleted ? completedBy : null,
     completed_at: isCompleted ? new Date().toISOString() : null,
     evidence_links: form.evidenceLinks.trim() || null,
   };
