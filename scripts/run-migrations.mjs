@@ -57,6 +57,7 @@ const ORDER = [
   "add_team_invitation_email_rls.sql",
   "add_team_invitation_rpc.sql",
   "fix_handle_new_user_trigger.sql",
+  "fix_profiles_missing_plan_role.sql",
 ];
 
 const url = process.env.DATABASE_URL;
