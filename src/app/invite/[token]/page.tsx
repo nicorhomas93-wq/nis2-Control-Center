@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ROLE_LABELS } from "@/lib/team/types";
+import { InviteAuthGate } from "@/components/auth/InviteAuthGate";
 import {
   acceptInvitation,
   getInvitationByToken,
@@ -51,7 +52,7 @@ export default async function InvitePage({
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(`/login?redirect=/invite/${token}`);
+    return <InviteAuthGate invitation={invitation} token={token} />;
   }
 
   const result = await acceptInvitation({
@@ -77,7 +78,7 @@ export default async function InvitePage({
               <p className="text-red-600">{result.error}</p>
               {result.code === "email_mismatch" ? (
                 <Link
-                  href={`/login?redirect=/invite/${token}`}
+                  href={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}&reauth=1`}
                   className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   Mit anderer E-Mail anmelden

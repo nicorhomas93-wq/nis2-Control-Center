@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -14,28 +13,36 @@ import { resolveAuthRedirect } from "@/lib/auth/redirect-path";
 interface AuthFormProps {
   mode: "login" | "register";
   redirectTo?: string;
+  invitedEmail?: string;
 }
 
-export function AuthForm({ mode, redirectTo }: AuthFormProps) {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
+export function AuthForm({ mode, redirectTo, invitedEmail }: AuthFormProps) {
+  const [email, setEmail] = useState(invitedEmail ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
   const targetPath = resolveAuthRedirect(redirectTo);
+  const authSwitchHref =
+    mode === "login"
+      ? redirectTo
+        ? `/register?redirect=${encodeURIComponent(redirectTo)}${invitedEmail ? `&email=${encodeURIComponent(invitedEmail)}` : ""}`
+        : "/register"
+      : redirectTo
+        ? `/login?redirect=${encodeURIComponent(redirectTo)}${invitedEmail ? `&email=${encodeURIComponent(invitedEmail)}` : ""}`
+        : "/login";
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
-        router.replace(targetPath);
+        window.location.assign(targetPath);
         return;
       }
       setCheckingSession(false);
     });
-  }, [router, targetPath]);
+  }, [targetPath]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,8 +62,8 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
       return;
     }
 
-    router.push(targetPath);
-    router.refresh();
+    await supabase.auth.getSession();
+    window.location.assign(targetPath);
   }
 
   if (checkingSession) {
@@ -85,9 +92,11 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
               {mode === "login" ? "Anmelden" : "Konto erstellen"}
             </CardTitle>
             <CardDescription>
-              {mode === "login"
-                ? "Melden Sie sich an, um auf Ihr Compliance-Dashboard zuzugreifen."
-                : "Erstellen Sie ein Konto und starten Sie Ihren NIS2-Check."}
+              {redirectTo?.startsWith("/invite/")
+                ? "Melden Sie sich mit der eingeladenen E-Mail-Adresse an, um die Einladung anzunehmen."
+                : mode === "login"
+                  ? "Melden Sie sich an, um auf Ihr Compliance-Dashboard zuzugreifen."
+                  : "Erstellen Sie ein Konto und starten Sie Ihren NIS2-Check."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -135,14 +144,14 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
               {mode === "login" ? (
                 <>
                   Noch kein Konto?{" "}
-                  <Link href="/register" className="font-medium text-brand-600 hover:underline">
+                  <Link href={authSwitchHref} className="font-medium text-brand-600 hover:underline">
                     Registrieren
                   </Link>
                 </>
               ) : (
                 <>
                   Bereits registriert?{" "}
-                  <Link href="/login" className="font-medium text-brand-600 hover:underline">
+                  <Link href={authSwitchHref} className="font-medium text-brand-600 hover:underline">
                     Anmelden
                   </Link>
                 </>
