@@ -195,7 +195,10 @@ async function acceptInvitationAdmin(options: {
   );
 
   if (memberError) {
-    return { ok: false, error: memberError.message };
+    return {
+      ok: false,
+      error: memberError.message?.trim() || "Mitgliedschaft konnte nicht angelegt werden.",
+    };
   }
 
   const { error: inviteError } = await admin
@@ -208,7 +211,10 @@ async function acceptInvitationAdmin(options: {
     .eq("id", options.invitation.id);
 
   if (inviteError) {
-    return { ok: false, error: inviteError.message };
+    return {
+      ok: false,
+      error: inviteError.message?.trim() || "Einladung konnte nicht abgeschlossen werden.",
+    };
   }
 
   await admin
