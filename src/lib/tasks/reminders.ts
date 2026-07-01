@@ -94,7 +94,7 @@ export async function processTaskReminders(
       .maybeSingle();
 
     if (profile?.email) {
-      await queueEmailNotification(supabase, {
+      await queueEmailNotification({
         companyId,
         recipientEmail: profile.email,
         notificationType: overdue ? "task_overdue" : "task_due_soon",

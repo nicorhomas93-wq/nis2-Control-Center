@@ -91,7 +91,15 @@ export function TeamMembersSettings({ companyId, currentRole }: TeamMembersSetti
       }
       setLastInviteLink(data.invitation?.inviteLink ?? null);
       setInviteEmail("");
-      setFeedback("Einladung erstellt. Link kann kopiert werden.");
+      if (data.emailSent) {
+        setFeedback("Einladung erstellt und per E-Mail versendet.");
+      } else if (data.emailError) {
+        setFeedback(
+          `Einladung erstellt, aber E-Mail konnte nicht gesendet werden: ${data.emailError}. Link kann kopiert werden.`
+        );
+      } else {
+        setFeedback("Einladung erstellt. Link kann kopiert werden.");
+      }
       void load();
     } finally {
       setInviting(false);
@@ -116,8 +124,20 @@ export function TeamMembersSettings({ companyId, currentRole }: TeamMembersSetti
       body: JSON.stringify({ companyId, invitationId: id, action: "resend" }),
     });
     const data = await res.json();
+    if (!res.ok) {
+      setFeedback(data.error ?? "Erneutes Senden fehlgeschlagen");
+      return;
+    }
     if (data.invitation?.inviteLink) {
       setLastInviteLink(data.invitation.inviteLink);
+    }
+    if (data.emailSent) {
+      setFeedback("Einladung erneut per E-Mail versendet.");
+    } else if (data.emailError) {
+      setFeedback(
+        `Link erneuert, E-Mail fehlgeschlagen: ${data.emailError}. Link kann kopiert werden.`
+      );
+    } else {
       setFeedback("Einladungslink erneuert.");
     }
     void load();

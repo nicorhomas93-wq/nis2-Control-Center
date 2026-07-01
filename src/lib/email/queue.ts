@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type EmailNotificationType =
   | "invitation"
@@ -18,6 +18,9 @@ export interface QueueEmailInput {
   relatedType?: string;
   relatedId?: string;
   scheduledAt?: string;
+  initialStatus?: "pending" | "sent" | "failed";
+  sentAt?: string;
+  errorMessage?: string;
 }
 
 export const EMAIL_TEMPLATES: Record<
@@ -56,10 +59,14 @@ export const EMAIL_TEMPLATES: Record<
 };
 
 export async function queueEmailNotification(
-  supabase: SupabaseClient,
   input: QueueEmailInput
-): Promise<void> {
-  await supabase.from("email_notifications").insert({
+): Promise<{ queued: boolean; error?: string }> {
+  const admin = createAdminClient();
+  if (!admin) {
+    return { queued: false, error: "E-Mail-Warteschlange nicht verfügbar" };
+  }
+
+  const { error } = await admin.from("email_notifications").insert({
     company_id: input.companyId ?? null,
     recipient_email: input.recipientEmail,
     subject: input.subject,
@@ -67,7 +74,15 @@ export async function queueEmailNotification(
     notification_type: input.notificationType,
     related_type: input.relatedType ?? null,
     related_id: input.relatedId ?? null,
-    status: "pending",
+    status: input.initialStatus ?? "pending",
     scheduled_at: input.scheduledAt ?? new Date().toISOString(),
+    sent_at: input.sentAt ?? null,
+    error_message: input.errorMessage ?? null,
   });
+
+  if (error) {
+    return { queued: false, error: error.message };
+  }
+
+  return { queued: true };
 }

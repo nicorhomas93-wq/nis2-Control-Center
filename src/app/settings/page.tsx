@@ -6,7 +6,7 @@ import { WhiteLabelSettings } from "@/components/settings/WhiteLabelSettings";
 import { TeamMembersSettings } from "@/components/settings/TeamMembersSettings";
 import { getCompanyMemberRole } from "@/lib/team/access";
 import { createClient } from "@/lib/supabase/server";
-import { getOrCreateCompany, getOrCreateProfile } from "@/lib/company";
+import { getWorkspaceCompany, getOrCreateProfile } from "@/lib/company";
 import { isPlatformOwner } from "@/lib/jarvis/access";
 import { canUseFeature } from "@/lib/billingAccess";
 import { getConsultantSettings } from "@/lib/white-label/branding";
@@ -41,11 +41,14 @@ export default async function SettingsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { company, missingTable } = await getOrCreateCompany(user.id);
+  const { company, missingTable } = await getWorkspaceCompany(user.id);
   const profile = await getOrCreateProfile(user.id, user.email);
   const platformOwner = isPlatformOwner(user.email, profile?.role);
   const whiteLabelAllowed = canUseFeature(company, "white_label", platformOwner);
-  const memberRole = company ? await getCompanyMemberRole(user.id, company.id) : null;
+  let memberRole = company ? await getCompanyMemberRole(user.id, company.id) : null;
+  if (!memberRole && company?.user_id === user.id) {
+    memberRole = "owner";
+  }
   const { settings: consultantSettings, missingTable: whiteLabelTableMissing } = company
     ? await getConsultantSettings(company.id)
     : { settings: null, missingTable: false };

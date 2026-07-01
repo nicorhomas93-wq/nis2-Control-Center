@@ -54,6 +54,7 @@ const ORDER = [
   "add_consultant_white_label.sql",
   "add_team_compliance_system.sql",
   "add_team_invite_accept_policy.sql",
+  "add_team_invitation_email_rls.sql",
 ];
 
 const url = process.env.DATABASE_URL;
