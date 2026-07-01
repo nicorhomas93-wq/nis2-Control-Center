@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
@@ -19,6 +19,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { performLogout } from "@/lib/auth/logout";
 import { createClient } from "@/lib/supabase/client";
 import { canAccessJarvis } from "@/lib/jarvis/access";
 import { canUseFeature } from "@/lib/billingAccess";
@@ -47,6 +48,7 @@ function SidebarPanel({
   visibleNavItems,
   pathname,
   onLogout,
+  loggingOut,
 }: {
   onNavigate?: () => void;
   showClose?: boolean;
@@ -54,6 +56,7 @@ function SidebarPanel({
   visibleNavItems: typeof navItems;
   pathname: string;
   onLogout: () => void;
+  loggingOut: boolean;
 }) {
   return (
     <>
@@ -101,14 +104,16 @@ function SidebarPanel({
         })}
       </nav>
 
-      <div className="border-t border-slate-800 p-3">
+      <div className="mt-auto border-t border-slate-800 p-3">
         <button
           type="button"
           onClick={onLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
+          disabled={loggingOut}
+          aria-label="Abmelden"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <LogOut className="h-4 w-4" />
-          Abmelden
+          <LogOut className="h-4 w-4 shrink-0" />
+          {loggingOut ? "Abmelden…" : "Abmelden"}
         </button>
       </div>
     </>
@@ -117,10 +122,10 @@ function SidebarPanel({
 
 export function DashboardSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { mobileOpen, closeMobile } = useSidebar();
   const [showJarvis, setShowJarvis] = useState(false);
   const [showMandanten, setShowMandanten] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     closeMobile();
@@ -157,17 +162,17 @@ export function DashboardSidebar() {
   });
 
   async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    if (loggingOut) return;
+    setLoggingOut(true);
     closeMobile();
-    router.push("/");
-    router.refresh();
+    await performLogout();
   }
 
   const panelProps = {
     visibleNavItems,
     pathname,
     onLogout: handleLogout,
+    loggingOut,
     onNavigate: closeMobile,
   };
 
