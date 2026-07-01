@@ -1,9 +1,11 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ROLE_LABELS } from "@/lib/team/types";
 import { InviteAuthGate } from "@/components/auth/InviteAuthGate";
+import { PENDING_INVITE_COOKIE } from "@/lib/auth/invite-cookie";
 import {
   acceptInvitation,
   getInvitationByToken,
@@ -64,6 +66,11 @@ export default async function InvitePage({
 
   if (!result.ok && result.code === "expired") {
     redirect("/login?error=invite_expired");
+  }
+
+  if (result.ok) {
+    const cookieStore = await cookies();
+    cookieStore.delete(PENDING_INVITE_COOKIE);
   }
 
   return (

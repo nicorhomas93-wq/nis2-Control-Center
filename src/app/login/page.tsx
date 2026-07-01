@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { redirectIfAuthenticated } from "@/lib/auth/redirect-if-authenticated";
+import { resolveInviteRedirect, PENDING_INVITE_COOKIE } from "@/lib/auth/invite-cookie";
 import { resolveAuthRedirect } from "@/lib/auth/redirect-path";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,7 +11,10 @@ export default async function LoginPage({
   searchParams: Promise<{ redirect?: string; reauth?: string; error?: string; email?: string }>;
 }) {
   const params = await searchParams;
-  const redirectTo = resolveAuthRedirect(params.redirect);
+  const cookieStore = await cookies();
+  const pendingInvite = cookieStore.get(PENDING_INVITE_COOKIE)?.value;
+  const effectiveRedirect = resolveInviteRedirect(params.redirect, pendingInvite);
+  const redirectTo = resolveAuthRedirect(effectiveRedirect);
 
   if (params.reauth === "1") {
     const supabase = await createClient();
@@ -18,5 +23,11 @@ export default async function LoginPage({
     await redirectIfAuthenticated(redirectTo);
   }
 
-  return <AuthForm mode="login" redirectTo={params.redirect} invitedEmail={params.email} />;
+  return (
+    <AuthForm
+      mode="login"
+      redirectTo={effectiveRedirect}
+      invitedEmail={params.email}
+    />
+  );
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { loginAccount, registerAccount, type AuthNotice } from "@/lib/auth/register";
-import { resolveNoticeMessage } from "@/lib/auth/errors";
+import { formatAuthError, resolveNoticeMessage } from "@/lib/auth/errors";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -35,6 +35,12 @@ export function AuthForm({ mode, redirectTo, invitedEmail }: AuthFormProps) {
       : redirectTo
         ? `/login?redirect=${encodeURIComponent(redirectTo)}${invitedEmail ? `&email=${encodeURIComponent(invitedEmail)}` : ""}`
         : "/login";
+
+  useEffect(() => {
+    if (invitedEmail) {
+      setEmail(invitedEmail);
+    }
+  }, [invitedEmail]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -81,6 +87,67 @@ export function AuthForm({ mode, redirectTo, invitedEmail }: AuthFormProps) {
 
     await supabase.auth.getSession();
     window.location.assign(targetPath);
+  }
+
+  async function handlePasswordReset() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setNotice({ type: "error", message: "Bitte geben Sie zuerst Ihre E-Mail-Adresse ein." });
+      return;
+    }
+
+    setLoading(true);
+    setNotice(null);
+    const supabase = createClient();
+    const redirectQuery = redirectTo
+      ? `?redirect=${encodeURIComponent(redirectTo)}&email=${encodeURIComponent(normalizedEmail)}`
+      : "";
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: `${window.location.origin}/login${redirectQuery}`,
+    });
+    setLoading(false);
+
+    if (error) {
+      setNotice({ type: "error", message: formatAuthError(error) });
+      return;
+    }
+
+    setNotice({
+      type: "info",
+      message:
+        "Wir haben Ihnen einen Link zum Zurücksetzen des Passworts gesendet. Bitte prüfen Sie Ihr Postfach.",
+    });
+  }
+
+  async function handleResendConfirmation() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setNotice({ type: "error", message: "Bitte geben Sie zuerst Ihre E-Mail-Adresse ein." });
+      return;
+    }
+
+    setLoading(true);
+    setNotice(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}${targetPath}`,
+      },
+    });
+    setLoading(false);
+
+    if (error) {
+      setNotice({ type: "error", message: formatAuthError(error) });
+      return;
+    }
+
+    setNotice({
+      type: "info",
+      message:
+        "Bestätigungs-E-Mail wurde erneut gesendet. Bitte klicken Sie den Link in der E-Mail, bevor Sie sich anmelden.",
+    });
   }
 
   if (checkingSession) {
@@ -172,6 +239,29 @@ export function AuthForm({ mode, redirectTo, invitedEmail }: AuthFormProps) {
                     ? "Anmelden"
                     : "Registrieren"}
               </Button>
+
+              {mode === "login" ? (
+                <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">
+                  <button
+                    type="button"
+                    className="text-left text-sm text-brand-600 hover:underline disabled:opacity-50"
+                    onClick={() => void handlePasswordReset()}
+                    disabled={loading}
+                  >
+                    Passwort vergessen?
+                  </button>
+                  {isInviteFlow ? (
+                    <button
+                      type="button"
+                      className="text-left text-sm text-brand-600 hover:underline disabled:opacity-50"
+                      onClick={() => void handleResendConfirmation()}
+                      disabled={loading}
+                    >
+                      Bestätigungs-E-Mail erneut senden
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </form>
 
             <p className="mt-4 text-center text-sm text-slate-500">

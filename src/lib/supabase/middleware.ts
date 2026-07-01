@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { canAccessJarvis } from "@/lib/jarvis/access";
+import {
+  isInvitePath,
+  PENDING_INVITE_COOKIE,
+  pendingInviteCookieOptions,
+} from "@/lib/auth/invite-cookie";
 
 async function resolveJarvisAccess(
   supabase: ReturnType<typeof createServerClient>,
@@ -32,6 +37,25 @@ const PROTECTED_PREFIXES = [
 ];
 
 const AUTH_ENTRY_PATHS = ["/", "/login", "/register"];
+
+function resolvePostAuthPath(request: NextRequest): string {
+  const redirect = request.nextUrl.searchParams.get("redirect");
+  if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) {
+    return redirect;
+  }
+
+  const pendingInvite = request.cookies.get(PENDING_INVITE_COOKIE)?.value;
+  if (isInvitePath(pendingInvite)) {
+    return pendingInvite;
+  }
+
+  return "/dashboard";
+}
+
+function attachPendingInviteCookie(response: NextResponse, path: string) {
+  if (!isInvitePath(path)) return;
+  response.cookies.set(PENDING_INVITE_COOKIE, path, pendingInviteCookieOptions());
+}
 
 export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -90,25 +114,30 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (user && isAuthRoute) {
-      const redirect = request.nextUrl.searchParams.get("redirect");
       const url = request.nextUrl.clone();
-      url.pathname =
-        redirect && redirect.startsWith("/") && !redirect.startsWith("//")
-          ? redirect
-          : "/dashboard";
+      url.pathname = resolvePostAuthPath(request);
       url.search = "";
       return NextResponse.redirect(url);
     }
 
     if (user && AUTH_ENTRY_PATHS.includes(path)) {
-      const redirect = request.nextUrl.searchParams.get("redirect");
       const url = request.nextUrl.clone();
-      url.pathname =
-        redirect && redirect.startsWith("/") && !redirect.startsWith("//")
-          ? redirect
-          : "/dashboard";
+      url.pathname = resolvePostAuthPath(request);
       url.search = "";
       return NextResponse.redirect(url);
+    }
+
+    if (isInvitePath(path)) {
+      attachPendingInviteCookie(supabaseResponse, path);
+    }
+
+    if ((path.startsWith("/login") || path.startsWith("/register")) && !request.nextUrl.searchParams.get("redirect")) {
+      const pendingInvite = request.cookies.get(PENDING_INVITE_COOKIE)?.value;
+      if (isInvitePath(pendingInvite)) {
+        const url = request.nextUrl.clone();
+        url.searchParams.set("redirect", pendingInvite);
+        return NextResponse.redirect(url);
+      }
     }
 
     if (user && path.startsWith("/jarvis") && !(await resolveJarvisAccess(supabase, user))) {

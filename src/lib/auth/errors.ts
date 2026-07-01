@@ -40,7 +40,7 @@ export function formatAuthError(error: unknown): string {
   }
 
   if (code === "invalid_credentials" || message?.toLowerCase().includes("invalid login")) {
-    return "E-Mail oder Passwort ist falsch. Falls Sie bereits ein Konto haben, melden Sie sich an.";
+    return "E-Mail oder Passwort ist falsch. Haben Sie Ihre E-Mail bestätigt? Nutzen Sie ggf. „Passwort zurücksetzen“.";
   }
 
   if (message) {
@@ -60,9 +60,11 @@ export function formatAuthError(error: unknown): string {
 
 export function resolveNoticeMessage(notice: { type: "error" | "info"; message?: string }): string {
   const text = notice.message?.trim();
-  if (text) return text;
+  if (!text) {
+    return notice.type === "error"
+      ? "Anmeldung fehlgeschlagen. Bitte erneut versuchen."
+      : "Bitte prüfen Sie Ihre E-Mails und bestätigen Sie Ihre Adresse.";
+  }
 
-  return notice.type === "error"
-    ? "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut oder melden Sie sich an."
-    : "Bitte prüfen Sie Ihre E-Mails und bestätigen Sie Ihre Adresse.";
+  return formatAuthError({ message: text });
 }
