@@ -148,7 +148,10 @@ export default async function DashboardPage({
     tasks = loadedTasks;
     onboardingMeta = onboardingData;
     vendors = loadedVendors;
-    vendorStats = buildVendorDashboardStats(vendors);
+    vendorStats = buildVendorDashboardStats(
+      vendors,
+      company?.vendors_applicability ?? "unknown"
+    );
 
     await syncCompanySecurityScore(supabase, company.id);
     securityHistory = await loadSecurityScoreHistory(supabase, company.id);
@@ -184,7 +187,7 @@ export default async function DashboardPage({
   const profileComplete = isCompanyProfileComplete(company);
   const openMeasures = meas.filter((m) => m.status !== "completed").length;
   const score = calculateComplianceScore(company, docs, meas);
-  const auditScore = calculateAuditFolderScore(docs);
+  const auditScore = calculateAuditFolderScore(docs, company);
   const activities = buildRecentActivity(assessments, docs, meas, complianceEvents);
   const missingCount = auditScore.total - auditScore.present;
 
@@ -316,6 +319,7 @@ export default async function DashboardPage({
           documents={docs}
           missingCount={missingCount}
           auditScorePercent={auditScore.percent}
+          vendorsApplicability={company.vendors_applicability}
         />
       )}
 
@@ -361,9 +365,11 @@ export default async function DashboardPage({
         <Card className="mb-8">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <div>
-              <CardTitle className="text-base">Lieferanten</CardTitle>
+              <CardTitle className="text-base">Lieferanten & Dienstleister</CardTitle>
               <p className="mt-1 text-sm text-slate-500">
-                Audit-Ordner 08_Lieferantenbewertung · Ø Score {vendorStats.averageScore}%
+                {vendorStats.notApplicable
+                  ? "Audit-Ordner 08: Nicht zutreffend (N/A)"
+                  : `Audit-Ordner 08_Lieferantenbewertung · Ø Score ${vendorStats.averageScore}%`}
               </p>
             </div>
             <Link href="/lieferanten">
@@ -374,6 +380,11 @@ export default async function DashboardPage({
             </Link>
           </CardHeader>
           <CardContent>
+            {vendorStats.notApplicable ? (
+              <p className="text-sm text-slate-600">
+                Keine relevanten Lieferanten — kein Score- oder Audit-Abzug.
+              </p>
+            ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <p className="text-sm text-slate-500">Lieferanten gesamt</p>
@@ -392,6 +403,7 @@ export default async function DashboardPage({
                 <p className="text-2xl font-bold text-amber-700">{vendorStats.reviewsDueCount}</p>
               </div>
             </div>
+            )}
           </CardContent>
         </Card>
       )}

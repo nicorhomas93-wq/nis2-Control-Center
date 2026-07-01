@@ -1,5 +1,11 @@
 import type { Company, Document, Measure, Risk } from "@/lib/types";
 import type { VendorWithDetails } from "@/lib/vendors/types";
+import {
+  getVendorApplicability,
+  isVendorsMandatory,
+  isVendorsNotApplicable,
+  isVendorsApplicabilityUnknown,
+} from "@/lib/vendors/applicability";
 import { isPlaceholderValue, deriveRiskProblemTitle } from "@/lib/compliance/risk-display";
 import { isWorkComplete } from "@/lib/compliance/obligations";
 import type { TaskItem } from "@/lib/tasks/types";
@@ -129,19 +135,41 @@ export function calculateDataQuality(input: {
     ).length ?? 0;
 
   const vendors = input.vendors ?? [];
+  const applicability = getVendorApplicability(input.company);
   let vendorMissingEvidence = 0;
   let vendorReviewsDue = 0;
+  let auditReadinessCapFromVendors: number | null = null;
 
-  if (vendors.length === 0) {
+  if (isVendorsNotApplicable(input.company)) {
+    checks.push({
+      checkKey: "vendor_inventory",
+      status: "confirmed_with_evidence",
+      qualityLevel: "high",
+      reason: "Lieferantenbewertung nicht zutreffend (N/A)",
+      relatedType: "vendor",
+    });
+  } else if (isVendorsApplicabilityUnknown(input.company)) {
+    checks.push({
+      checkKey: "vendor_applicability",
+      status: "missing",
+      qualityLevel: "medium",
+      reason: "Relevanz von Lieferanten unbekannt",
+      relatedType: "vendor",
+    });
+    hints.push(
+      "Bitte angeben, ob relevante Lieferanten/Dienstleister vorhanden sind (Ja/Nein)."
+    );
+    auditReadinessCapFromVendors = 80;
+  } else if (isVendorsMandatory(input.company) && vendors.length === 0) {
     checks.push({
       checkKey: "vendor_inventory",
       status: "missing",
-      qualityLevel: "medium",
-      reason: "Keine Lieferanten erfasst",
+      qualityLevel: "high",
+      reason: "Keine Lieferanten erfasst (erforderlich)",
       relatedType: "vendor",
     });
     hints.push("Lieferanteninventar fehlt für Audit-Ordner 08.");
-  } else {
+  } else if (vendors.length > 0) {
     checks.push({
       checkKey: "vendor_inventory",
       status: "confirmed",
@@ -151,7 +179,11 @@ export function calculateDataQuality(input: {
     });
 
     for (const vendor of vendors) {
-      const missing = countMissingEvidence(vendor.evidence, vendor.criticality);
+      const missing = countMissingEvidence(
+        vendor.evidence,
+        vendor.criticality,
+        vendor.provider_key
+      );
       if (missing > 0) {
         vendorMissingEvidence += missing;
         checks.push({
@@ -210,9 +242,12 @@ export function calculateDataQuality(input: {
   const sum = checks.reduce((acc, c) => acc + statusWeight(c.status), 0);
   const percent = Math.round(sum / checks.length);
 
-  let auditReadinessCap: number | null = null;
-  if (percent < 50) auditReadinessCap = 60;
-  else if (percent < 70) auditReadinessCap = 80;
+  let auditReadinessCap: number | null = auditReadinessCapFromVendors;
+  if (percent < 50) auditReadinessCap = Math.min(auditReadinessCap ?? 100, 60);
+  else if (percent < 70) {
+    auditReadinessCap =
+      auditReadinessCap === null ? 80 : Math.min(auditReadinessCap, 80);
+  }
 
   return { percent, checks, hints, auditReadinessCap };
 }

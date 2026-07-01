@@ -7,7 +7,8 @@ export type AuditAreaDisplayStatus =
   | "missing"
   | "outdated"
   | "review_due"
-  | "evidence_missing";
+  | "evidence_missing"
+  | "not_applicable";
 
 export const AUDIT_STATUS_LABELS: Record<AuditAreaDisplayStatus, string> = {
   complete: "Vollständig",
@@ -17,6 +18,7 @@ export const AUDIT_STATUS_LABELS: Record<AuditAreaDisplayStatus, string> = {
   outdated: "Veraltet",
   review_due: "Review fällig",
   evidence_missing: "Nachweis fehlt",
+  not_applicable: "Nicht zutreffend",
 };
 
 export const AUDIT_STATUS_BADGE_CLASS: Record<AuditAreaDisplayStatus, string> = {
@@ -27,6 +29,7 @@ export const AUDIT_STATUS_BADGE_CLASS: Record<AuditAreaDisplayStatus, string> = 
   outdated: "bg-red-100 text-red-800",
   review_due: "bg-amber-100 text-amber-800",
   evidence_missing: "bg-amber-100 text-amber-800",
+  not_applicable: "bg-slate-100 text-slate-700",
 };
 
 const MIN_CONTENT_LENGTH = 200;

@@ -38,6 +38,7 @@ interface AuditPageClientProps {
   securityScore?: number;
   nis2Status: Nis2Status;
   complianceScore: number;
+  vendorsApplicability?: import("@/lib/vendors/types").VendorApplicability | null;
   profileComplete: boolean;
   initialDocuments: Document[];
   initialMeasures: Measure[];
@@ -56,6 +57,7 @@ export function AuditPageClient({
   securityScore = 0,
   nis2Status,
   complianceScore,
+  vendorsApplicability,
   profileComplete,
   initialDocuments,
   initialMeasures,
@@ -86,8 +88,17 @@ export function AuditPageClient({
         company_name: companyName ?? null,
         security_contact_name: securityContactName ?? null,
         security_score: securityScore,
+        vendors_applicability: vendorsApplicability ?? "unknown",
       }) as Company,
-    [companyId, nis2Status, complianceScore, companyName, securityContactName, securityScore]
+    [
+      companyId,
+      nis2Status,
+      complianceScore,
+      companyName,
+      securityContactName,
+      securityScore,
+      vendorsApplicability,
+    ]
   );
 
   const auditScore = useMemo(
@@ -98,7 +109,10 @@ export function AuditPageClient({
     () => getAuditFolderStatuses(documents, companyCtx),
     [documents, companyCtx]
   );
-  const missingTypes = useMemo(() => getMissingAuditDocumentTypes(documents), [documents]);
+  const missingTypes = useMemo(
+    () => getMissingAuditDocumentTypes(documents, companyCtx),
+    [documents, companyCtx]
+  );
 
   function upsertDocument(doc: Document) {
     setDocuments((prev) => {
@@ -139,7 +153,7 @@ export function AuditPageClient({
   }
 
   async function handleGenerateMissing() {
-    const missing = getMissingAuditDocumentTypes(documents);
+    const missing = getMissingAuditDocumentTypes(documents, companyCtx);
     if (missing.length === 0) return;
 
     setBatchLoading(true);

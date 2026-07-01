@@ -5,7 +5,9 @@ import type {
   VendorQuestionnaireAnswers,
   VendorRiskLevel,
 } from "@/lib/vendors/types";
-import { requiredEvidenceForCriticality } from "@/lib/vendors/evidence-types";
+import { requiredEvidenceForCriticality, requiredEvidenceForVendor } from "@/lib/vendors/evidence-types";
+import { normalizeEvidenceStatus } from "@/lib/vendors/evidence-status";
+import { getProviderRiskFloor } from "@/lib/vendors/provider-catalog";
 
 const CRITICALITY_BASE_RISK: Record<VendorCriticality, VendorRiskLevel> = {
   low: "low",
@@ -44,14 +46,16 @@ export function scoreQuestionnaire(answers: VendorQuestionnaireAnswers): number 
   return Math.min(100, Math.round((sum / max) * 100));
 }
 
-function evidenceStatusPoints(status: VendorEvidenceStatus): number {
-  switch (status) {
-    case "present":
+function evidenceStatusPoints(status: VendorEvidenceStatus | string): number {
+  const normalized = normalizeEvidenceStatus(status);
+  switch (normalized) {
+    case "fulfilled":
       return 100;
-    case "review_due":
+    case "in_progress":
       return 50;
-    case "expired":
-    case "missing":
+    case "not_applicable":
+      return 100;
+    case "not_fulfilled":
     default:
       return 0;
   }
@@ -59,15 +63,18 @@ function evidenceStatusPoints(status: VendorEvidenceStatus): number {
 
 export function scoreEvidence(
   evidence: VendorEvidence[],
-  criticality: VendorCriticality
+  criticality: VendorCriticality,
+  providerKey?: string | null
 ): number {
-  const required = requiredEvidenceForCriticality(criticality);
+  const required = requiredEvidenceForVendor(criticality, providerKey);
   if (required.length === 0) return 100;
 
-  const byType = new Map(evidence.map((e) => [e.evidence_type, e.status]));
+  const byType = new Map(
+    evidence.map((e) => [e.evidence_type, normalizeEvidenceStatus(e.status)])
+  );
   let sum = 0;
   for (const type of required) {
-    sum += evidenceStatusPoints(byType.get(type) ?? "missing");
+    sum += evidenceStatusPoints(byType.get(type) ?? "not_fulfilled");
   }
   return Math.round(sum / required.length);
 }
@@ -77,8 +84,14 @@ export function calculateRiskLevel(input: {
   questionnaireScore: number;
   evidenceScore: number;
   answers: VendorQuestionnaireAnswers;
+  providerKey?: string | null;
 }): VendorRiskLevel {
   let risk = CRITICALITY_BASE_RISK[input.criticality];
+
+  const floor = getProviderRiskFloor(input.providerKey);
+  if (floor) {
+    risk = riskMax(risk, floor);
+  }
 
   if (input.evidenceScore < 50) {
     risk = riskMax(risk, "high");
@@ -131,13 +144,16 @@ export function isReviewDue(nextReviewAt: string | null): boolean {
 
 export function countMissingEvidence(
   evidence: VendorEvidence[],
-  criticality: VendorCriticality
+  criticality: VendorCriticality,
+  providerKey?: string | null
 ): number {
-  const required = requiredEvidenceForCriticality(criticality);
-  const byType = new Map(evidence.map((e) => [e.evidence_type, e.status]));
+  const required = requiredEvidenceForVendor(criticality, providerKey);
+  const byType = new Map(
+    evidence.map((e) => [e.evidence_type, normalizeEvidenceStatus(e.status)])
+  );
   return required.filter((t) => {
-    const status = byType.get(t) ?? "missing";
-    return status === "missing" || status === "expired";
+    const status = byType.get(t) ?? "not_fulfilled";
+    return status === "not_fulfilled";
   }).length;
 }
 
@@ -145,14 +161,20 @@ export function evaluateVendor(input: {
   criticality: VendorCriticality;
   evidence: VendorEvidence[];
   answers: VendorQuestionnaireAnswers;
+  providerKey?: string | null;
 }) {
   const questionnaireScore = scoreQuestionnaire(input.answers);
-  const evidenceScore = scoreEvidence(input.evidence, input.criticality);
+  const evidenceScore = scoreEvidence(
+    input.evidence,
+    input.criticality,
+    input.providerKey
+  );
   const riskLevel = calculateRiskLevel({
     criticality: input.criticality,
     questionnaireScore,
     evidenceScore,
     answers: input.answers,
+    providerKey: input.providerKey,
   });
   const vendorScore = calculateVendorScore(questionnaireScore, evidenceScore);
 

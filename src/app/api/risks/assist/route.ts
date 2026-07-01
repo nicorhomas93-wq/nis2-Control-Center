@@ -273,7 +273,8 @@ export async function POST(request: Request) {
     scoreDelta,
     feedbackMessage: buildScoreFeedbackMessage(scoreDelta, {
       measureCompleted,
-      missingEvidence: getMissingAuditDocumentTypes(afterData.documents).length > 0,
+      missingEvidence:
+        getMissingAuditDocumentTypes(afterData.documents, afterData.company).length > 0,
       hasOpenMandatoryMeasures,
     }),
     redirectTo:

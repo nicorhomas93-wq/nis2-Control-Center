@@ -5,6 +5,10 @@ import {
   type AuditFolderQuality,
   type AuditAreaDisplayStatus,
 } from "@/lib/audit/audit-folder-quality";
+import {
+  getVendorAuditNaQuality,
+  isVendorsNotApplicable,
+} from "@/lib/vendors/applicability";
 
 export type { AuditFolderQuality, AuditAreaDisplayStatus };
 export {
@@ -93,16 +97,29 @@ export function getDocumentForFolder(
 
 export function getAuditFolderStatuses(
   documents: Document[],
-  company?: Pick<Company, "security_contact_name"> | null
+  company?: Pick<Company, "security_contact_name" | "vendors_applicability"> | null
 ): AuditFolderStatus[] {
   return AUDIT_FOLDERS.map((folder) => {
+    if (folder.documentType === "lieferantenbewertung" && isVendorsNotApplicable(company)) {
+      const quality = getVendorAuditNaQuality(company);
+      return {
+        folderName: folder.folderName,
+        documentType: folder.documentType,
+        label: folder.label,
+        present: true,
+        document: getDocumentForFolder(documents, folder.documentType),
+        quality,
+        displayStatus: quality.status,
+      };
+    }
+
     const document = getDocumentForFolder(documents, folder.documentType);
     const quality = evaluateAuditFolderQuality(document, company);
     return {
       folderName: folder.folderName,
       documentType: folder.documentType,
       label: folder.label,
-      present: Boolean(document),
+      present: Boolean(document) || quality.status === "not_applicable",
       document,
       quality,
       displayStatus: quality.status,
@@ -110,15 +127,21 @@ export function getAuditFolderStatuses(
   });
 }
 
-export function getMissingAuditDocumentTypes(documents: Document[]): DocumentType[] {
-  return AUDIT_FOLDERS.filter(
-    (f) => !getDocumentForFolder(documents, f.documentType)
-  ).map((f) => f.documentType);
+export function getMissingAuditDocumentTypes(
+  documents: Document[],
+  company?: Pick<Company, "vendors_applicability"> | null
+): DocumentType[] {
+  return AUDIT_FOLDERS.filter((f) => {
+    if (f.documentType === "lieferantenbewertung" && isVendorsNotApplicable(company)) {
+      return false;
+    }
+    return !getDocumentForFolder(documents, f.documentType);
+  }).map((f) => f.documentType);
 }
 
 export function calculateDetailedAuditFolderScore(
   documents: Document[],
-  company?: Pick<Company, "security_contact_name"> | null
+  company?: Pick<Company, "security_contact_name" | "vendors_applicability"> | null
 ): {
   percent: number;
   complete: number;
@@ -132,13 +155,22 @@ export function calculateDetailedAuditFolderScore(
   }>;
 } {
   const areas = AUDIT_FOLDERS.map((folder) => {
+    if (folder.documentType === "lieferantenbewertung" && isVendorsNotApplicable(company)) {
+      return {
+        folderName: folder.folderName,
+        label: folder.label,
+        quality: getVendorAuditNaQuality(company),
+      };
+    }
     const document = getDocumentForFolder(documents, folder.documentType);
     const quality = evaluateAuditFolderQuality(document, company);
     return { folderName: folder.folderName, label: folder.label, quality };
   });
 
   const total = areas.length;
-  const complete = areas.filter((a) => a.quality.status === "complete").length;
+  const complete = areas.filter(
+    (a) => a.quality.status === "complete" || a.quality.status === "not_applicable"
+  ).length;
   const missing = areas.filter((a) => a.quality.status === "missing").length;
   const incomplete = total - complete - missing;
   const percent =
@@ -151,7 +183,7 @@ export function calculateDetailedAuditFolderScore(
 
 export function calculateAuditFolderScore(
   documents: Document[],
-  company?: Pick<Company, "security_contact_name"> | null
+  company?: Pick<Company, "security_contact_name" | "vendors_applicability"> | null
 ): {
   present: number;
   total: number;

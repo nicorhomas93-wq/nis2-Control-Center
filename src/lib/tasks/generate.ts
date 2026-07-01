@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createTaskIfNotExists } from "@/lib/tasks/service";
-import type { Document, Incident, Measure, Risk } from "@/lib/types";
+import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
 import { isWorkComplete } from "@/lib/compliance/obligations";
 import { getMissingAuditDocumentTypes } from "@/lib/audit/audit-folders";
 import { deriveRiskProblemTitle } from "@/lib/compliance/risk-display";
@@ -134,9 +134,10 @@ export async function autoTaskFromAuditGaps(
   supabase: SupabaseClient,
   companyId: string,
   documents: Document[],
-  createdBy?: string
+  createdBy?: string,
+  company?: Pick<Company, "vendors_applicability"> | null
 ): Promise<void> {
-  const missing = getMissingAuditDocumentTypes(documents);
+  const missing = getMissingAuditDocumentTypes(documents, company);
   for (const docType of missing) {
     await createTaskIfNotExists(supabase, {
       companyId,
@@ -156,6 +157,7 @@ export async function runAutoTasksForCompany(
   supabase: SupabaseClient,
   companyId: string,
   data: {
+    company?: Pick<Company, "vendors_applicability"> | null;
     risks: Risk[];
     measures: Measure[];
     documents: Document[];
@@ -177,5 +179,5 @@ export async function runAutoTasksForCompany(
   for (const incident of data.incidents) {
     await autoTaskFromIncident(supabase, incident, createdBy);
   }
-  await autoTaskFromAuditGaps(supabase, companyId, data.documents, createdBy);
+  await autoTaskFromAuditGaps(supabase, companyId, data.documents, createdBy, data.company);
 }

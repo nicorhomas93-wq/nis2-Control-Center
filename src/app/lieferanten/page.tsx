@@ -8,6 +8,7 @@ import {
   buildVendorDashboardStats,
   loadVendorsWithDetails,
 } from "@/lib/vendors/service";
+import { getVendorApplicability } from "@/lib/vendors/applicability";
 import { redirect } from "next/navigation";
 
 export default async function LieferantenPage() {
@@ -20,12 +21,13 @@ export default async function LieferantenPage() {
   const { company, missingTable, isViewingMandant } = await getWorkspaceCompany(user.id);
 
   let vendors: Awaited<ReturnType<typeof loadVendorsWithDetails>> = [];
-  let stats = buildVendorDashboardStats([]);
+  let stats = buildVendorDashboardStats([], "unknown");
+  const applicability = getVendorApplicability(company);
 
   if (company) {
     try {
       vendors = await loadVendorsWithDetails(supabase, company.id);
-      stats = buildVendorDashboardStats(vendors);
+      stats = buildVendorDashboardStats(vendors, applicability);
     } catch {
       vendors = [];
     }
@@ -36,9 +38,10 @@ export default async function LieferantenPage() {
       {missingTable && <SupabaseSetupBanner />}
       {isViewingMandant && <ActiveMandantBanner companyName={company?.company_name ?? null} />}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Lieferanten</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Lieferanten & Dienstleister</h1>
         <p className="mt-1 text-slate-500">
-          Lieferantenbewertungen, Nachweise und Audit-Ordner 08_Lieferantenbewertung.
+          NIS2-konforme Bewertung von Lieferanten, Cloud- und IT-Dienstleistern inkl. Nachweisen und
+          Audit-Ordner 08_Lieferantenbewertung.
         </p>
       </div>
       {company ? (
@@ -47,6 +50,7 @@ export default async function LieferantenPage() {
           companyName={company.company_name ?? "Unternehmen"}
           initialVendors={vendors}
           initialStats={stats}
+          initialApplicability={applicability}
         />
       ) : (
         <p className="text-sm text-slate-600">Bitte zuerst das Unternehmensprofil vervollständigen.</p>

@@ -19,6 +19,7 @@ import type {
 import { applyTaskScoreImpact } from "@/lib/compliance/task-score-impact";
 import type { TaskItem } from "@/lib/tasks/types";
 import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
+import type { VendorWithDetails } from "@/lib/vendors/types";
 import { getDocumentTypeLabel } from "@/lib/nis2/document-types";
 
 function securityLevelFromScore(score: number): SecurityLevel {
@@ -39,6 +40,7 @@ export function calculateSecurityStatus(input: {
   risks: Risk[];
   incidents: Incident[];
   tasks?: TaskItem[];
+  vendors?: VendorWithDetails[];
 }): SecurityStatusResult {
   const drivers: ScoreDriver[] = [];
   let score = 100;
@@ -178,7 +180,10 @@ export function calculateSecurityStatus(input: {
     }
   }
 
-  const missingTypes = getMissingAuditDocumentTypes(input.documents);
+  const missingTypes = getMissingAuditDocumentTypes(
+    input.documents,
+    input.company ?? null
+  );
   for (const docType of missingTypes) {
     const impact = 5;
     score -= impact;

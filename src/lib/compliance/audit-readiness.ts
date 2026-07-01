@@ -33,13 +33,17 @@ export function calculateAuditReadiness(
     risks: Risk[];
     incidents: Incident[];
     tasks?: TaskItem[];
+    vendors?: import("@/lib/vendors/types").VendorWithDetails[];
   },
   securityScore?: number
 ): AuditReadinessResult {
   let score = 100;
   const reasons: string[] = [];
 
-  const missingTypes = getMissingAuditDocumentTypes(input.documents);
+  const missingTypes = getMissingAuditDocumentTypes(
+    input.documents,
+    input.company ?? null
+  );
   if (missingTypes.length > 0) {
     const deduction = missingTypes.length * 10;
     score -= deduction;
@@ -158,6 +162,7 @@ export function calculateAuditReadiness(
     measures: input.measures,
     documents: input.documents,
     tasks: input.tasks,
+    vendors: input.vendors,
   });
   score = applyDataQualityCap(score, dataQuality);
 

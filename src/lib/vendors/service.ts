@@ -1,21 +1,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   CompanyVendor,
+  VendorApplicability,
   VendorAssessment,
   VendorDashboardStats,
   VendorEvidence,
   VendorWithDetails,
 } from "@/lib/vendors/types";
 import { VENDOR_EVIDENCE_TYPES } from "@/lib/vendors/evidence-types";
+import { getRecommendedEvidenceTypes } from "@/lib/vendors/provider-catalog";
 import {
   countMissingEvidence,
   isReviewDue,
 } from "@/lib/vendors/scoring";
+import { isVendorsNotApplicable } from "@/lib/vendors/applicability";
 
 export async function ensureVendorEvidenceRows(
   supabase: SupabaseClient,
   companyId: string,
-  vendorId: string
+  vendorId: string,
+  providerKey?: string | null
 ): Promise<void> {
   const { data: existing } = await supabase
     .from("vendor_evidence")
@@ -27,12 +31,17 @@ export async function ensureVendorEvidenceRows(
 
   if (missing.length === 0) return;
 
+  const recommended = new Set(getRecommendedEvidenceTypes(providerKey));
+
   await supabase.from("vendor_evidence").insert(
     missing.map((evidence_type) => ({
       vendor_id: vendorId,
       company_id: companyId,
       evidence_type,
-      status: "missing",
+      status:
+        providerKey && recommended.size > 0 && !recommended.has(evidence_type)
+          ? "not_applicable"
+          : "not_fulfilled",
     }))
   );
 }
@@ -84,14 +93,31 @@ export async function loadVendorsWithDetails(
 }
 
 export function buildVendorDashboardStats(
-  vendors: VendorWithDetails[]
+  vendors: VendorWithDetails[],
+  applicability: VendorApplicability = "unknown"
 ): VendorDashboardStats {
+  if (isVendorsNotApplicable({ vendors_applicability: applicability })) {
+    return {
+      totalVendors: 0,
+      criticalVendors: 0,
+      missingEvidenceCount: 0,
+      reviewsDueCount: 0,
+      averageScore: 100,
+      applicability,
+      notApplicable: true,
+    };
+  }
+
   let missingEvidenceCount = 0;
   let reviewsDueCount = 0;
   let scoreSum = 0;
 
   for (const vendor of vendors) {
-    missingEvidenceCount += countMissingEvidence(vendor.evidence, vendor.criticality);
+    missingEvidenceCount += countMissingEvidence(
+      vendor.evidence,
+      vendor.criticality,
+      vendor.provider_key
+    );
     if (isReviewDue(vendor.next_review_at)) reviewsDueCount += 1;
     scoreSum += vendor.vendor_score;
   }
@@ -105,5 +131,7 @@ export function buildVendorDashboardStats(
     reviewsDueCount,
     averageScore:
       vendors.length > 0 ? Math.round(scoreSum / vendors.length) : 0,
+    applicability,
+    notApplicable: false,
   };
 }

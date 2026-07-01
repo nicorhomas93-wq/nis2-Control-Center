@@ -60,6 +60,8 @@ const ORDER = [
   "fix_profiles_missing_plan_role.sql",
   "add_team_data_access_rls.sql",
   "add_company_vendors.sql",
+  "add_vendor_applicability_na.sql",
+  "add_vendor_categories_providers.sql",
 ];
 
 const url = process.env.DATABASE_URL;

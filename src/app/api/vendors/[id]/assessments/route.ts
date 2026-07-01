@@ -105,6 +105,7 @@ export async function POST(
     criticality: effectiveCriticality,
     evidence,
     answers,
+    providerKey: vendor.provider_key,
   });
 
   const evidenceSnapshot = Object.fromEntries(

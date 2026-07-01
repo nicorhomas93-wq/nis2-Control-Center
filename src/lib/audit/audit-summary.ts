@@ -87,14 +87,16 @@ export function buildStructuredAuditSummary({
   nextSteps: nextStepsInput,
 }: BuildAuditSummaryParams): string {
   const folderStatuses = getAuditFolderStatuses(documents, company);
-  const missing = getMissingAuditDocumentTypes(documents);
+  const missing = getMissingAuditDocumentTypes(documents, company);
   const score = calculateAuditFolderScore(documents, company);
   const openMeasures = measures.filter((m) => m.status !== "completed");
   const openRisks = risks.filter(
     (r) => r.risk_level !== "low" && !isRiskTreated(r, measures)
   );
   const missingEvidence = folderStatuses.filter(
-    (s) => s.displayStatus === "evidence_missing" || s.displayStatus === "missing"
+    (s) =>
+      s.displayStatus === "evidence_missing" ||
+      (s.displayStatus === "missing" && s.documentType !== "lieferantenbewertung")
   ).length;
   const nextSteps =
     nextStepsInput ??

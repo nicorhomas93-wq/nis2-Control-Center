@@ -14,7 +14,7 @@ import {
 import { isRiskTreated } from "@/lib/compliance/risk-treatment";
 import { resolveRiskAsset } from "@/lib/assets/resolve";
 import type { CriticalityLevel, NextStepAction, SecurityStatusResult } from "@/lib/compliance/types";
-import type { Document, Incident, Measure, Risk } from "@/lib/types";
+import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
 import type { TaskItem } from "@/lib/tasks/types";
 import { isTaskOpen } from "@/lib/tasks/types";
 
@@ -49,6 +49,7 @@ function hasOpenTaskFor(tasks: TaskItem[] | undefined, relatedType: string, rela
 
 export function buildNextSteps(
   input: {
+    company?: Pick<Company, "vendors_applicability"> | null;
     documents: Document[];
     measures: Measure[];
     risks: Risk[];
@@ -198,7 +199,10 @@ export function buildNextSteps(
     });
   }
 
-  const missing = getMissingAuditDocumentTypes(input.documents);
+  const missing = getMissingAuditDocumentTypes(
+    input.documents,
+    input.company ?? null
+  );
   for (const docType of missing.slice(0, 3)) {
     if (securityStatus && driverIds.size > 0 && !driverIds.has(`doc-missing-${docType}`)) {
       continue;

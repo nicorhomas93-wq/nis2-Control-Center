@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyCompanyOwnership } from "@/lib/company";
 import { getDbErrorMessage, isMissingTableError } from "@/lib/supabase/db-error";
-import type { VendorCriticality, VendorStatus } from "@/lib/vendors/types";
+import type { VendorCategory, VendorCriticality, VendorStatus } from "@/lib/vendors/types";
 
 export async function PATCH(
   request: Request,
@@ -26,6 +26,11 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   if (fields.name !== undefined) updates.name = String(fields.name).trim();
+  if (fields.providerKey !== undefined) {
+    updates.provider_key =
+      fields.providerKey && fields.providerKey !== "custom" ? fields.providerKey : null;
+  }
+  if (fields.category !== undefined) updates.category = fields.category as VendorCategory;
   if (fields.contactName !== undefined) updates.contact_name = fields.contactName?.trim() || null;
   if (fields.contactEmail !== undefined) updates.contact_email = fields.contactEmail?.trim() || null;
   if (fields.website !== undefined) updates.website = fields.website?.trim() || null;

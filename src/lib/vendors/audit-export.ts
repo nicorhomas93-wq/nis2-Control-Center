@@ -1,10 +1,16 @@
 import type { VendorWithDetails } from "@/lib/vendors/types";
+import { VENDOR_CATEGORY_LABELS } from "@/lib/vendors/categories";
 import {
   VENDOR_CRITICALITY_LABELS,
   VENDOR_EVIDENCE_LABELS,
   VENDOR_EVIDENCE_STATUS_LABELS,
   VENDOR_RISK_LABELS,
 } from "@/lib/vendors/evidence-types";
+import {
+  getEvidenceLabelForProvider,
+  getProviderRiskAdvisory,
+} from "@/lib/vendors/provider-catalog";
+import { normalizeEvidenceStatus } from "@/lib/vendors/evidence-status";
 import { QUESTIONNAIRE_ANSWER_LABELS, VENDOR_QUESTIONNAIRE } from "@/lib/vendors/questionnaire";
 import { formatDate } from "@/lib/utils";
 
@@ -35,29 +41,36 @@ export function buildVendorAuditDocumentContent(
 
   lines.push("## Lieferantenliste", "");
   lines.push(
-    "| Lieferant | Kritikalität | Risiko | Score | Letzte Bewertung | Nächste Wiedervorlage |",
-    "| --- | --- | --- | --- | --- | --- |"
+    "| Lieferant | Kategorie | Kritikalität | Risiko | Score | Letzte Bewertung | Nächste Wiedervorlage |",
+    "| --- | --- | --- | --- | --- | --- | --- |"
   );
 
   for (const v of vendors) {
+    const categoryLabel = VENDOR_CATEGORY_LABELS[v.category ?? "sonstiger"];
     lines.push(
-      `| ${v.name} | ${VENDOR_CRITICALITY_LABELS[v.criticality]} | ${VENDOR_RISK_LABELS[v.risk_level]} | ${v.vendor_score}% | ${v.last_assessed_at ? formatDate(v.last_assessed_at) : "—"} | ${v.next_review_at ? formatDate(v.next_review_at) : "—"} |`
+      `| ${v.name} | ${categoryLabel} | ${VENDOR_CRITICALITY_LABELS[v.criticality]} | ${VENDOR_RISK_LABELS[v.risk_level]} | ${v.vendor_score}% | ${v.last_assessed_at ? formatDate(v.last_assessed_at) : "—"} | ${v.next_review_at ? formatDate(v.next_review_at) : "—"} |`
     );
   }
 
   lines.push("", "## Risikobewertung", "");
   for (const v of vendors) {
     const latest = v.assessments[0];
-    lines.push(
+    const advisory = getProviderRiskAdvisory(v.provider_key);
+    const riskLines = [
       `### ${v.name}`,
+      `- Kategorie: ${VENDOR_CATEGORY_LABELS[v.category ?? "sonstiger"]}`,
       `- Kritikalität: ${VENDOR_CRITICALITY_LABELS[v.criticality]}`,
       `- Risiko-Level: ${VENDOR_RISK_LABELS[v.risk_level]}`,
       `- Lieferanten-Score: ${v.vendor_score}%`,
+    ];
+    if (advisory) riskLines.push(`- Hinweis: ${advisory}`);
+    riskLines.push(
       latest
         ? `- Bewertung v${latest.version} vom ${formatDate(latest.assessed_at)} (Fragebogen ${latest.questionnaire_score}%, Nachweise ${latest.evidence_score}%)`
         : "- Noch keine versionierte Bewertung gespeichert",
       ""
     );
+    lines.push(...riskLines);
   }
 
   lines.push("## Dokumentenstatus / Nachweise", "");
@@ -68,8 +81,10 @@ export function buildVendorAuditDocumentContent(
       continue;
     }
     for (const e of v.evidence) {
-      const label = VENDOR_EVIDENCE_LABELS[e.evidence_type];
-      const status = VENDOR_EVIDENCE_STATUS_LABELS[e.status];
+      const label =
+        getEvidenceLabelForProvider(v.provider_key, e.evidence_type) ??
+        VENDOR_EVIDENCE_LABELS[e.evidence_type];
+      const status = VENDOR_EVIDENCE_STATUS_LABELS[normalizeEvidenceStatus(e.status)];
       const valid = e.valid_until ? ` (gültig bis ${formatDate(e.valid_until)})` : "";
       lines.push(`- ${label}: ${status}${valid}`);
     }

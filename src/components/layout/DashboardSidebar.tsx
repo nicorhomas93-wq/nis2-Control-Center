@@ -37,7 +37,7 @@ const navItems = [
   { href: "/company", label: "Unternehmen", icon: Building2 },
   { href: "/assessment", label: "Betroffenheitscheck", icon: ShieldCheck },
   { href: "/documents", label: "Dokumente", icon: FileText },
-  { href: "/lieferanten", label: "Lieferanten", icon: Truck },
+  { href: "/lieferanten", label: "Lieferanten & Dienstleister", icon: Truck },
   { href: "/fragebogen", label: "Fragebögen", icon: ClipboardList },
   { href: "/risks", label: "Risikoanalyse", icon: ShieldAlert },
   { href: "/measures", label: "Maßnahmen", icon: ClipboardCheck },

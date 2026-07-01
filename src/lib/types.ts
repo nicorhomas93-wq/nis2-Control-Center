@@ -3,6 +3,7 @@ import type {
   WebPresenceEvidence,
   WebPresenceStatus,
 } from "@/lib/jarvis/outreach/web-presence-types";
+import type { VendorApplicability } from "@/lib/vendors/types";
 
 export type { DetectedWebsiteType, WebPresenceEvidence, WebPresenceStatus };
 export type { CompanyAsset, AssetCategory, AssetCriticality } from "@/lib/assets/types";
@@ -14,9 +15,12 @@ export type {
   VendorDashboardStats,
   VendorCriticality,
   VendorRiskLevel,
+  VendorCategory,
+  VendorStatus,
   VendorEvidenceType,
   VendorEvidenceStatus,
   VendorQuestionnaireAnswers,
+  VendorApplicability,
 } from "@/lib/vendors/types";
 
 export type Nis2Status =
@@ -82,6 +86,7 @@ export interface Company {
   pilot_setup_paid_at?: string | null;
   pilot_phase_completed_at?: string | null;
   security_score?: number | null;
+  vendors_applicability?: VendorApplicability | null;
   deleted_at?: string | null;
   deleted_by?: string | null;
   deletion_reason?: string | null;

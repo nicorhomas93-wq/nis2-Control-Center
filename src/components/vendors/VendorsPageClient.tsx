@@ -3,19 +3,39 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
+  VendorApplicability,
+  VendorCategory,
   VendorDashboardStats,
   VendorEvidence,
   VendorQuestionnaireAnswers,
+  VendorStatus,
   VendorWithDetails,
 } from "@/lib/types";
+import {
+  VENDOR_CATEGORIES,
+  VENDOR_CATEGORY_LABELS,
+  VENDOR_STATUS_LABELS,
+} from "@/lib/vendors/categories";
+import {
+  getEvidenceLabelForProvider,
+  getProviderDefaults,
+  getProviderRiskAdvisory,
+  getRecommendedEvidenceTypes,
+} from "@/lib/vendors/provider-catalog";
+import { VendorProviderSelect } from "@/components/vendors/VendorProviderSelect";
 import {
   VENDOR_CRITICALITY_LABELS,
   VENDOR_EVIDENCE_LABELS,
   VENDOR_EVIDENCE_STATUS_LABELS,
+  VENDOR_EVIDENCE_STATUS_OPTIONS,
   VENDOR_RISK_BADGE,
   VENDOR_RISK_LABELS,
   VENDOR_EVIDENCE_STATUS_BADGE,
 } from "@/lib/vendors/evidence-types";
+import {
+  VENDOR_APPLICABILITY_LABELS,
+  VENDOR_APPLICABILITY_QUESTION,
+} from "@/lib/vendors/applicability";
 import {
   QUESTIONNAIRE_ANSWER_LABELS,
   VENDOR_QUESTIONNAIRE,
@@ -26,27 +46,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Badge } from "@/components/ui/Badge";
-import { Loader2, Plus, FileDown, ClipboardCheck, Truck } from "lucide-react";
+import { Loader2, Plus, FileDown, ClipboardCheck, Truck, Trash2, Save } from "lucide-react";
 
 interface VendorsPageClientProps {
   companyId: string;
   companyName: string;
   initialVendors: VendorWithDetails[];
   initialStats: VendorDashboardStats;
+  initialApplicability: VendorApplicability;
 }
 
 const CRITICALITY_OPTIONS = ["low", "medium", "high", "critical"] as const;
-const EVIDENCE_STATUS_OPTIONS = ["present", "missing", "expired", "review_due"] as const;
 
 export function VendorsPageClient({
   companyId,
   companyName,
   initialVendors,
   initialStats,
+  initialApplicability,
 }: VendorsPageClientProps) {
   const router = useRouter();
   const [vendors, setVendors] = useState(initialVendors);
   const [stats, setStats] = useState(initialStats);
+  const [applicability, setApplicability] = useState<VendorApplicability>(initialApplicability);
+  const [savingApplicability, setSavingApplicability] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(initialVendors[0]?.id ?? null);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,9 +78,28 @@ export function VendorsPageClient({
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const [newName, setNewName] = useState("");
+  const [newProviderKey, setNewProviderKey] = useState<string | null>(null);
+  const [newCategory, setNewCategory] = useState<VendorCategory>("sonstiger");
+  const [newDescription, setNewDescription] = useState("");
+  const [newWebsite, setNewWebsite] = useState("");
   const [newCriticality, setNewCriticality] = useState<(typeof CRITICALITY_OPTIONS)[number]>("medium");
+  const [newStatus, setNewStatus] = useState<VendorStatus>("active");
   const [newContact, setNewContact] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newNextReview, setNewNextReview] = useState("");
+  const [providerHints, setProviderHints] = useState<ReturnType<typeof getProviderDefaults>>(null);
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState({
+    name: "",
+    category: "sonstiger" as VendorCategory,
+    description: "",
+    website: "",
+    criticality: "medium" as (typeof CRITICALITY_OPTIONS)[number],
+    status: "active" as VendorStatus,
+    contactName: "",
+    contactEmail: "",
+    nextReviewAt: "",
+  });
 
   const selected = useMemo(
     () => vendors.find((v) => v.id === selectedId) ?? null,
@@ -67,11 +109,38 @@ export function VendorsPageClient({
   const [answers, setAnswers] = useState<VendorQuestionnaireAnswers>({});
   const [evidenceDraft, setEvidenceDraft] = useState<VendorEvidence[]>([]);
 
+  const selectedRiskAdvisory = useMemo(
+    () => getProviderRiskAdvisory(selected?.provider_key),
+    [selected?.provider_key]
+  );
+
+  const recommendedEvidenceTypes = useMemo(
+    () => getRecommendedEvidenceTypes(selected?.provider_key ?? newProviderKey),
+    [selected?.provider_key, newProviderKey]
+  );
+
   const syncSelection = useCallback((vendor: VendorWithDetails | null) => {
     if (!vendor) return;
     setEvidenceDraft(vendor.evidence);
     const latest = vendor.assessments[0];
-    setAnswers(latest?.questionnaire_answers ?? {});
+    const providerDefaults = getProviderDefaults(vendor.provider_key);
+    setAnswers(
+      latest?.questionnaire_answers ??
+        providerDefaults?.questionnaire ??
+        {}
+    );
+    setEditDraft({
+      name: vendor.name,
+      category: vendor.category ?? "sonstiger",
+      description: vendor.description ?? "",
+      website: vendor.website ?? "",
+      criticality: vendor.criticality,
+      status: vendor.status,
+      contactName: vendor.contact_name ?? "",
+      contactEmail: vendor.contact_email ?? "",
+      nextReviewAt: vendor.next_review_at?.slice(0, 10) ?? "",
+    });
+    setEditing(false);
   }, []);
 
   useEffect(() => {
@@ -90,8 +159,50 @@ export function VendorsPageClient({
     if (res.ok) {
       setVendors(data.vendors ?? []);
       setStats(data.stats ?? initialStats);
+      if (data.applicability) setApplicability(data.applicability);
     }
     router.refresh();
+  }
+
+  async function handleApplicabilityChange(value: VendorApplicability) {
+    setSavingApplicability(true);
+    setError(null);
+    setFeedback(null);
+    const res = await fetch("/api/vendors/applicability", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyId, applicability: value }),
+    });
+    const data = await res.json();
+    setSavingApplicability(false);
+    if (!res.ok) {
+      setError(data.error ?? "Speichern fehlgeschlagen");
+      return;
+    }
+    setApplicability(value);
+    if (value === "no") {
+      setFeedback(
+        "Lieferantenbewertung als Nicht zutreffend (N/A) markiert. Kein Score- oder Audit-Abzug."
+      );
+    } else if (value === "unknown") {
+      setFeedback("Hinweis: Unbekannte Relevanz reduziert die Audit-Bereitschaft.");
+    } else {
+      setFeedback("Lieferantenbewertung ist jetzt verpflichtend. Bitte Lieferanten erfassen.");
+    }
+    await reload();
+  }
+
+  function applyProviderDefaults(providerKey: string | null, name: string) {
+    const defaults = getProviderDefaults(providerKey);
+    setNewName(name);
+    setNewProviderKey(providerKey);
+    setProviderHints(defaults);
+    if (defaults) {
+      setNewCategory(defaults.category);
+      setNewWebsite(defaults.website);
+      setNewCriticality(defaults.criticality);
+      setAnswers((prev) => ({ ...defaults.questionnaire, ...prev }));
+    }
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -105,9 +216,15 @@ export function VendorsPageClient({
       body: JSON.stringify({
         companyId,
         name: newName,
+        providerKey: newProviderKey,
+        category: newCategory,
+        description: newDescription,
+        website: newWebsite,
         criticality: newCriticality,
+        status: newStatus,
         contactName: newContact,
         contactEmail: newEmail,
+        nextReviewAt: newNextReview || undefined,
       }),
     });
     const data = await res.json();
@@ -117,11 +234,71 @@ export function VendorsPageClient({
       return;
     }
     setNewName("");
+    setNewProviderKey(null);
+    setNewCategory("sonstiger");
+    setNewDescription("");
+    setNewWebsite("");
     setNewContact("");
     setNewEmail("");
+    setNewNextReview("");
+    setProviderHints(null);
+    if (data.providerDefaults?.questionnaire) {
+      setAnswers(data.providerDefaults.questionnaire);
+    }
     await reload();
     if (data.vendor?.id) selectVendor(data.vendor.id);
     setFeedback("Lieferant angelegt.");
+  }
+
+  async function handleUpdateVendor() {
+    if (!selected) return;
+    setSaving(true);
+    setError(null);
+    const res = await fetch(`/api/vendors/${selected.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyId,
+        name: editDraft.name,
+        category: editDraft.category,
+        description: editDraft.description,
+        website: editDraft.website,
+        criticality: editDraft.criticality,
+        status: editDraft.status,
+        contactName: editDraft.contactName,
+        contactEmail: editDraft.contactEmail,
+        nextReviewAt: editDraft.nextReviewAt || null,
+      }),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (!res.ok) {
+      setError(data.error ?? "Speichern fehlgeschlagen");
+      return;
+    }
+    setEditing(false);
+    setFeedback("Stammdaten gespeichert.");
+    await reload();
+    if (selected.id) selectVendor(selected.id);
+  }
+
+  async function handleDeleteVendor() {
+    if (!selected) return;
+    if (!window.confirm(`Lieferant „${selected.name}“ wirklich entfernen?`)) return;
+    setSaving(true);
+    setError(null);
+    const res = await fetch(`/api/vendors/${selected.id}?companyId=${companyId}`, {
+      method: "DELETE",
+    });
+    setSaving(false);
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error ?? "Löschen fehlgeschlagen");
+      return;
+    }
+    setSelectedId(null);
+    setFeedback("Lieferant entfernt.");
+    await reload();
   }
 
   async function handleSaveEvidence() {
@@ -206,6 +383,9 @@ export function VendorsPageClient({
     );
   }
 
+  const vendorsMandatory = applicability === "yes";
+  const vendorsNotApplicable = applicability === "no";
+
   return (
     <div className="space-y-6">
       {feedback && (
@@ -219,6 +399,52 @@ export function VendorsPageClient({
         </div>
       )}
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Relevanz Lieferanten & Dienstleister</CardTitle>
+          <CardDescription>{VENDOR_APPLICABILITY_QUESTION}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          {(["yes", "no", "unknown"] as VendorApplicability[]).map((value) => (
+            <Button
+              key={value}
+              type="button"
+              variant={applicability === value ? "primary" : "outline"}
+              disabled={savingApplicability}
+              onClick={() => void handleApplicabilityChange(value)}
+            >
+              {savingApplicability && applicability === value ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : null}
+              {VENDOR_APPLICABILITY_LABELS[value]}
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
+
+      {vendorsNotApplicable && (
+        <Card className="border-slate-200 bg-slate-50">
+          <CardContent className="pt-6 text-sm text-slate-700">
+            <p className="font-medium">Status: Nicht zutreffend (N/A)</p>
+            <p className="mt-2">
+              Für {companyName} ist keine Lieferantenbewertung erforderlich. Der Audit-Bereich
+              08_Lieferantenbewertung gilt als bewertet — ohne Score- oder Compliance-Abzug.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {applicability === "unknown" && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="pt-6 text-sm text-amber-900">
+            Bitte beantworten Sie die Frage oben (Ja/Nein). Solange die Relevanz unbekannt ist,
+            wird die Audit-Bereitschaft reduziert.
+          </CardContent>
+        </Card>
+      )}
+
+      {!vendorsNotApplicable && (
+        <>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
@@ -247,7 +473,10 @@ export function VendorsPageClient({
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Button onClick={handleExportAudit} disabled={exporting || vendors.length === 0}>
+        <Button
+          onClick={handleExportAudit}
+          disabled={exporting || (vendorsMandatory && vendors.length === 0 && !vendorsNotApplicable)}
+        >
           {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
           Audit-Ordner 08 exportieren
         </Button>
@@ -258,19 +487,63 @@ export function VendorsPageClient({
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Truck className="h-4 w-4" />
-              Lieferanten anlegen
+              Lieferanten & Dienstleister anlegen
             </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreate} className="space-y-3">
+              <VendorProviderSelect
+                value={newName}
+                providerKey={newProviderKey}
+                onChange={(sel) => applyProviderDefaults(sel.providerKey, sel.name)}
+              />
+              {providerHints && (
+                <div className="rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm text-brand-900">
+                  <p className="font-medium">Empfohlene Nachweise</p>
+                  <ul className="mt-2 list-inside list-disc space-y-1 text-brand-800">
+                    {providerHints.recommendedEvidence.map((item) => (
+                      <li key={`${item.evidenceType}-${item.label}`}>{item.label}</li>
+                    ))}
+                  </ul>
+                  {providerHints.riskAdvisory && (
+                    <p className="mt-2 text-xs text-brand-700">{providerHints.riskAdvisory}</p>
+                  )}
+                </div>
+              )}
               <div>
-                <Label htmlFor="vendor-name">Name</Label>
+                <Label htmlFor="vendor-category">Kategorie</Label>
+                <select
+                  id="vendor-category"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value as VendorCategory)}
+                >
+                  {VENDOR_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {VENDOR_CATEGORY_LABELS[c]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="vendor-description">Beschreibung</Label>
+                <textarea
+                  id="vendor-description"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  rows={2}
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="Leistungsumfang, Vertragsbezug …"
+                />
+              </div>
+              <div>
+                <Label htmlFor="vendor-website">Website</Label>
                 <Input
-                  id="vendor-name"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="z. B. Cloud-Provider GmbH"
-                  required
+                  id="vendor-website"
+                  type="url"
+                  value={newWebsite}
+                  onChange={(e) => setNewWebsite(e.target.value)}
+                  placeholder="https://"
                 />
               </div>
               <div>
@@ -289,6 +562,27 @@ export function VendorsPageClient({
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <Label htmlFor="vendor-status">Status</Label>
+                <select
+                  id="vendor-status"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value as VendorStatus)}
+                >
+                  <option value="active">{VENDOR_STATUS_LABELS.active}</option>
+                  <option value="inactive">{VENDOR_STATUS_LABELS.inactive}</option>
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="vendor-next-review">Nächste Prüfung</Label>
+                <Input
+                  id="vendor-next-review"
+                  type="date"
+                  value={newNextReview}
+                  onChange={(e) => setNewNextReview(e.target.value)}
+                />
               </div>
               <div>
                 <Label htmlFor="vendor-contact">Ansprechpartner</Label>
@@ -336,7 +630,8 @@ export function VendorsPageClient({
                       </Badge>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
-                      Score {v.vendor_score}% · {VENDOR_CRITICALITY_LABELS[v.criticality]}
+                      {VENDOR_CATEGORY_LABELS[v.category ?? "sonstiger"]} · Score {v.vendor_score}% ·{" "}
+                      {VENDOR_CRITICALITY_LABELS[v.criticality]}
                     </p>
                   </button>
                 ))
@@ -347,26 +642,222 @@ export function VendorsPageClient({
 
         {selected ? (
           <div className="space-y-6">
+            {selectedRiskAdvisory && (
+              <Card className="border-amber-200 bg-amber-50">
+                <CardContent className="pt-6 text-sm text-amber-900">
+                  <p className="font-medium">Risikohinweis</p>
+                  <p className="mt-1">{selectedRiskAdvisory}</p>
+                  <p className="mt-2 text-xs">
+                    Auch etablierte Anbieter werden nicht automatisch als risikofrei bewertet.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
-                <CardTitle>{selected.name}</CardTitle>
-                <CardDescription>
-                  Letzte Bewertung:{" "}
-                  {selected.last_assessed_at ? formatDate(selected.last_assessed_at) : "—"} ·
-                  Wiedervorlage:{" "}
-                  {selected.next_review_at ? formatDate(selected.next_review_at) : "—"}
-                </CardDescription>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle>{selected.name}</CardTitle>
+                    <CardDescription>
+                      {VENDOR_CATEGORY_LABELS[selected.category ?? "sonstiger"]} · Letzte Bewertung:{" "}
+                      {selected.last_assessed_at ? formatDate(selected.last_assessed_at) : "—"} ·
+                      Wiedervorlage:{" "}
+                      {selected.next_review_at ? formatDate(selected.next_review_at) : "—"}
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditing((e) => !e)}
+                    >
+                      {editing ? "Abbrechen" : "Bearbeiten"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleDeleteVendor()}
+                      disabled={saving}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                <Badge className={VENDOR_RISK_BADGE[selected.risk_level]}>
-                  Risiko {VENDOR_RISK_LABELS[selected.risk_level]}
-                </Badge>
-                <Badge className="bg-slate-100 text-slate-800">Score {selected.vendor_score}%</Badge>
-                <Badge className="bg-slate-100 text-slate-800">
-                  Kritikalität {VENDOR_CRITICALITY_LABELS[selected.criticality]}
-                </Badge>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  <Badge className={VENDOR_RISK_BADGE[selected.risk_level]}>
+                    Risiko {VENDOR_RISK_LABELS[selected.risk_level]}
+                  </Badge>
+                  <Badge className="bg-slate-100 text-slate-800">Score {selected.vendor_score}%</Badge>
+                  <Badge className="bg-slate-100 text-slate-800">
+                    Kritikalität {VENDOR_CRITICALITY_LABELS[selected.criticality]}
+                  </Badge>
+                  <Badge className="bg-slate-100 text-slate-800">
+                    {VENDOR_STATUS_LABELS[selected.status]}
+                  </Badge>
+                </div>
+
+                {editing ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <Label>Firmenname</Label>
+                      <Input
+                        value={editDraft.name}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Kategorie</Label>
+                      <select
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        value={editDraft.category}
+                        onChange={(e) =>
+                          setEditDraft((d) => ({
+                            ...d,
+                            category: e.target.value as VendorCategory,
+                          }))
+                        }
+                      >
+                        {VENDOR_CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {VENDOR_CATEGORY_LABELS[c]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Status</Label>
+                      <select
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        value={editDraft.status}
+                        onChange={(e) =>
+                          setEditDraft((d) => ({
+                            ...d,
+                            status: e.target.value as VendorStatus,
+                          }))
+                        }
+                      >
+                        <option value="active">{VENDOR_STATUS_LABELS.active}</option>
+                        <option value="inactive">{VENDOR_STATUS_LABELS.inactive}</option>
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label>Beschreibung</Label>
+                      <textarea
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        rows={2}
+                        value={editDraft.description}
+                        onChange={(e) =>
+                          setEditDraft((d) => ({ ...d, description: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Website</Label>
+                      <Input
+                        value={editDraft.website}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, website: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Nächste Prüfung</Label>
+                      <Input
+                        type="date"
+                        value={editDraft.nextReviewAt}
+                        onChange={(e) =>
+                          setEditDraft((d) => ({ ...d, nextReviewAt: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Ansprechpartner</Label>
+                      <Input
+                        value={editDraft.contactName}
+                        onChange={(e) =>
+                          setEditDraft((d) => ({ ...d, contactName: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>E-Mail</Label>
+                      <Input
+                        type="email"
+                        value={editDraft.contactEmail}
+                        onChange={(e) =>
+                          setEditDraft((d) => ({ ...d, contactEmail: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Kritikalität</Label>
+                      <select
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        value={editDraft.criticality}
+                        onChange={(e) =>
+                          setEditDraft((d) => ({
+                            ...d,
+                            criticality: e.target.value as (typeof CRITICALITY_OPTIONS)[number],
+                          }))
+                        }
+                      >
+                        {CRITICALITY_OPTIONS.map((c) => (
+                          <option key={c} value={c}>
+                            {VENDOR_CRITICALITY_LABELS[c]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Button onClick={() => void handleUpdateVendor()} disabled={saving}>
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Stammdaten speichern
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+                    {selected.description && <p className="sm:col-span-2">{selected.description}</p>}
+                    {selected.website && (
+                      <p>
+                        Website:{" "}
+                        <a
+                          href={selected.website}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-brand-600 hover:underline"
+                        >
+                          {selected.website}
+                        </a>
+                      </p>
+                    )}
+                    {selected.contact_name && <p>Ansprechpartner: {selected.contact_name}</p>}
+                    {selected.contact_email && <p>E-Mail: {selected.contact_email}</p>}
+                  </div>
+                )}
               </CardContent>
             </Card>
+
+            {recommendedEvidenceTypes.length > 0 && (
+              <Card className="border-brand-200 bg-brand-50/50">
+                <CardHeader>
+                  <CardTitle className="text-base">Empfohlene Nachweise</CardTitle>
+                  <CardDescription>
+                    Provider-spezifische Vorschläge für {selected.name}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="list-inside list-disc space-y-1 text-sm text-slate-700">
+                    {getProviderDefaults(selected.provider_key)?.recommendedEvidence.map((item) => (
+                      <li key={`${item.evidenceType}-${item.label}`}>{item.label}</li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
@@ -381,7 +872,13 @@ export function VendorsPageClient({
                   >
                     <div>
                       <p className="text-sm font-medium">
-                        {VENDOR_EVIDENCE_LABELS[row.evidence_type]}
+                        {getEvidenceLabelForProvider(selected.provider_key, row.evidence_type) ??
+                          VENDOR_EVIDENCE_LABELS[row.evidence_type]}
+                        {recommendedEvidenceTypes.includes(row.evidence_type) && (
+                          <span className="ml-2 text-xs font-normal text-brand-600">
+                            empfohlen
+                          </span>
+                        )}
                       </p>
                       <Badge className={`mt-1 ${VENDOR_EVIDENCE_STATUS_BADGE[row.status]}`}>
                         {VENDOR_EVIDENCE_STATUS_LABELS[row.status]}
@@ -397,7 +894,7 @@ export function VendorsPageClient({
                         )
                       }
                     >
-                      {EVIDENCE_STATUS_OPTIONS.map((s) => (
+                      {VENDOR_EVIDENCE_STATUS_OPTIONS.map((s) => (
                         <option key={s} value={s}>
                           {VENDOR_EVIDENCE_STATUS_LABELS[s]}
                         </option>
@@ -483,6 +980,8 @@ export function VendorsPageClient({
           </Card>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

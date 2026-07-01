@@ -2,6 +2,17 @@ export type VendorCriticality = "low" | "medium" | "high" | "critical";
 export type VendorRiskLevel = "low" | "medium" | "high" | "critical";
 export type VendorStatus = "active" | "inactive";
 
+export type VendorCategory =
+  | "cloud"
+  | "hosting"
+  | "saas"
+  | "rechenzentrum"
+  | "managed_services"
+  | "it_dienstleister"
+  | "softwareanbieter"
+  | "telekommunikation"
+  | "sonstiger";
+
 export type VendorEvidenceType =
   | "iso_27001"
   | "tisax"
@@ -14,7 +25,13 @@ export type VendorEvidenceType =
   | "selbstauskunft"
   | "other";
 
-export type VendorEvidenceStatus = "present" | "missing" | "expired" | "review_due";
+export type VendorEvidenceStatus =
+  | "fulfilled"
+  | "not_fulfilled"
+  | "in_progress"
+  | "not_applicable";
+
+export type VendorApplicability = "yes" | "no" | "unknown";
 
 export type VendorQuestionnaireAnswer = "yes" | "no" | "unknown";
 
@@ -30,6 +47,8 @@ export interface CompanyVendor {
   id: string;
   company_id: string;
   name: string;
+  category: VendorCategory;
+  provider_key: string | null;
   contact_name: string | null;
   contact_email: string | null;
   website: string | null;
@@ -92,4 +111,6 @@ export interface VendorDashboardStats {
   missingEvidenceCount: number;
   reviewsDueCount: number;
   averageScore: number;
+  applicability: VendorApplicability;
+  notApplicable: boolean;
 }

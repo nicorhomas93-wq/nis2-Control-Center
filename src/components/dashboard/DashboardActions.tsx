@@ -15,6 +15,7 @@ interface DashboardActionsProps {
   documents: Document[];
   missingCount: number;
   auditScorePercent: number;
+  vendorsApplicability?: import("@/lib/vendors/types").VendorApplicability | null;
 }
 
 export function DashboardActions({
@@ -23,6 +24,7 @@ export function DashboardActions({
   documents,
   missingCount,
   auditScorePercent,
+  vendorsApplicability,
 }: DashboardActionsProps) {
   const [pilotOpen, setPilotOpen] = useState(false);
   const [batchLoading, setBatchLoading] = useState(false);
@@ -30,7 +32,9 @@ export function DashboardActions({
   const [error, setError] = useState<string | null>(null);
 
   async function handleGenerateMissing() {
-    const missing = getMissingAuditDocumentTypes(documents);
+    const missing = getMissingAuditDocumentTypes(documents, {
+      vendors_applicability: vendorsApplicability ?? "unknown",
+    });
     if (missing.length === 0) return;
 
     setBatchLoading(true);

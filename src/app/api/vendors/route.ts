@@ -7,7 +7,13 @@ import {
   ensureVendorEvidenceRows,
   loadVendorsWithDetails,
 } from "@/lib/vendors/service";
-import type { VendorCriticality } from "@/lib/vendors/types";
+import { getVendorApplicability } from "@/lib/vendors/applicability";
+import {
+  getProviderDefaults,
+  matchKnownProviderByName,
+} from "@/lib/vendors/provider-catalog";
+import { nextReviewDate } from "@/lib/vendors/scoring";
+import type { VendorApplicability, VendorCategory, VendorCriticality } from "@/lib/vendors/types";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -27,8 +33,9 @@ export async function GET(request: Request) {
 
   try {
     const vendors = await loadVendorsWithDetails(supabase, companyId);
-    const stats = buildVendorDashboardStats(vendors);
-    return NextResponse.json({ vendors, stats });
+    const applicability = getVendorApplicability(company);
+    const stats = buildVendorDashboardStats(vendors, applicability);
+    return NextResponse.json({ vendors, stats, applicability });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Laden fehlgeschlagen";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -46,11 +53,14 @@ export async function POST(request: Request) {
   const {
     companyId,
     name,
+    providerKey,
+    category,
     contactName,
     contactEmail,
     website,
     description,
     criticality,
+    status,
     notes,
     processesPersonalData,
     nextReviewAt,
@@ -63,19 +73,41 @@ export async function POST(request: Request) {
   const company = await verifyCompanyOwnership(user.id, companyId);
   if (!company) return NextResponse.json({ error: "Unternehmen nicht gefunden" }, { status: 404 });
 
+  const knownByName = matchKnownProviderByName(String(name));
+  const effectiveProviderKey =
+    providerKey && providerKey !== "custom"
+      ? providerKey
+      : knownByName?.key ?? null;
+  const providerDefaults = getProviderDefaults(effectiveProviderKey);
+
+  const effectiveCriticality =
+    (criticality as VendorCriticality) ??
+    providerDefaults?.criticality ??
+    "medium";
+  const effectiveCategory =
+    (category as VendorCategory) ?? providerDefaults?.category ?? "sonstiger";
+  const effectiveWebsite = website?.trim() || providerDefaults?.website || null;
+  const reviewAt =
+    nextReviewAt ?? nextReviewDate(effectiveCriticality).toISOString();
+
   const { data: vendor, error } = await supabase
     .from("company_vendors")
     .insert({
       company_id: companyId,
       name: String(name).trim(),
+      provider_key: effectiveProviderKey || null,
+      category: effectiveCategory,
       contact_name: contactName?.trim() || null,
       contact_email: contactEmail?.trim() || null,
-      website: website?.trim() || null,
+      website: effectiveWebsite,
       description: description?.trim() || null,
-      criticality: (criticality as VendorCriticality) ?? "medium",
+      criticality: effectiveCriticality,
+      status: status ?? "active",
       notes: notes?.trim() || null,
-      processes_personal_data: Boolean(processesPersonalData),
-      next_review_at: nextReviewAt ?? null,
+      processes_personal_data:
+        processesPersonalData ??
+        providerDefaults?.questionnaire.processes_personal_data === "yes",
+      next_review_at: reviewAt,
     })
     .select()
     .single();
@@ -87,12 +119,22 @@ export async function POST(request: Request) {
     );
   }
 
-  await ensureVendorEvidenceRows(supabase, companyId, vendor.id);
+  await ensureVendorEvidenceRows(supabase, companyId, vendor.id, effectiveProviderKey);
 
   const { data: evidence } = await supabase
     .from("vendor_evidence")
     .select("*")
     .eq("vendor_id", vendor.id);
 
-  return NextResponse.json({ vendor, evidence: evidence ?? [] });
+  return NextResponse.json({
+    vendor,
+    evidence: evidence ?? [],
+    providerDefaults: providerDefaults
+      ? {
+          questionnaire: providerDefaults.questionnaire,
+          recommendedEvidence: providerDefaults.recommendedEvidence,
+          riskAdvisory: providerDefaults.riskAdvisory,
+        }
+      : null,
+  });
 }

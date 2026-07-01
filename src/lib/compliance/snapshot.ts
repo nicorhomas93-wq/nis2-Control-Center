@@ -43,9 +43,13 @@ export function buildComplianceSnapshot(input: ComplianceDataInput): ComplianceS
     tasks: input.tasks,
     vendors: input.vendors,
   });
-  const securityStatus = calculateSecurityStatus(input);
+  const securityStatus = calculateSecurityStatus({
+    ...input,
+    vendors: input.vendors,
+  });
   let nextSteps = buildNextSteps(
     {
+      company: input.company,
       documents: input.documents,
       measures: input.measures,
       risks: input.risks,

@@ -100,7 +100,8 @@ export async function POST(request: Request) {
   await autoTaskFromMeasure(supabase, measure as Measure, user.id);
 
   const compliance = await buildComplianceResponse(supabase, companyId, beforeStatus.score, {
-    missingEvidence: getMissingAuditDocumentTypes(beforeData.documents).length > 0,
+    missingEvidence:
+      getMissingAuditDocumentTypes(beforeData.documents, beforeData.company).length > 0,
   });
 
   return NextResponse.json({
@@ -179,7 +180,8 @@ export async function PATCH(request: Request) {
 
   const compliance = await buildComplianceResponse(supabase, existing.company_id, beforeStatus.score, {
     measureCompleted,
-    missingEvidence: getMissingAuditDocumentTypes(afterData.documents).length > 0,
+    missingEvidence:
+      getMissingAuditDocumentTypes(afterData.documents, afterData.company).length > 0,
     hasOpenMandatoryMeasures,
   });
 

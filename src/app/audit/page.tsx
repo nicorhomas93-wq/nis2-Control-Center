@@ -61,6 +61,7 @@ export default async function AuditPage() {
           securityScore={company.security_score ?? 0}
           nis2Status={company.nis2_status}
           complianceScore={company.compliance_score ?? 0}
+          vendorsApplicability={company.vendors_applicability}
           profileComplete={isCompanyProfileComplete(company)}
           initialDocuments={documents}
           initialMeasures={measures}

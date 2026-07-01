@@ -4,6 +4,7 @@ import { verifyCompanyOwnership } from "@/lib/company";
 import { saveGeneratedDocument } from "@/lib/documents/save-document";
 import { syncCompanySecurityScore } from "@/lib/compliance/sync";
 import { buildVendorAuditDocumentContent } from "@/lib/vendors/audit-export";
+import { buildVendorNaAuditDocumentContent, isVendorsNotApplicable } from "@/lib/vendors/applicability";
 import { loadVendorsWithDetails } from "@/lib/vendors/service";
 import { getDocumentTypeLabel } from "@/lib/nis2/document-types";
 import type { Document } from "@/lib/types";
@@ -24,10 +25,9 @@ export async function POST(request: Request) {
   if (!company) return NextResponse.json({ error: "Unternehmen nicht gefunden" }, { status: 404 });
 
   const vendors = await loadVendorsWithDetails(supabase, companyId);
-  const content = buildVendorAuditDocumentContent(
-    company.company_name ?? "Unternehmen",
-    vendors
-  );
+  const content = isVendorsNotApplicable(company)
+    ? buildVendorNaAuditDocumentContent(company.company_name ?? "Unternehmen")
+    : buildVendorAuditDocumentContent(company.company_name ?? "Unternehmen", vendors);
   const typeLabel = getDocumentTypeLabel("lieferantenbewertung");
 
   const { data: existing } = await supabase
