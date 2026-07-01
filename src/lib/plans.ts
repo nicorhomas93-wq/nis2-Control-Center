@@ -81,7 +81,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       "Zentrale Audit-Übersicht",
       "Vollständige Audit-Exports für Kunden",
       "Skalierbares Compliance-System",
-      "White-Label vorbereitet",
+      "White-Label inklusive",
     ],
     cta: "Consultant buchen",
   },

@@ -1,25 +1,21 @@
-import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
-import { MobileHeader } from "@/components/layout/MobileHeader";
-import { SidebarProvider } from "@/components/layout/SidebarContext";
+import { createClient } from "@/lib/supabase/server";
+import { resolveBrandingForUser } from "@/lib/white-label/branding";
+import { DEFAULT_BRANDING } from "@/lib/white-label/types";
+import { DashboardShellClient } from "@/components/layout/DashboardShellClient";
 
 /**
  * Zentrales App-Layout für alle authentifizierten Bereiche.
- * Desktop: feste Sidebar links. Mobile: Drawer + MobileHeader.
+ * Lädt White-Label-Branding für Consultant-Pläne serverseitig.
  */
-export function DashboardShell({ children }: { children: React.ReactNode }) {
-  return (
-    <SidebarProvider>
-      <div className="flex min-h-screen bg-slate-50">
-        <DashboardSidebar />
+export async function DashboardShell({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <MobileHeader />
+  const branding = user
+    ? await resolveBrandingForUser(user.id, user.email)
+    : DEFAULT_BRANDING;
 
-          <main className="flex-1 overflow-auto">
-            <div className="mx-auto max-w-6xl p-4 md:p-6">{children}</div>
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
-  );
+  return <DashboardShellClient branding={branding}>{children}</DashboardShellClient>;
 }

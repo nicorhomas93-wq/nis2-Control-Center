@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, Shield } from "lucide-react";
+import { Menu } from "lucide-react";
+import { BrandLogo } from "@/components/layout/BrandLogo";
 import { useSidebar } from "@/components/layout/SidebarContext";
 
 export function MobileHeader() {
@@ -18,11 +19,7 @@ export function MobileHeader() {
         <Menu className="h-5 w-5" />
       </button>
       <Link href="/dashboard" className="flex min-w-0 items-center gap-2">
-        <Shield className="h-6 w-6 shrink-0 text-brand-600" />
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-slate-900">TKND</p>
-          <p className="truncate text-xs text-slate-500">NIS2 Control Center</p>
-        </div>
+        <BrandLogo variant="header" />
       </Link>
     </header>
   );

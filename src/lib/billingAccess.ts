@@ -8,7 +8,8 @@ export type BillingFeature =
   | "risks"
   | "measures"
   | "incidents"
-  | "multi_tenant";
+  | "multi_tenant"
+  | "white_label";
 
 const FEATURE_MATRIX: Record<string, BillingFeature[]> = {
   free: ["documents.basic"],
@@ -27,6 +28,7 @@ const FEATURE_MATRIX: Record<string, BillingFeature[]> = {
     "measures",
     "incidents",
     "multi_tenant",
+    "white_label",
   ],
   pilot: [
     "documents.all",
@@ -97,7 +99,7 @@ export function canUseFeature(
 }
 
 export function getUpgradeHint(feature: BillingFeature): string | null {
-  if (feature === "multi_tenant") {
+  if (feature === "multi_tenant" || feature === "white_label") {
     return "Für diese Funktion ist der Consultant-Plan erforderlich.";
   }
   if (

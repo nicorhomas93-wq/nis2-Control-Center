@@ -2,9 +2,12 @@ import { DashboardShell } from "@/components/layout/DashboardShell";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { BillingSection } from "@/components/billing/BillingSection";
 import { StripeTestModeBanner } from "@/components/billing/StripeTestModeBanner";
+import { WhiteLabelSettings } from "@/components/settings/WhiteLabelSettings";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateCompany, getOrCreateProfile } from "@/lib/company";
 import { isPlatformOwner } from "@/lib/jarvis/access";
+import { canUseFeature } from "@/lib/billingAccess";
+import { getConsultantSettings } from "@/lib/white-label/branding";
 import { APP_VERSION } from "@/lib/app-config";
 import { isOpenAIConfigured } from "@/lib/ai/generate";
 import { Badge } from "@/components/ui/Badge";
@@ -39,6 +42,10 @@ export default async function SettingsPage() {
   const { company, missingTable } = await getOrCreateCompany(user.id);
   const profile = await getOrCreateProfile(user.id, user.email);
   const platformOwner = isPlatformOwner(user.email, profile?.role);
+  const whiteLabelAllowed = canUseFeature(company, "white_label", platformOwner);
+  const { settings: consultantSettings, missingTable: whiteLabelTableMissing } = company
+    ? await getConsultantSettings(company.id)
+    : { settings: null, missingTable: false };
 
   const openAiActive = isOpenAIConfigured();
   const supabaseConfigured = Boolean(
@@ -118,6 +125,13 @@ export default async function SettingsPage() {
             <BillingSection company={company} platformOwner={platformOwner} />
           </CardContent>
         </Card>
+
+        <WhiteLabelSettings
+          allowed={whiteLabelAllowed}
+          companyId={company?.id ?? null}
+          initialSettings={consultantSettings}
+          missingTable={whiteLabelTableMissing}
+        />
 
         <Card>
           <CardHeader>

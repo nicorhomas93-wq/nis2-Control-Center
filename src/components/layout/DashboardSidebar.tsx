@@ -13,13 +13,13 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
-  Shield,
   ShieldAlert,
   ShieldCheck,
   Users,
   X,
 } from "lucide-react";
 import { performLogout } from "@/lib/auth/logout";
+import { BrandLogo } from "@/components/layout/BrandLogo";
 import { createClient } from "@/lib/supabase/client";
 import { canAccessJarvis } from "@/lib/jarvis/access";
 import { canUseFeature } from "@/lib/billingAccess";
@@ -63,11 +63,7 @@ function SidebarPanel({
       <div className="border-b border-slate-800 px-6 py-5">
         <div className="flex items-start justify-between gap-2">
           <Link href="/dashboard" className="flex items-center gap-2" onClick={onNavigate}>
-            <Shield className="h-6 w-6 text-brand-400" />
-            <div>
-              <p className="text-sm font-bold leading-tight">TKND</p>
-              <p className="text-xs text-slate-400">NIS2 Control Center</p>
-            </div>
+            <BrandLogo variant="sidebar" />
           </Link>
           {showClose && onClose ? (
             <button
