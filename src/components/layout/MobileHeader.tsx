@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { BrandLogo } from "@/components/layout/BrandLogo";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useSidebar } from "@/components/layout/SidebarContext";
 
 export function MobileHeader() {
@@ -18,9 +19,10 @@ export function MobileHeader() {
       >
         <Menu className="h-5 w-5" />
       </button>
-      <Link href="/dashboard" className="flex min-w-0 items-center gap-2">
+      <Link href="/dashboard" className="flex min-w-0 flex-1 items-center gap-2">
         <BrandLogo variant="header" />
       </Link>
+      <NotificationBell />
     </header>
   );
 }

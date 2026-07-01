@@ -23,6 +23,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import { ActivityTimeline } from "@/components/activity/ActivityTimeline";
 
 interface ScoreImpact {
   securityPoints: number;
@@ -467,6 +468,13 @@ export function RiskAssistModal({
                 {error && (
                   <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
                 )}
+
+                <ActivityTimeline
+                  companyId={companyId}
+                  entityType="risk"
+                  entityId={risk.id}
+                  className="border-0 shadow-none"
+                />
               </div>
             </div>
 

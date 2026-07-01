@@ -52,6 +52,8 @@ const ORDER = [
   "add_risk_treatment_status.sql",
   "add_incident_response_fields.sql",
   "add_consultant_white_label.sql",
+  "add_team_compliance_system.sql",
+  "add_team_invite_accept_policy.sql",
 ];
 
 const url = process.env.DATABASE_URL;

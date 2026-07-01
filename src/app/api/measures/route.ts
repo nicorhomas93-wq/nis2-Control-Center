@@ -11,7 +11,9 @@ import {
   syncAndReturnComplianceSnapshot,
 } from "@/lib/compliance/sync";
 import { getDbErrorMessage, isMissingTableError } from "@/lib/supabase/db-error";
+import { autoTaskFromMeasure } from "@/lib/tasks/generate";
 import type { Measure } from "@/lib/types";
+import { logFieldChanges } from "@/lib/activity/changes";
 
 async function buildComplianceResponse(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -95,6 +97,8 @@ export async function POST(request: Request) {
     measure_id: measure.id,
   });
 
+  await autoTaskFromMeasure(supabase, measure as Measure, user.id);
+
   const compliance = await buildComplianceResponse(supabase, companyId, beforeStatus.score, {
     missingEvidence: getMissingAuditDocumentTypes(beforeData.documents).length > 0,
   });
@@ -139,6 +143,17 @@ export async function PATCH(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
+
+  if (Object.keys(updates).length > 0) {
+    await logFieldChanges(supabase, {
+      companyId: existing.company_id,
+      userId: user.id,
+      entityType: "measure",
+      entityId: id,
+      oldRow: existing as Record<string, unknown>,
+      updates,
+    });
+  }
 
   const updatedRisk = await reconcileMeasureCompliance(supabase, id, existing.company_id);
   const measureRow = measure as Measure;

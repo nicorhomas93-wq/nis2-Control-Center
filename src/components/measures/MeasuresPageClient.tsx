@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Plus } from "lucide-react";
+import { ActivityTimeline } from "@/components/activity/ActivityTimeline";
 import { resolveObligationStatus } from "@/lib/compliance/obligations";
 import { OBLIGATION_STATUS_LABELS } from "@/lib/compliance/types";
 
@@ -70,6 +71,7 @@ export function MeasuresPageClient({
   const [titleWarning, setTitleWarning] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [timelineId, setTimelineId] = useState<string | null>(null);
 
   function handleTitleChange(value: string) {
     setTitle(value);
@@ -435,20 +437,31 @@ export function MeasuresPageClient({
                         {m.responsible ?? "–"}
                       </td>
                       <td className="px-6 py-4">
-                        <Select
-                          value={m.status}
-                          onChange={(e) =>
-                            updateStatus(
-                              m.id,
-                              e.target.value as MeasureStatus
-                            )
-                          }
-                          className="w-36"
-                        >
-                          <option value="open">Offen</option>
-                          <option value="in_progress">In Bearbeitung</option>
-                          <option value="completed">Umgesetzt</option>
-                        </Select>
+                        <div className="flex flex-col gap-2">
+                          <Select
+                            value={m.status}
+                            onChange={(e) =>
+                              updateStatus(
+                                m.id,
+                                e.target.value as MeasureStatus
+                              )
+                            }
+                            className="w-36"
+                          >
+                            <option value="open">Offen</option>
+                            <option value="in_progress">In Bearbeitung</option>
+                            <option value="completed">Umgesetzt</option>
+                          </Select>
+                          <button
+                            type="button"
+                            className="text-left text-xs text-brand-600 hover:underline"
+                            onClick={() =>
+                              setTimelineId(timelineId === m.id ? null : m.id)
+                            }
+                          >
+                            {timelineId === m.id ? "Verlauf ausblenden" : "Verlauf"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     );
@@ -459,6 +472,14 @@ export function MeasuresPageClient({
           )}
         </CardContent>
       </Card>
+
+      {timelineId ? (
+        <ActivityTimeline
+          companyId={companyId}
+          entityType="measure"
+          entityId={timelineId}
+        />
+      ) : null}
     </div>
   );
 }

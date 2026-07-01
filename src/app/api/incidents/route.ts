@@ -9,6 +9,8 @@ import { formatSupabaseError, normalizeSupabaseError } from "@/lib/incidents/err
 import { normalizeIncidentUpdateFields } from "@/lib/incidents/payload";
 import { formStateToPayload, incidentToFormState, normalizeIncidentStatus } from "@/lib/incidents/types";
 import { updateIncidentRecord } from "@/lib/incidents/save";
+import { autoTaskFromIncident } from "@/lib/tasks/generate";
+import { logFieldChanges } from "@/lib/activity/changes";
 import type { Incident } from "@/lib/types";
 
 function errorResponse(
@@ -135,6 +137,12 @@ export async function POST(request: Request) {
     }
 
     try {
+      await autoTaskFromIncident(supabase, data as Incident, user.id);
+    } catch (taskError) {
+      console.warn("Incident auto-task failed:", taskError);
+    }
+
+    try {
       await syncCompanySecurityScore(supabase, companyId);
     } catch (syncError) {
       console.warn("Incident insert: security score sync failed:", syncError);
@@ -249,7 +257,19 @@ export async function PATCH(request: Request) {
       });
     }
 
+    await logFieldChanges(supabase, {
+      companyId: existing.company_id,
+      userId: user.id,
+      entityType: "incident",
+      entityId: incidentId,
+      oldRow: existing as Record<string, unknown>,
+      updates,
+    });
+
     try {
+      if (result.data) {
+        await autoTaskFromIncident(supabase, result.data as unknown as Incident, user.id);
+      }
       await syncCompanySecurityScore(supabase, existing.company_id);
     } catch (syncError) {
       console.warn("Incident PATCH: security score sync failed:", syncError);

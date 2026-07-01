@@ -70,6 +70,9 @@ export interface Company {
   pilot_setup_paid_at?: string | null;
   pilot_phase_completed_at?: string | null;
   security_score?: number | null;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  deletion_reason?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -8,6 +8,8 @@ import {
   Bot,
   Building2,
   ClipboardCheck,
+  ClipboardList,
+  ListChecks,
   FileText,
   FolderArchive,
   LayoutDashboard,
@@ -15,13 +17,14 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
   Users,
   X,
 } from "lucide-react";
 import { performLogout } from "@/lib/auth/logout";
 import { BrandLogo } from "@/components/layout/BrandLogo";
 import { createClient } from "@/lib/supabase/client";
-import { canAccessJarvis } from "@/lib/jarvis/access";
+import { canAccessJarvis, isPlatformOwner } from "@/lib/jarvis/access";
 import { canUseFeature } from "@/lib/billingAccess";
 import type { Company } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -33,11 +36,14 @@ const navItems = [
   { href: "/company", label: "Unternehmen", icon: Building2 },
   { href: "/assessment", label: "Betroffenheitscheck", icon: ShieldCheck },
   { href: "/documents", label: "Dokumente", icon: FileText },
+  { href: "/fragebogen", label: "Fragebögen", icon: ClipboardList },
   { href: "/risks", label: "Risikoanalyse", icon: ShieldAlert },
   { href: "/measures", label: "Maßnahmen", icon: ClipboardCheck },
+  { href: "/aufgaben", label: "Aufgaben", icon: ListChecks },
   { href: "/incidents", label: "Sicherheitsvorfall", icon: AlertTriangle },
   { href: "/audit", label: "Audit-Ordner", icon: FolderArchive },
   { href: "/jarvis", label: "Jarvis Sales", icon: Bot },
+  { href: "/owner", label: "Owner-Verwaltung", icon: Trash2, ownerOnly: true },
   { href: "/settings", label: "Einstellungen", icon: Settings },
 ];
 
@@ -121,6 +127,7 @@ export function DashboardSidebar() {
   const { mobileOpen, closeMobile } = useSidebar();
   const [showJarvis, setShowJarvis] = useState(false);
   const [showMandanten, setShowMandanten] = useState(false);
+  const [showOwner, setShowOwner] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -133,6 +140,7 @@ export function DashboardSidebar() {
       if (!data.user?.email) {
         setShowJarvis(false);
         setShowMandanten(false);
+        setShowOwner(false);
         return;
       }
       const [{ data: profile }, { data: company }] = await Promise.all([
@@ -145,6 +153,7 @@ export function DashboardSidebar() {
           .maybeSingle(),
       ]);
       setShowJarvis(canAccessJarvis(data.user.email, profile?.role));
+      setShowOwner(isPlatformOwner(data.user.email, profile?.role));
       setShowMandanten(
         canUseFeature(company as Company | null, "multi_tenant", canAccessJarvis(data.user.email, profile?.role))
       );
@@ -153,6 +162,7 @@ export function DashboardSidebar() {
 
   const visibleNavItems = navItems.filter((item) => {
     if (item.href === "/jarvis" && !showJarvis) return false;
+    if (item.ownerOnly && !showOwner) return false;
     if (item.consultantOnly && !showMandanten) return false;
     return true;
   });

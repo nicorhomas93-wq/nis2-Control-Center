@@ -30,6 +30,7 @@ import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { ActivityTimeline } from "@/components/activity/ActivityTimeline";
 import { FileText, Loader2 } from "lucide-react";
 
 interface IncidentDetailEditorProps {
@@ -484,6 +485,12 @@ export function IncidentDetailEditor({
           </div>
         </div>
       </SectionCard>
+
+      <ActivityTimeline
+        companyId={companyId}
+        entityType="incident"
+        entityId={incident.id}
+      />
 
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <Button type="button" onClick={handleSave} disabled={saving || generating}>

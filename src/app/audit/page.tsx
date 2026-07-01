@@ -5,6 +5,7 @@ import { ActiveMandantBanner } from "@/components/consultant/ActiveMandantBanner
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceCompany, isCompanyProfileComplete } from "@/lib/company";
 import type { Document, Measure, Risk } from "@/lib/types";
+import { activeOnly } from "@/lib/supabase/soft-delete";
 import { redirect } from "next/navigation";
 
 export default async function AuditPage() {
@@ -23,13 +24,15 @@ export default async function AuditPage() {
 
   if (company) {
     const [docsRes, measuresRes, risksRes] = await Promise.all([
-      supabase
-        .from("documents")
-        .select("*")
-        .eq("company_id", company.id)
-        .order("updated_at", { ascending: false }),
-      supabase.from("measures").select("*").eq("company_id", company.id),
-      supabase.from("risks").select("*").eq("company_id", company.id),
+      activeOnly(
+        supabase
+          .from("documents")
+          .select("*")
+          .eq("company_id", company.id)
+          .order("updated_at", { ascending: false })
+      ),
+      activeOnly(supabase.from("measures").select("*").eq("company_id", company.id)),
+      activeOnly(supabase.from("risks").select("*").eq("company_id", company.id)),
     ]);
 
     documents = (docsRes.data ?? []).map((d) => ({

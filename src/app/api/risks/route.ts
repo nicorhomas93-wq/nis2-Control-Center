@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyCompanyOwnership } from "@/lib/company";
 import { syncCompanySecurityScore } from "@/lib/compliance/sync";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
+import { logFieldChanges } from "@/lib/activity/changes";
+import { autoTaskFromRisk } from "@/lib/tasks/generate";
 
 export async function PATCH(request: Request) {
   const supabase = await createClient();
@@ -22,7 +24,7 @@ export async function PATCH(request: Request) {
     asset_id,
   } = body;
 
-  const { data: risk } = await supabase.from("risks").select("id, company_id").eq("id", id).single();
+  const { data: risk } = await supabase.from("risks").select("*").eq("id", id).single();
   if (!risk) return NextResponse.json({ error: "Risiko nicht gefunden" }, { status: 404 });
 
   const company = await verifyCompanyOwnership(user.id, risk.company_id);
@@ -50,6 +52,22 @@ export async function PATCH(request: Request) {
 
   const { error } = await supabase.from("risks").update(updates).eq("id", id);
   if (error) return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
+
+  if (Object.keys(updates).length > 0) {
+    await logFieldChanges(supabase, {
+      companyId: risk.company_id,
+      userId: user.id,
+      entityType: "risk",
+      entityId: id,
+      oldRow: risk as Record<string, unknown>,
+      updates,
+    });
+  }
+
+  const { data: updatedRisk } = await supabase.from("risks").select("*").eq("id", id).single();
+  if (updatedRisk) {
+    await autoTaskFromRisk(supabase, updatedRisk, user.id);
+  }
 
   await syncCompanySecurityScore(supabase, risk.company_id);
 

@@ -14,8 +14,10 @@ export interface SendCustomerMessageInput {
   channel: CustomerMessageChannel;
   subject?: string | null;
   body: string;
-  sentByUserId: string;
+  sentByUserId?: string | null;
   sentByEmail?: string | null;
+  source?: "manual" | "automatic";
+  triggerType?: string | null;
 }
 
 export interface SendCustomerMessageResult {
@@ -128,9 +130,11 @@ export async function sendCustomerMessage(
       subject: input.subject?.trim() || null,
       body,
       status,
+      source: input.source ?? "manual",
+      trigger_type: input.triggerType ?? null,
       recipient_email: input.channel === "email" ? recipient.email : null,
       recipient_phone: input.channel === "whatsapp" ? recipient.phone : null,
-      sent_by: input.sentByUserId,
+      sent_by: input.sentByUserId ?? null,
     })
     .select("id")
     .single();
@@ -151,14 +155,20 @@ export async function sendCustomerMessage(
   }
 
   await logJarvisEvent(supabase, {
-    event_type: input.channel === "internal" ? "customer_message_logged" : "customer_message_sent",
+    event_type:
+      input.source === "automatic"
+        ? "customer_message_automatic"
+        : input.channel === "internal"
+          ? "customer_message_logged"
+          : "customer_message_sent",
     entity_type: input.entityType,
     entity_id: input.entityId,
-    summary: `Nachricht (${input.channel}) an ${recipient.companyName}`,
+    summary: `Nachricht (${input.source === "automatic" ? "auto" : input.channel}) an ${recipient.companyName}`,
     details: {
       message_id: row.id,
       channel: input.channel,
       status,
+      trigger_type: input.triggerType,
       sent_by: input.sentByEmail,
     },
   });

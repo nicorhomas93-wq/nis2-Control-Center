@@ -28,6 +28,7 @@ const PROTECTED_PREFIXES = [
   "/jarvis",
   "/settings",
   "/billing",
+  "/owner",
 ];
 
 const AUTH_ENTRY_PATHS = ["/", "/login", "/register"];
@@ -118,6 +119,18 @@ export async function updateSession(request: NextRequest) {
 
     if (user && path.startsWith("/api/jarvis") && !(await resolveJarvisAccess(supabase, user))) {
       return NextResponse.json({ error: "Nicht autorisiert" }, { status: 403 });
+    }
+
+    if (user && (path.startsWith("/owner") || path.startsWith("/api/owner"))) {
+      const jarvisOk = await resolveJarvisAccess(supabase, user);
+      if (!jarvisOk) {
+        if (path.startsWith("/api/")) {
+          return NextResponse.json({ error: "Keine Berechtigung zum Löschen." }, { status: 403 });
+        }
+        const url = request.nextUrl.clone();
+        url.pathname = "/dashboard";
+        return NextResponse.redirect(url);
+      }
     }
 
     return supabaseResponse;

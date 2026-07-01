@@ -12,8 +12,14 @@ import { isPlatformOwner } from "@/lib/jarvis/access";
 import { calculateAuditFolderScore } from "@/lib/audit/audit-folders";
 import { calculateComplianceScore } from "@/lib/nis2/compliance-score";
 import { buildComplianceSnapshot } from "@/lib/compliance/snapshot";
+import { TaskDashboardCards } from "@/components/dashboard/TaskDashboardCards";
+import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
+import { loadCompanyTasks, countOpenTasks } from "@/lib/tasks/service";
+import { isTaskOpen } from "@/lib/tasks/types";
+import type { TaskItem } from "@/lib/tasks/types";
 import { buildComplianceWarnings } from "@/lib/compliance/warnings";
 import { loadSecurityScoreHistory, syncCompanySecurityScore } from "@/lib/compliance/sync";
+import { activeOnly } from "@/lib/supabase/soft-delete";
 import { getNis2StatusColor, getNis2StatusLabel } from "@/lib/nis2/betroffenheit";
 import { formatDate } from "@/lib/utils";
 import type { ActivityItem, Document, Incident, Measure, Nis2Assessment, Risk } from "@/lib/types";
@@ -85,21 +91,45 @@ export default async function DashboardPage({
   let lastAuditExport: string | null = null;
   let securityHistory: Awaited<ReturnType<typeof loadSecurityScoreHistory>> = [];
   let complianceEvents: { id: string; title: string; details: string | null; created_at: string }[] = [];
+  let tasks: TaskItem[] = [];
 
   if (company) {
-    const [docRes, measRes, risksRes, incidentsRes, assessRes, auditRes, eventsRes] = await Promise.all([
-      supabase.from("documents").select("*").eq("company_id", company.id).order("created_at", { ascending: false }),
-      supabase.from("measures").select("*").eq("company_id", company.id),
-      supabase.from("risks").select("*").eq("company_id", company.id),
-      supabase.from("incidents").select("*").eq("company_id", company.id),
-      supabase.from("nis2_assessments").select("*").eq("company_id", company.id).order("created_at", { ascending: false }).limit(5),
-      supabase.from("audit_exports").select("created_at").eq("company_id", company.id).order("created_at", { ascending: false }).limit(1),
-      supabase
-        .from("compliance_events")
-        .select("id, title, details, created_at")
-        .eq("company_id", company.id)
-        .order("created_at", { ascending: false })
-        .limit(10),
+    const [docRes, measRes, risksRes, incidentsRes, assessRes, auditRes, eventsRes, loadedTasks] = await Promise.all([
+      activeOnly(
+        supabase
+          .from("documents")
+          .select("*")
+          .eq("company_id", company.id)
+          .order("created_at", { ascending: false })
+      ),
+      activeOnly(supabase.from("measures").select("*").eq("company_id", company.id)),
+      activeOnly(supabase.from("risks").select("*").eq("company_id", company.id)),
+      activeOnly(supabase.from("incidents").select("*").eq("company_id", company.id)),
+      activeOnly(
+        supabase
+          .from("nis2_assessments")
+          .select("*")
+          .eq("company_id", company.id)
+          .order("created_at", { ascending: false })
+          .limit(5)
+      ),
+      activeOnly(
+        supabase
+          .from("audit_exports")
+          .select("created_at")
+          .eq("company_id", company.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+      ),
+      activeOnly(
+        supabase
+          .from("compliance_events")
+          .select("id, title, details, created_at")
+          .eq("company_id", company.id)
+          .order("created_at", { ascending: false })
+          .limit(10)
+      ),
+      loadCompanyTasks(supabase, company.id),
     ]);
     docs = (docRes.data ?? []) as Document[];
     meas = (measRes.data ?? []) as Measure[];
@@ -108,6 +138,7 @@ export default async function DashboardPage({
     assessments = (assessRes.data ?? []) as Nis2Assessment[];
     lastAuditExport = auditRes.data?.[0]?.created_at ?? null;
     complianceEvents = (eventsRes.data ?? []) as typeof complianceEvents;
+    tasks = loadedTasks;
 
     await syncCompanySecurityScore(supabase, company.id);
     securityHistory = await loadSecurityScoreHistory(supabase, company.id);
@@ -119,6 +150,7 @@ export default async function DashboardPage({
     measures: meas,
     risks,
     incidents,
+    tasks,
   });
   const securityStatus = complianceSnapshot.securityStatus;
   const nextSteps = complianceSnapshot.nextSteps;
@@ -136,6 +168,24 @@ export default async function DashboardPage({
   const activities = buildRecentActivity(assessments, docs, meas, complianceEvents);
   const missingCount = auditScore.total - auditScore.present;
 
+  const myTasks = tasks.filter(
+    (t) => t.assigned_to === user.id && isTaskOpen(t.status)
+  );
+  const myCounts = countOpenTasks(myTasks);
+  const teamCritical = tasks.filter(
+    (t) => t.priority === "critical" && isTaskOpen(t.status)
+  );
+  const missingEvidence = tasks.filter(
+    (t) => t.status === "waiting_evidence" || (t.evidence_required && isTaskOpen(t.status))
+  );
+  const auditAreas = [
+    ...new Set(
+      missingEvidence
+        .map((t) => t.task_type)
+        .filter((t) => t === "audit" || t === "evidence")
+    ),
+  ];
+
   return (
     <DashboardShell>
       {missingTable && <SupabaseSetupBanner />}
@@ -152,6 +202,12 @@ export default async function DashboardPage({
       <BillingStatusBanner company={ownCompany} platformOwner={platformOwner} />
 
       {company && (
+        <div className="mb-6">
+          <OnboardingChecklist companyId={company.id} />
+        </div>
+      )}
+
+      {company && (
         <SecurityStatusCardClient
           companyId={company.id}
           score={securityStatus.score}
@@ -163,10 +219,43 @@ export default async function DashboardPage({
         />
       )}
 
+      {company && (
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <p className="text-sm text-slate-500">Datenqualität</p>
+            <p className="mt-1 text-3xl font-bold text-slate-900">
+              {complianceSnapshot.dataQuality.percent}%
+            </p>
+            {complianceSnapshot.dataQuality.hints.length > 0 ? (
+              <ul className="mt-2 space-y-1 text-sm text-slate-600">
+                {complianceSnapshot.dataQuality.hints.map((h: string) => (
+                  <li key={h}>· {h}</li>
+                ))}
+              </ul>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
+
       {company && <ComplianceWarningsBanner warnings={complianceWarnings} />}
 
       {company && (
         <NextStepsCardClient companyId={company.id} initialSteps={nextSteps} />
+      )}
+
+      {company && (
+        <div className="mb-8">
+          <TaskDashboardCards
+            myTasks={myTasks}
+            teamCritical={teamCritical}
+            missingEvidenceCount={missingEvidence.length}
+            auditAreas={auditAreas}
+            dataQualityPercent={complianceSnapshot.dataQuality.percent}
+            dataQualityHints={complianceSnapshot.dataQuality.hints}
+            myOpenCount={myCounts.open}
+            myOverdueCount={myCounts.overdue}
+          />
+        </div>
       )}
 
       {showFunnelWelcome && company && (

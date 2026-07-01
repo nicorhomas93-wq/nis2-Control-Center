@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/Badge";
 import { LEAD_STATUS_LABELS } from "@/lib/jarvis/constants";
 import { getLeadScoreCategory, getLeadScoreCategoryColor } from "@/lib/jarvis/lead-scoring";
-import { SendCustomerMessageButton } from "@/components/jarvis/customer-message/SendCustomerMessageButton";
+import { CustomerMessageSection } from "@/components/jarvis/customer-message/CustomerMessageSection";
 import { customerMessageTargetFromLead } from "@/lib/jarvis/customer-message/targets";
 import type { Lead } from "@/lib/types";
 
@@ -56,10 +56,9 @@ export function SalesPipeline({ leads }: { leads: Lead[] }) {
                         </Badge>
                       </div>
                       <div className="mt-3">
-                        <SendCustomerMessageButton
+                        <CustomerMessageSection
                           target={customerMessageTargetFromLead(lead)}
-                          variant="ghost"
-                          className="w-full justify-center"
+                          compact
                         />
                       </div>
                     </div>

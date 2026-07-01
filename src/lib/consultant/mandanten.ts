@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import type { Company } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
 import { getDbErrorMessage, isMissingTableError } from "@/lib/supabase/db-error";
+import { activeOnly } from "@/lib/supabase/soft-delete";
 
 export const ACTIVE_MANDANT_COOKIE = "tknd_active_company_id";
 
@@ -20,12 +21,14 @@ export async function listMandanten(
 ): Promise<{ mandanten: Company[]; missingTable: boolean; error: string | null }> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("is_mandant", true)
-    .order("company_name", { ascending: true });
+  const { data, error } = await activeOnly(
+    supabase
+      .from("companies")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("is_mandant", true)
+      .order("company_name", { ascending: true })
+  );
 
   if (error) {
     return {
@@ -91,13 +94,14 @@ export async function resolveWorkspaceCompany(
   }
 
   const supabase = await createClient();
-  const { data: mandant } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("id", activeId)
-    .eq("user_id", userId)
-    .eq("is_mandant", true)
-    .maybeSingle();
+  const { data: mandant } = await activeOnly(
+    supabase
+      .from("companies")
+      .select("*")
+      .eq("id", activeId)
+      .eq("user_id", userId)
+      .eq("is_mandant", true)
+  ).maybeSingle();
 
   if (mandant) {
     return { company: mandant as Company, isViewingMandant: true };

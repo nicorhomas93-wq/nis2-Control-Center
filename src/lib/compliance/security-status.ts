@@ -16,6 +16,8 @@ import type {
   SecurityLevel,
   SecurityStatusResult,
 } from "@/lib/compliance/types";
+import { applyTaskScoreImpact } from "@/lib/compliance/task-score-impact";
+import type { TaskItem } from "@/lib/tasks/types";
 import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
 import { getDocumentTypeLabel } from "@/lib/nis2/document-types";
 
@@ -36,6 +38,7 @@ export function calculateSecurityStatus(input: {
   measures: Measure[];
   risks: Risk[];
   incidents: Incident[];
+  tasks?: TaskItem[];
 }): SecurityStatusResult {
   const drivers: ScoreDriver[] = [];
   let score = 100;
@@ -221,6 +224,10 @@ export function calculateSecurityStatus(input: {
       category: "assessment",
       label: "Betroffenheitscheck nicht abgeschlossen",
     });
+  }
+
+  if (input.tasks?.length) {
+    score = applyTaskScoreImpact(score, input.tasks, (driver) => addDriver(drivers, driver));
   }
 
   score = Math.max(0, Math.min(100, score));

@@ -4,6 +4,12 @@ export type CustomerMessageChannel = "email" | "whatsapp" | "internal";
 
 export type CustomerMessageStatus = "logged" | "sent" | "failed";
 
+export type CustomerMessageSource = "manual" | "automatic";
+
+import type { AutomationTriggerType } from "@/lib/jarvis/customer-message/automation-triggers";
+
+export type { AutomationTriggerType };
+
 export interface CustomerMessageTarget {
   entityType: CustomerEntityType;
   entityId: string;
@@ -23,6 +29,8 @@ export interface CustomerMessage {
   subject: string | null;
   body: string;
   status: CustomerMessageStatus;
+  source: CustomerMessageSource;
+  trigger_type: AutomationTriggerType | null;
   recipient_email: string | null;
   recipient_phone: string | null;
   sent_by: string | null;

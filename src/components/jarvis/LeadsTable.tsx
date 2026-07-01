@@ -8,7 +8,7 @@ import {
   calculateLeadScore,
   getLeadScoreCategoryColor,
 } from "@/lib/jarvis/lead-scoring";
-import { SendCustomerMessageButton } from "@/components/jarvis/customer-message/SendCustomerMessageButton";
+import { CustomerMessageSection } from "@/components/jarvis/customer-message/CustomerMessageSection";
 import { customerMessageTargetFromLead } from "@/lib/jarvis/customer-message/targets";
 import type { Lead } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -52,7 +52,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
             <th className="py-3 pr-4 font-medium">Score</th>
             <th className="py-3 pr-4 font-medium">Quelle</th>
             <th className="py-3 pr-4 font-medium">Erstellt</th>
-            <th className="py-3 font-medium">Aktion</th>
+            <th className="py-3 font-medium">Nachrichten</th>
           </tr>
         </thead>
         <tbody>
@@ -76,7 +76,10 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
               <td className="py-3 pr-4 text-slate-600">{lead.source ?? "—"}</td>
               <td className="py-3 pr-4 text-slate-500">{formatDate(lead.created_at)}</td>
               <td className="py-3">
-                <SendCustomerMessageButton target={customerMessageTargetFromLead(lead)} />
+                <CustomerMessageSection
+                  target={customerMessageTargetFromLead(lead)}
+                  compact
+                />
               </td>
             </tr>
           ))}

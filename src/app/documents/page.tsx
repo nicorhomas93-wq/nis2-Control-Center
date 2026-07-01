@@ -5,6 +5,7 @@ import { ActiveMandantBanner } from "@/components/consultant/ActiveMandantBanner
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceCompany, isCompanyProfileComplete } from "@/lib/company";
 import { isOpenAIConfigured } from "@/lib/ai/generate";
+import { activeOnly } from "@/lib/supabase/soft-delete";
 import type { Document } from "@/lib/types";
 import { redirect } from "next/navigation";
 
@@ -18,11 +19,13 @@ export default async function DocumentsPage() {
 
   let documents: Document[] = [];
   if (company) {
-    const { data } = await supabase
-      .from("documents")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("updated_at", { ascending: false });
+    const { data } = await activeOnly(
+      supabase
+        .from("documents")
+        .select("*")
+        .eq("company_id", company.id)
+        .order("updated_at", { ascending: false })
+    );
     documents = (data ?? []).map((d) => ({
       ...(d as Document),
       version: (d as Document).version ?? 1,

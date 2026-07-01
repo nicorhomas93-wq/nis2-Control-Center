@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
+import { evaluateCustomerProfile } from "@/lib/jarvis/customer-message/evaluate-customer-profile";
 import type {
   CustomerEntityType,
   CustomerMessageChannel,
@@ -9,6 +10,47 @@ import { sendCustomerMessage } from "@/lib/jarvis/customer-message/send-customer
 
 const ENTITY_TYPES: CustomerEntityType[] = ["jarvis_lead", "b2b_outreach_lead"];
 const CHANNELS: CustomerMessageChannel[] = ["email", "whatsapp", "internal"];
+
+export async function GET(request: Request) {
+  const access = await requireJarvisApiAccess();
+  if (!access.ok) return access.response;
+
+  const { searchParams } = new URL(request.url);
+  const entityType = searchParams.get("entityType") as CustomerEntityType | null;
+  const entityId = searchParams.get("entityId")?.trim();
+
+  if (!entityType || !ENTITY_TYPES.includes(entityType)) {
+    return NextResponse.json({ error: "entityType fehlt oder ungültig" }, { status: 400 });
+  }
+  if (!entityId) {
+    return NextResponse.json({ error: "entityId fehlt" }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+
+  const [{ data: messages }, { data: settings }, profile] = await Promise.all([
+    supabase
+      .from("customer_messages")
+      .select("*")
+      .eq("entity_type", entityType)
+      .eq("entity_id", entityId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("customer_message_automation")
+      .select("auto_enabled")
+      .eq("entity_type", entityType)
+      .eq("entity_id", entityId)
+      .maybeSingle(),
+    evaluateCustomerProfile(supabase, entityType, entityId),
+  ]);
+
+  return NextResponse.json({
+    messages: messages ?? [],
+    autoEnabled: Boolean(settings?.auto_enabled),
+    profile,
+  });
+}
 
 export async function POST(request: Request) {
   const access = await requireJarvisApiAccess();
@@ -50,6 +92,7 @@ export async function POST(request: Request) {
       body: messageBody,
       sentByUserId: user.id,
       sentByEmail: user.email,
+      source: "manual",
     });
 
     return NextResponse.json(result);

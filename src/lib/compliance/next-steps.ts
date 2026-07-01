@@ -15,6 +15,8 @@ import { isRiskTreated } from "@/lib/compliance/risk-treatment";
 import { resolveRiskAsset } from "@/lib/assets/resolve";
 import type { CriticalityLevel, NextStepAction, SecurityStatusResult } from "@/lib/compliance/types";
 import type { Document, Incident, Measure, Risk } from "@/lib/types";
+import type { TaskItem } from "@/lib/tasks/types";
+import { isTaskOpen } from "@/lib/tasks/types";
 
 function priorityWeight(p: CriticalityLevel): number {
   switch (p) {
@@ -35,6 +37,16 @@ function isActiveRisk(risk: Risk, measures: Measure[]): boolean {
   return !isRiskTreated(risk, measures);
 }
 
+function hasOpenTaskFor(tasks: TaskItem[] | undefined, relatedType: string, relatedId: string): boolean {
+  if (!tasks?.length) return false;
+  return tasks.some(
+    (t) =>
+      t.related_type === relatedType &&
+      t.related_id === relatedId &&
+      isTaskOpen(t.status)
+  );
+}
+
 export function buildNextSteps(
   input: {
     documents: Document[];
@@ -42,6 +54,7 @@ export function buildNextSteps(
     risks: Risk[];
     incidents: Incident[];
     assets?: import("@/lib/assets/types").CompanyAsset[];
+    tasks?: TaskItem[];
   },
   securityStatus?: SecurityStatusResult
 ): NextStepAction[] {
@@ -60,6 +73,7 @@ export function buildNextSteps(
 
   for (const measure of input.measures) {
     if (isWorkComplete(measure.status)) continue;
+    if (hasOpenTaskFor(input.tasks, "measure", measure.id) && measure.status === "completed") continue;
 
     if (securityStatus && driverIds.size > 0) {
       const hasDriver =

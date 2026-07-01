@@ -26,11 +26,13 @@ export default async function RisksPage() {
         .from("risks")
         .select("*")
         .eq("company_id", company.id)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false }),
       supabase
         .from("measures")
         .select("*")
         .eq("company_id", company.id)
+        .is("deleted_at", null)
         .not("risk_id", "is", null),
     ]);
     risks = (risksRes.data ?? []) as Risk[];

@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildComplianceSnapshot } from "@/lib/compliance/snapshot";
 import type { SecurityScoreSnapshot } from "@/lib/compliance/types";
+import { loadCompanyTasks } from "@/lib/tasks/service";
+import type { TaskItem } from "@/lib/tasks/types";
 import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
 
 export async function loadCompanyComplianceData(
@@ -12,13 +14,15 @@ export async function loadCompanyComplianceData(
   measures: Measure[];
   risks: Risk[];
   incidents: Incident[];
+  tasks: TaskItem[];
 }> {
-  const [companyRes, documentsRes, measuresRes, risksRes, incidentsRes] = await Promise.all([
+  const [companyRes, documentsRes, measuresRes, risksRes, incidentsRes, tasks] = await Promise.all([
     supabase.from("companies").select("*").eq("id", companyId).maybeSingle(),
     supabase.from("documents").select("*").eq("company_id", companyId),
     supabase.from("measures").select("*").eq("company_id", companyId),
     supabase.from("risks").select("*").eq("company_id", companyId),
     supabase.from("incidents").select("*").eq("company_id", companyId),
+    loadCompanyTasks(supabase, companyId),
   ]);
 
   return {
@@ -27,6 +31,7 @@ export async function loadCompanyComplianceData(
     measures: (measuresRes.data ?? []) as Measure[],
     risks: (risksRes.data ?? []) as Risk[],
     incidents: (incidentsRes.data ?? []) as Incident[],
+    tasks,
   };
 }
 
@@ -48,6 +53,7 @@ export async function syncAndReturnComplianceSnapshot(
     measures: data.measures,
     risks: data.risks,
     incidents: data.incidents,
+    tasks: data.tasks,
   });
   const status = snapshot.securityStatus;
   const today = new Date().toISOString().slice(0, 10);

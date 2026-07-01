@@ -8,6 +8,9 @@ import {
 } from "@/lib/compliance/obligations";
 import { isPlaceholderValue } from "@/lib/compliance/risk-display";
 import { isRiskTreated } from "@/lib/compliance/risk-treatment";
+import { applyDataQualityCap, calculateDataQuality } from "@/lib/compliance/data-quality";
+import { applyTaskAuditImpact } from "@/lib/compliance/task-score-impact";
+import type { TaskItem } from "@/lib/tasks/types";
 import type { Document, Incident, Measure, Risk } from "@/lib/types";
 
 export const AUDIT_READINESS_LABELS: Record<AuditReadinessLevel, string> = {
@@ -24,10 +27,12 @@ function levelFromPercent(percent: number): AuditReadinessLevel {
 
 export function calculateAuditReadiness(
   input: {
+    company?: import("@/lib/types").Company | null;
     documents: Document[];
     measures: Measure[];
     risks: Risk[];
     incidents: Incident[];
+    tasks?: TaskItem[];
   },
   securityScore?: number
 ): AuditReadinessResult {
@@ -143,6 +148,19 @@ export function calculateAuditReadiness(
     reasons.push(`Vorfall unvollständig dokumentiert: ${incident.title}`);
   }
 
+  if (input.tasks?.length) {
+    score = applyTaskAuditImpact(score, input.tasks, reasons);
+  }
+
+  const dataQuality = calculateDataQuality({
+    company: input.company ?? null,
+    risks: input.risks,
+    measures: input.measures,
+    documents: input.documents,
+    tasks: input.tasks,
+  });
+  score = applyDataQualityCap(score, dataQuality);
+
   const hasOpenIssues =
     missingTypes.length > 0 ||
     openMandatoryMeasures > 0 ||
@@ -170,6 +188,10 @@ export function calculateAuditReadiness(
 
   const level = levelFromPercent(score);
   const uniqueReasons = [...new Set(reasons)].slice(0, 4);
+
+  if (dataQuality.percent < 70 && !uniqueReasons.some((r) => r.includes("Datenqualität"))) {
+    uniqueReasons.push(`Datenqualität ${dataQuality.percent}% begrenzt Audit-Bereitschaft`);
+  }
 
   let summary: string;
   if (level === "ready" && !hasOpenIssues) {

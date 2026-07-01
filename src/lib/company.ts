@@ -2,6 +2,7 @@ import type { Company, Profile } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
 import { getDbErrorMessage, isMissingTableError } from "@/lib/supabase/db-error";
 import { resolveWorkspaceCompany } from "@/lib/consultant/mandanten";
+import { activeOnly } from "@/lib/supabase/soft-delete";
 
 export async function getOrCreateProfile(
   userId: string,
@@ -35,12 +36,13 @@ export async function getOrCreateCompany(
 ): Promise<{ company: Company | null; missingTable: boolean; error: string | null }> {
   const supabase = await createClient();
 
-  const { data: existing, error: fetchError } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("is_mandant", false)
-    .maybeSingle();
+  const { data: existing, error: fetchError } = await activeOnly(
+    supabase
+      .from("companies")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("is_mandant", false)
+  ).maybeSingle();
 
   if (fetchError && isMissingTableError(fetchError)) {
     return { company: null, missingTable: true, error: getDbErrorMessage(fetchError) };
@@ -75,20 +77,7 @@ export async function getOrCreateCompany(
   return { company: created as Company, missingTable: false, error: null };
 }
 
-export async function verifyCompanyOwnership(
-  userId: string,
-  companyId: string
-): Promise<Company | null> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("id", companyId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  return (data as Company) ?? null;
-}
+export { verifyCompanyAccess, verifyCompanyOwnership } from "@/lib/team/access";
 
 export async function getWorkspaceCompany(
   userId: string

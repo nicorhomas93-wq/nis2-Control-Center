@@ -4,6 +4,7 @@ import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { ActiveMandantBanner } from "@/components/consultant/ActiveMandantBanner";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceCompany } from "@/lib/company";
+import { activeOnly } from "@/lib/supabase/soft-delete";
 import type { Incident } from "@/lib/types";
 import { redirect } from "next/navigation";
 
@@ -17,7 +18,13 @@ export default async function IncidentsPage() {
 
   let incidents: Incident[] = [];
   if (company) {
-    const { data } = await supabase.from("incidents").select("*").eq("company_id", company.id).order("created_at", { ascending: false });
+    const { data } = await activeOnly(
+      supabase
+        .from("incidents")
+        .select("*")
+        .eq("company_id", company.id)
+        .order("created_at", { ascending: false })
+    );
     incidents = (data ?? []) as Incident[];
   }
 

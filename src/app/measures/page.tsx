@@ -5,6 +5,7 @@ import { ActiveMandantBanner } from "@/components/consultant/ActiveMandantBanner
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceCompany } from "@/lib/company";
 import { ensureSuggestedAssets } from "@/lib/assets/sync";
+import { activeOnly } from "@/lib/supabase/soft-delete";
 import type { CompanyAsset, Measure, Risk } from "@/lib/types";
 import { redirect } from "next/navigation";
 
@@ -21,8 +22,20 @@ export default async function MeasuresPage() {
   let assets: CompanyAsset[] = [];
   if (company) {
     const [measRes, risksRes] = await Promise.all([
-      supabase.from("measures").select("*").eq("company_id", company.id).order("created_at", { ascending: false }),
-      supabase.from("risks").select("*").eq("company_id", company.id).order("created_at", { ascending: false }),
+      activeOnly(
+        supabase
+          .from("measures")
+          .select("*")
+          .eq("company_id", company.id)
+          .order("created_at", { ascending: false })
+      ),
+      activeOnly(
+        supabase
+          .from("risks")
+          .select("*")
+          .eq("company_id", company.id)
+          .order("created_at", { ascending: false })
+      ),
     ]);
     measures = (measRes.data ?? []) as Measure[];
     risks = (risksRes.data ?? []) as Risk[];

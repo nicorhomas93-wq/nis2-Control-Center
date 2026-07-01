@@ -3,6 +3,8 @@ import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { BillingSection } from "@/components/billing/BillingSection";
 import { StripeTestModeBanner } from "@/components/billing/StripeTestModeBanner";
 import { WhiteLabelSettings } from "@/components/settings/WhiteLabelSettings";
+import { TeamMembersSettings } from "@/components/settings/TeamMembersSettings";
+import { getCompanyMemberRole } from "@/lib/team/access";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateCompany, getOrCreateProfile } from "@/lib/company";
 import { isPlatformOwner } from "@/lib/jarvis/access";
@@ -43,6 +45,7 @@ export default async function SettingsPage() {
   const profile = await getOrCreateProfile(user.id, user.email);
   const platformOwner = isPlatformOwner(user.email, profile?.role);
   const whiteLabelAllowed = canUseFeature(company, "white_label", platformOwner);
+  const memberRole = company ? await getCompanyMemberRole(user.id, company.id) : null;
   const { settings: consultantSettings, missingTable: whiteLabelTableMissing } = company
     ? await getConsultantSettings(company.id)
     : { settings: null, missingTable: false };
@@ -125,6 +128,8 @@ export default async function SettingsPage() {
             <BillingSection company={company} platformOwner={platformOwner} />
           </CardContent>
         </Card>
+
+        <TeamMembersSettings companyId={company?.id ?? null} currentRole={memberRole} />
 
         <WhiteLabelSettings
           allowed={whiteLabelAllowed}
