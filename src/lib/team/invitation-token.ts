@@ -1,3 +1,4 @@
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { CompanyRole } from "@/lib/team/types";
 
@@ -17,60 +18,131 @@ function normalizeEmail(email: string): string {
   return email.toLowerCase().trim();
 }
 
-function resolveCompanyName(companies: unknown): string | null {
-  if (Array.isArray(companies)) {
-    return (companies[0] as { company_name?: string } | undefined)?.company_name ?? null;
+export function normalizeInviteToken(token: string): string {
+  try {
+    return decodeURIComponent(token).trim();
+  } catch {
+    return token.trim();
   }
-  return (companies as { company_name?: string } | null)?.company_name ?? null;
+}
+
+function mapInvitationRow(row: {
+  id: string;
+  company_id: string;
+  email: string;
+  role: string;
+  token: string;
+  status: string;
+  invited_by: string | null;
+  expires_at: string;
+  company_name?: string | null;
+}): InvitationByToken {
+  return {
+    id: row.id,
+    company_id: row.company_id,
+    email: row.email,
+    role: row.role as CompanyRole,
+    token: row.token,
+    status: row.status,
+    invited_by: row.invited_by,
+    expires_at: row.expires_at,
+    company_name: row.company_name ?? null,
+  };
+}
+
+async function getInvitationByTokenRpc(token: string): Promise<InvitationByToken | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_invitation_by_token", {
+    p_token: token,
+  });
+
+  if (error || !data || typeof data !== "object") {
+    return null;
+  }
+
+  const row = data as Record<string, unknown>;
+  if (!row.id || !row.company_id || !row.email || !row.role || !row.token || !row.expires_at) {
+    return null;
+  }
+
+  return mapInvitationRow({
+    id: String(row.id),
+    company_id: String(row.company_id),
+    email: String(row.email),
+    role: String(row.role),
+    token: String(row.token),
+    status: String(row.status ?? "invited"),
+    invited_by: row.invited_by ? String(row.invited_by) : null,
+    expires_at: String(row.expires_at),
+    company_name: row.company_name ? String(row.company_name) : null,
+  });
+}
+
+async function getInvitationByTokenAdmin(token: string): Promise<InvitationByToken | null> {
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data, error } = await admin
+    .from("company_invitations")
+    .select("id, company_id, email, role, token, status, invited_by, expires_at")
+    .eq("token", token)
+    .eq("status", "invited")
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const { data: company } = await admin
+    .from("companies")
+    .select("company_name")
+    .eq("id", data.company_id)
+    .maybeSingle();
+
+  return mapInvitationRow({
+    ...data,
+    company_name: company?.company_name ?? null,
+  });
 }
 
 export async function getInvitationByToken(
   token: string
 ): Promise<InvitationByToken | null> {
-  const admin = createAdminClient();
-  if (!admin || !token.trim()) return null;
+  const normalized = normalizeInviteToken(token);
+  if (!normalized) return null;
 
-  const { data } = await admin
-    .from("company_invitations")
-    .select("id, company_id, email, role, token, status, invited_by, expires_at, companies(company_name)")
-    .eq("token", token.trim())
-    .eq("status", "invited")
-    .maybeSingle();
+  const viaAdmin = await getInvitationByTokenAdmin(normalized);
+  if (viaAdmin) return viaAdmin;
 
-  if (!data) return null;
-
-  return {
-    id: data.id,
-    company_id: data.company_id,
-    email: data.email,
-    role: data.role as CompanyRole,
-    token: data.token,
-    status: data.status,
-    invited_by: data.invited_by,
-    expires_at: data.expires_at,
-    company_name: resolveCompanyName(data.companies),
-  };
+  return getInvitationByTokenRpc(normalized);
 }
 
 export async function markInvitationExpired(invitationId: string): Promise<void> {
   const admin = createAdminClient();
-  if (!admin) return;
+  if (admin) {
+    await admin
+      .from("company_invitations")
+      .update({ status: "expired", updated_at: new Date().toISOString() })
+      .eq("id", invitationId);
+    return;
+  }
 
-  await admin
+  const supabase = await createClient();
+  await supabase
     .from("company_invitations")
     .update({ status: "expired", updated_at: new Date().toISOString() })
     .eq("id", invitationId);
 }
 
-export async function acceptInvitation(options: {
+type AcceptResult =
+  | { ok: true }
+  | { ok: false; error: string; code?: "email_mismatch" | "expired" | "not_found" };
+
+async function acceptInvitationAdmin(options: {
   invitation: InvitationByToken;
   userId: string;
   userEmail: string | null;
-}): Promise<{ ok: true } | { ok: false; error: string; code?: "email_mismatch" | "expired" }> {
+}): Promise<AcceptResult | null> {
   const admin = createAdminClient();
-  if (!admin) {
-    return { ok: false, error: "Einladung konnte nicht verarbeitet werden." };
-  }
+  if (!admin) return null;
 
   if (!options.userEmail?.trim()) {
     return {
@@ -145,4 +217,57 @@ export async function acceptInvitation(options: {
     .eq("id", options.userId);
 
   return { ok: true };
+}
+
+async function acceptInvitationRpc(token: string): Promise<AcceptResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("accept_company_invitation", {
+    p_token: token,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  const result = data as Record<string, unknown> | null;
+  if (!result || result.ok !== true) {
+    const code = String(result?.error ?? "");
+    if (code === "expired") {
+      return { ok: false, error: "Diese Einladung ist abgelaufen.", code: "expired" };
+    }
+    if (code === "email_mismatch" && result) {
+      const expected = String(result.expected_email ?? "die eingeladene Adresse");
+      const actual = String(result.actual_email ?? "Ihre Anmeldung");
+      return {
+        ok: false,
+        error: `Diese Einladung gilt für ${expected}. Sie sind als ${actual} angemeldet.`,
+        code: "email_mismatch",
+      };
+    }
+    if (code === "email_missing") {
+      return {
+        ok: false,
+        error: "Ihr Konto hat keine E-Mail-Adresse. Bitte melden Sie sich mit der eingeladenen Adresse an.",
+        code: "email_mismatch",
+      };
+    }
+    if (code === "not_found") {
+      return { ok: false, error: "Einladung nicht gefunden.", code: "not_found" };
+    }
+    return { ok: false, error: "Einladung konnte nicht angenommen werden." };
+  }
+
+  return { ok: true };
+}
+
+export async function acceptInvitation(options: {
+  invitation: InvitationByToken;
+  userId: string;
+  userEmail: string | null;
+  token: string;
+}): Promise<AcceptResult> {
+  const viaAdmin = await acceptInvitationAdmin(options);
+  if (viaAdmin) return viaAdmin;
+
+  return acceptInvitationRpc(normalizeInviteToken(options.token));
 }

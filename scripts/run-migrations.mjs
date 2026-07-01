@@ -55,6 +55,7 @@ const ORDER = [
   "add_team_compliance_system.sql",
   "add_team_invite_accept_policy.sql",
   "add_team_invitation_email_rls.sql",
+  "add_team_invitation_rpc.sql",
 ];
 
 const url = process.env.DATABASE_URL;

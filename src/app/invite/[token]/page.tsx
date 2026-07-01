@@ -7,14 +7,18 @@ import {
   acceptInvitation,
   getInvitationByToken,
   markInvitationExpired,
+  normalizeInviteToken,
 } from "@/lib/team/invitation-token";
+
+export const dynamic = "force-dynamic";
 
 export default async function InvitePage({
   params,
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const { token } = await params;
+  const { token: rawToken } = await params;
+  const token = normalizeInviteToken(rawToken);
   const invitation = await getInvitationByToken(token);
 
   if (!invitation) {
@@ -54,6 +58,7 @@ export default async function InvitePage({
     invitation,
     userId: user.id,
     userEmail: user.email ?? null,
+    token,
   });
 
   if (!result.ok && result.code === "expired") {
