@@ -3,12 +3,14 @@ export type PlanId = "starter" | "business" | "consultant" | "pilot" | "free";
 export interface SubscriptionPlan {
   id: Exclude<CheckoutPlanId, "pilot">;
   name: string;
+  description: string;
   price: number;
   interval: "month";
   stripePriceEnv: string;
   stripePaymentLinkEnv?: string;
   features: string[];
   highlighted?: boolean;
+  badge?: string;
   cta: string;
 }
 
@@ -28,6 +30,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: "starter",
     name: "Basis",
+    description: "Für kleine Unternehmen zur ersten Orientierung.",
     price: 49,
     interval: "month",
     stripePriceEnv: "STRIPE_PRICE_STARTER",
@@ -35,44 +38,50 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     features: [
       "Unternehmensprofil",
       "Betroffenheitscheck",
-      "3 Dokumente",
+      "Grundlegende Dokumente",
       "PDF-Export",
-      "Basis-Auditübersicht",
+      "Einfache Audit-Übersicht",
     ],
     cta: "Basis buchen",
   },
   {
     id: "business",
     name: "Business",
+    description: "Für Unternehmen, die ihre NIS2-Compliance aktiv steuern möchten.",
     price: 199,
     interval: "month",
     stripePriceEnv: "STRIPE_PRICE_BUSINESS",
     stripePaymentLinkEnv: "NEXT_PUBLIC_STRIPE_PAYMENT_LINK_BUSINESS",
     highlighted: true,
+    badge: "Empfohlen",
     features: [
-      "alle Dokumenttypen",
-      "Versionierung",
-      "Maßnahmen",
-      "Risikoanalyse",
-      "Incident-Dokumentation",
-      "Audit-Ordner",
-      "ZIP-Export",
+      "Live Sicherheitsstatus (Score 0–100)",
+      "Klare Handlungsempfehlungen („Was ist jetzt zu tun?“)",
+      "Automatische Risiko- und Maßnahmensteuerung",
+      "Audit-Bereitschaft in Echtzeit",
+      "Incident-Dokumentation und Abschluss-Workflows",
+      "Top-Risiken und Score-Ursachen auf einen Blick",
+      "Vollständiger Audit-Ordner",
+      "ZIP-Export für Prüfungen",
     ],
     cta: "Business buchen",
   },
   {
     id: "consultant",
     name: "Consultant / Systemhaus",
+    description: "Für Berater, IT-Systemhäuser und MSPs",
     price: 699,
     interval: "month",
     stripePriceEnv: "STRIPE_PRICE_CONSULTANT",
     stripePaymentLinkEnv: "NEXT_PUBLIC_STRIPE_PAYMENT_LINK_CONSULTANT",
     features: [
-      "mehrere Mandanten vorbereitet",
-      "vollständige Dokumentpakete",
-      "Audit-Exports",
+      "Verwaltung mehrerer Mandanten",
+      "Compliance-Steuerung pro Kunde",
+      "Live Sicherheitsstatus je Unternehmen",
+      "Zentrale Audit-Übersicht",
+      "Vollständige Audit-Exports für Kunden",
+      "Skalierbares Compliance-System",
       "White-Label vorbereitet",
-      "priorisierte Pilotfeatures",
     ],
     cta: "Consultant buchen",
   },
