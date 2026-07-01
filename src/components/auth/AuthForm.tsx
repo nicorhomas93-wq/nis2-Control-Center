@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { loginAccount, registerAccount, type AuthNotice } from "@/lib/auth/register";
+import { resolveNoticeMessage } from "@/lib/auth/errors";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -145,15 +146,23 @@ export function AuthForm({ mode, redirectTo, invitedEmail }: AuthFormProps) {
               </div>
 
               {notice ? (
-                <p
-                  className={`rounded-lg px-3 py-2 text-sm ${
+                <div
+                  className={`space-y-2 rounded-lg px-3 py-2 text-sm ${
                     notice.type === "error"
                       ? "bg-red-50 text-red-700"
                       : "bg-blue-50 text-blue-800"
                   }`}
                 >
-                  {notice.message}
-                </p>
+                  <p>{resolveNoticeMessage(notice)}</p>
+                  {notice.suggestLogin ? (
+                    <Link
+                      href={authSwitchHref}
+                      className="inline-flex font-medium underline underline-offset-2"
+                    >
+                      Jetzt anmelden
+                    </Link>
+                  ) : null}
+                </div>
               ) : null}
 
               <Button type="submit" className="w-full" disabled={loading}>

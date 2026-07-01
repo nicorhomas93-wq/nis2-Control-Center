@@ -1,9 +1,29 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatAuthError } from "@/lib/auth/errors";
 
-export type AuthNotice =
-  | { type: "error"; message: string }
-  | { type: "info"; message: string };
+export type AuthNotice = {
+  type: "error" | "info";
+  message: string;
+  suggestLogin?: boolean;
+};
+
+async function trySignIn(
+  supabase: SupabaseClient,
+  email: string,
+  password: string
+): Promise<boolean> {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  return !error;
+}
+
+function existingAccountNotice(): AuthNotice {
+  return {
+    type: "error",
+    message:
+      "Diese E-Mail ist bereits registriert. Bitte melden Sie sich mit Ihrem Passwort an.",
+    suggestLogin: true,
+  };
+}
 
 export async function registerAccount(
   supabase: SupabaseClient,
@@ -25,20 +45,45 @@ export async function registerAccount(
   });
 
   if (signUpError) {
-    return {
-      ok: false,
-      notice: { type: "error", message: formatAuthError(signUpError) },
-    };
-  }
+    const duplicate =
+      signUpError.message === "User already registered" ||
+      signUpError.code === "user_already_exists";
 
-  if (data.user?.identities?.length === 0) {
+    if (duplicate && (await trySignIn(supabase, email, options.password))) {
+      return { ok: true };
+    }
+
     return {
       ok: false,
       notice: {
         type: "error",
-        message: "Ein Konto mit dieser E-Mail existiert bereits. Bitte melden Sie sich an.",
+        message: formatAuthError(signUpError),
+        suggestLogin: duplicate,
       },
     };
+  }
+
+  if (!data.user) {
+    if (await trySignIn(supabase, email, options.password)) {
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      notice: {
+        type: "error",
+        message:
+          "Registrierung konnte nicht abgeschlossen werden. Falls Sie bereits ein Konto haben, melden Sie sich an.",
+        suggestLogin: true,
+      },
+    };
+  }
+
+  if (data.user.identities?.length === 0) {
+    if (await trySignIn(supabase, email, options.password)) {
+      return { ok: true };
+    }
+    return { ok: false, notice: existingAccountNotice() };
   }
 
   const { data: sessionData } = await supabase.auth.getSession();
@@ -46,19 +91,11 @@ export async function registerAccount(
     return { ok: true };
   }
 
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email,
-    password: options.password,
-  });
-
-  if (!signInError) {
+  if (await trySignIn(supabase, email, options.password)) {
     return { ok: true };
   }
 
-  const needsConfirmation =
-    !data.user?.email_confirmed_at ||
-    signInError.message?.toLowerCase().includes("email not confirmed") ||
-    signInError.code === "email_not_confirmed";
+  const needsConfirmation = !data.user.email_confirmed_at;
 
   if (needsConfirmation) {
     return {
@@ -73,7 +110,12 @@ export async function registerAccount(
 
   return {
     ok: false,
-    notice: { type: "error", message: formatAuthError(signInError) },
+    notice: {
+      type: "error",
+      message:
+        "Registrierung abgeschlossen, aber Anmeldung fehlgeschlagen. Bitte melden Sie sich manuell an.",
+      suggestLogin: true,
+    },
   };
 }
 
