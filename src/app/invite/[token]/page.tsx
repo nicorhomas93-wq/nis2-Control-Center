@@ -25,6 +25,9 @@ export default async function InvitePage({
   const invitation = await getInvitationByToken(token);
 
   if (!invitation) {
+    const cookieStore = await cookies();
+    cookieStore.delete(PENDING_INVITE_COOKIE);
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
         <Card className="max-w-md">
@@ -34,7 +37,13 @@ export default async function InvitePage({
           <CardContent className="space-y-4 text-sm text-slate-600">
             <p>Diese Einladung ist abgelaufen, widerrufen oder bereits verwendet.</p>
             <Link
-              href="/login"
+              href="/dashboard?clear_invite=1"
+              className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Zum Dashboard (Einladung ignorieren)
+            </Link>
+            <Link
+              href="/login?clear_invite=1&to=/login"
               className="inline-flex w-full items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
             >
               Zur Anmeldung
@@ -71,6 +80,9 @@ export default async function InvitePage({
   if (result.ok) {
     const cookieStore = await cookies();
     cookieStore.delete(PENDING_INVITE_COOKIE);
+  } else {
+    const cookieStore = await cookies();
+    cookieStore.delete(PENDING_INVITE_COOKIE);
   }
 
   return (
@@ -92,10 +104,10 @@ export default async function InvitePage({
                 </Link>
               ) : (
                 <Link
-                  href="/login"
+                  href="/dashboard?clear_invite=1"
                   className="inline-flex w-full items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
                 >
-                  Zur Anmeldung
+                  Zum Dashboard
                 </Link>
               )}
             </>

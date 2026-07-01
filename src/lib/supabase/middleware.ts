@@ -44,11 +44,6 @@ function resolvePostAuthPath(request: NextRequest): string {
     return redirect;
   }
 
-  const pendingInvite = request.cookies.get(PENDING_INVITE_COOKIE)?.value;
-  if (isInvitePath(pendingInvite)) {
-    return pendingInvite;
-  }
-
   return "/dashboard";
 }
 
@@ -59,6 +54,18 @@ function attachPendingInviteCookie(response: NextResponse, path: string) {
 
 export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
+
+  if (request.nextUrl.searchParams.get("clear_invite") === "1") {
+    const target = request.nextUrl.searchParams.get("to");
+    const safeTarget =
+      target && target.startsWith("/") && !target.startsWith("//") ? target : "/dashboard";
+    const url = request.nextUrl.clone();
+    url.pathname = safeTarget;
+    url.search = "";
+    const response = NextResponse.redirect(url);
+    response.cookies.delete(PENDING_INVITE_COOKIE);
+    return response;
+  }
 
   if (path === "/betroffenheit" || path.startsWith("/betroffenheit/")) {
     const url = request.nextUrl.clone();
@@ -131,7 +138,11 @@ export async function updateSession(request: NextRequest) {
       attachPendingInviteCookie(supabaseResponse, path);
     }
 
-    if ((path.startsWith("/login") || path.startsWith("/register")) && !request.nextUrl.searchParams.get("redirect")) {
+    if (
+      !user &&
+      (path.startsWith("/login") || path.startsWith("/register")) &&
+      !request.nextUrl.searchParams.get("redirect")
+    ) {
       const pendingInvite = request.cookies.get(PENDING_INVITE_COOKIE)?.value;
       if (isInvitePath(pendingInvite)) {
         const url = request.nextUrl.clone();
