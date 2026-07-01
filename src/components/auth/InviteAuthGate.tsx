@@ -51,8 +51,9 @@ export function InviteAuthGate({ invitation, token }: InviteAuthGateProps) {
             </div>
 
             <p>
-              Melden Sie sich mit <strong>{invitation.email}</strong> an oder erstellen Sie ein
-              Konto mit genau dieser Adresse.
+              Für <strong>{invitation.email}</strong> existiert noch kein Konto. Wählen Sie{" "}
+              <strong>Konto erstellen</strong> — wir legen es direkt an (ohne E-Mail-Bestätigung).
+              Haben Sie schon ein Konto? Dann <strong>Anmelden</strong>.
             </p>
 
             <div className="grid gap-2">

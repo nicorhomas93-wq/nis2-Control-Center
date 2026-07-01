@@ -12,6 +12,61 @@ import { Label } from "@/components/ui/Label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { resolveAuthRedirect } from "@/lib/auth/redirect-path";
 
+async function registerInviteViaServer(options: {
+  token: string;
+  email: string;
+  password: string;
+  supabase: ReturnType<typeof createClient>;
+  targetPath: string;
+}): Promise<{ ok: true } | { ok: false; notice: AuthNotice }> {
+  const res = await fetch("/api/auth/register-invite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token: options.token,
+      email: options.email,
+      password: options.password,
+    }),
+  });
+
+  const data = (await res.json()) as {
+    error?: string;
+    suggestLogin?: boolean;
+    message?: string;
+  };
+
+  if (!res.ok) {
+    return {
+      ok: false,
+      notice: {
+        type: "error",
+        message: data.error ?? "Registrierung fehlgeschlagen.",
+        suggestLogin: data.suggestLogin,
+      },
+    };
+  }
+
+  const login = await loginAccount(options.supabase, {
+    email: options.email,
+    password: options.password,
+  });
+
+  if (!login.ok) {
+    return {
+      ok: false,
+      notice: {
+        type: "info",
+        message:
+          data.message ??
+          "Konto wurde angelegt. Bitte melden Sie sich jetzt an, um die Einladung anzunehmen.",
+        suggestLogin: true,
+      },
+    };
+  }
+
+  return { ok: true };
+}
+
 interface AuthFormProps {
   mode: "login" | "register";
   redirectTo?: string;
@@ -27,6 +82,7 @@ export function AuthForm({ mode, redirectTo, invitedEmail }: AuthFormProps) {
 
   const targetPath = resolveAuthRedirect(redirectTo);
   const isInviteFlow = Boolean(redirectTo?.startsWith("/invite/"));
+  const inviteToken = isInviteFlow ? redirectTo!.slice("/invite/".length) : null;
   const authSwitchHref =
     mode === "login"
       ? redirectTo
@@ -73,11 +129,19 @@ export function AuthForm({ mode, redirectTo, invitedEmail }: AuthFormProps) {
     const result =
       mode === "login"
         ? await loginAccount(supabase, { email: normalizedEmail, password })
-        : await registerAccount(supabase, {
-            email: normalizedEmail,
-            password,
-            redirectPath: targetPath,
-          });
+        : isInviteFlow && inviteToken
+          ? await registerInviteViaServer({
+              token: inviteToken,
+              email: normalizedEmail,
+              password,
+              supabase,
+              targetPath,
+            })
+          : await registerAccount(supabase, {
+              email: normalizedEmail,
+              password,
+              redirectPath: targetPath,
+            });
 
     if (!result.ok) {
       setNotice(result.notice);
