@@ -60,6 +60,27 @@ export async function getOrCreateCompany(
     return { company: existing as Company, missingTable: false, error: null };
   }
 
+  const { data: membership, error: memberError } = await supabase
+    .from("company_members")
+    .select("company_id, companies(*)")
+    .eq("user_id", userId)
+    .eq("active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (memberError && isMissingTableError(memberError)) {
+    return { company: null, missingTable: true, error: getDbErrorMessage(memberError) };
+  }
+
+  const teamCompanyRaw = membership?.companies;
+  const teamCompany = (
+    Array.isArray(teamCompanyRaw) ? teamCompanyRaw[0] : teamCompanyRaw
+  ) as Company | null | undefined;
+  if (teamCompany && !teamCompany.deleted_at) {
+    return { company: teamCompany, missingTable: false, error: null };
+  }
+
   const { data: created, error: createError } = await supabase
     .from("companies")
     .insert({ user_id: userId, is_mandant: false })

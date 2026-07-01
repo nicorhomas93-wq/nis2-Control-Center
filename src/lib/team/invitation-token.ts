@@ -78,16 +78,23 @@ async function getInvitationByTokenRpc(token: string): Promise<InvitationByToken
   });
 }
 
-async function getInvitationByTokenAdmin(token: string): Promise<InvitationByToken | null> {
+async function getInvitationByTokenAdmin(
+  token: string,
+  options?: { includeAccepted?: boolean }
+): Promise<InvitationByToken | null> {
   const admin = createAdminClient();
   if (!admin) return null;
 
-  const { data, error } = await admin
+  let query = admin
     .from("company_invitations")
     .select("id, company_id, email, role, token, status, invited_by, expires_at")
-    .eq("token", token)
-    .eq("status", "invited")
-    .maybeSingle();
+    .eq("token", token);
+
+  if (!options?.includeAccepted) {
+    query = query.eq("status", "invited");
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error || !data) return null;
 
@@ -103,6 +110,24 @@ async function getInvitationByTokenAdmin(token: string): Promise<InvitationByTok
   });
 }
 
+async function isActiveTeamMember(
+  userId: string,
+  companyId: string
+): Promise<boolean> {
+  const admin = createAdminClient();
+  if (!admin) return false;
+
+  const { data } = await admin
+    .from("company_members")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("company_id", companyId)
+    .eq("active", true)
+    .maybeSingle();
+
+  return Boolean(data);
+}
+
 export async function getInvitationByToken(
   token: string
 ): Promise<InvitationByToken | null> {
@@ -113,6 +138,18 @@ export async function getInvitationByToken(
   if (viaAdmin) return viaAdmin;
 
   return getInvitationByTokenRpc(normalized);
+}
+
+export async function getInvitationByTokenAnyStatus(
+  token: string
+): Promise<InvitationByToken | null> {
+  const normalized = normalizeInviteToken(token);
+  if (!normalized) return null;
+
+  const viaAdmin = await getInvitationByTokenAdmin(normalized, { includeAccepted: true });
+  if (viaAdmin) return viaAdmin;
+
+  return getInvitationByToken(normalized);
 }
 
 export async function markInvitationExpired(invitationId: string): Promise<void> {
@@ -272,6 +309,10 @@ export async function acceptInvitation(options: {
   userEmail: string | null;
   token: string;
 }): Promise<AcceptResult> {
+  if (await isActiveTeamMember(options.userId, options.invitation.company_id)) {
+    return { ok: true };
+  }
+
   const viaAdmin = await acceptInvitationAdmin(options);
   if (viaAdmin) return viaAdmin;
 

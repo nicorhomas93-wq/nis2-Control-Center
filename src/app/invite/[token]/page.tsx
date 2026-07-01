@@ -9,11 +9,17 @@ import { PENDING_INVITE_COOKIE } from "@/lib/auth/invite-cookie";
 import {
   acceptInvitation,
   getInvitationByToken,
+  getInvitationByTokenAnyStatus,
   markInvitationExpired,
   normalizeInviteToken,
 } from "@/lib/team/invitation-token";
 
 export const dynamic = "force-dynamic";
+
+function clearInviteCookie() {
+  const cookieStore = cookies();
+  void cookieStore.then((store) => store.delete(PENDING_INVITE_COOKIE));
+}
 
 export default async function InvitePage({
   params,
@@ -22,11 +28,20 @@ export default async function InvitePage({
 }) {
   const { token: rawToken } = await params;
   const token = normalizeInviteToken(rawToken);
-  const invitation = await getInvitationByToken(token);
+  let invitation = await getInvitationByToken(token);
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!invitation && user) {
+    const accepted = await getInvitationByTokenAnyStatus(token);
+    if (accepted?.status === "active") {
+      invitation = accepted;
+    }
+  }
 
   if (!invitation) {
-    const cookieStore = await cookies();
-    cookieStore.delete(PENDING_INVITE_COOKIE);
+    clearInviteCookie();
 
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
@@ -40,7 +55,7 @@ export default async function InvitePage({
               href="/dashboard?clear_invite=1"
               className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
-              Zum Dashboard (Einladung ignorieren)
+              Zum Dashboard
             </Link>
             <Link
               href="/login?clear_invite=1&to=/login"
@@ -54,13 +69,10 @@ export default async function InvitePage({
     );
   }
 
-  if (new Date(invitation.expires_at) < new Date()) {
+  if (new Date(invitation.expires_at) < new Date() && invitation.status === "invited") {
     await markInvitationExpired(invitation.id);
     redirect("/login?error=invite_expired");
   }
-
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
     return <InviteAuthGate invitation={invitation} token={token} />;
@@ -77,19 +89,21 @@ export default async function InvitePage({
     redirect("/login?error=invite_expired");
   }
 
-  if (result.ok) {
-    const cookieStore = await cookies();
-    cookieStore.delete(PENDING_INVITE_COOKIE);
-  } else {
-    const cookieStore = await cookies();
-    cookieStore.delete(PENDING_INVITE_COOKIE);
-  }
+  clearInviteCookie();
+
+  const alreadyMember = invitation.status === "active" && result.ok;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <Card className="max-w-md">
         <CardHeader>
-          <CardTitle>{result.ok ? "Willkommen im Team" : "Einladung konnte nicht angenommen werden"}</CardTitle>
+          <CardTitle>
+            {result.ok
+              ? alreadyMember
+                ? "Sie sind bereits im Team"
+                : "Willkommen im Team"
+              : "Einladung konnte nicht angenommen werden"}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-slate-600">
           {!result.ok ? (
@@ -97,10 +111,10 @@ export default async function InvitePage({
               <p className="text-red-600">{result.error}</p>
               {result.code === "email_mismatch" ? (
                 <Link
-                  href={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}&reauth=1`}
+                  href={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}&reauth=1&email=${encodeURIComponent(invitation.email)}`}
                   className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
-                  Mit anderer E-Mail anmelden
+                  Mit {invitation.email} anmelden
                 </Link>
               ) : (
                 <Link
@@ -114,11 +128,22 @@ export default async function InvitePage({
           ) : (
             <>
               <p>
-                Sie wurden zu <strong>{invitation.company_name ?? "einem Unternehmen"}</strong> als{" "}
-                <strong>{ROLE_LABELS[invitation.role]}</strong> hinzugefügt.
+                {alreadyMember
+                  ? "Ihr Konto ist bereits mit diesem Unternehmen verknüpft."
+                  : "Sie wurden erfolgreich hinzugefügt zu"}{" "}
+                <strong>{invitation.company_name ?? "Ihrem Team"}</strong>
+                {!alreadyMember ? (
+                  <>
+                    {" "}
+                    als <strong>{ROLE_LABELS[invitation.role]}</strong>.
+                  </>
+                ) : null}
+              </p>
+              <p className="text-slate-500">
+                Angemeldet als <strong>{user.email}</strong>
               </p>
               <Link
-                href="/dashboard"
+                href="/dashboard?clear_invite=1"
                 className="inline-flex w-full items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
               >
                 Zum Dashboard
