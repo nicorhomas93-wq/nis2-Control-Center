@@ -66,6 +66,9 @@ const ORDER = [
   "add_compliance_evidence_center.sql",
   "add_jarvis_partner_scoring.sql",
   "add_jarvis_lead_finder_fields.sql",
+  "add_jarvis_linkedin_campaigns.sql",
+  "add_jarvis_campaign_response_automation.sql",
+  "add_jarvis_content_hub.sql",
 ];
 
 const url = process.env.DATABASE_URL;

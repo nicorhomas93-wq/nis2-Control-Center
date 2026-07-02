@@ -414,6 +414,135 @@ export interface TrafficTask {
   campaign?: TrafficCampaign | null;
 }
 
+export interface LinkedInCampaign {
+  id: string;
+  name: string;
+  target_group: string;
+  description: string | null;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+  responsible: string;
+  pipeline_value: number | null;
+  template_key: string | null;
+  goal: string | null;
+  created_at: string;
+  updated_at: string;
+  lead_count?: number;
+}
+
+export interface LinkedInCampaignLead {
+  id: string;
+  campaign_id: string;
+  company_name: string;
+  website: string | null;
+  contact_name: string | null;
+  linkedin_url: string | null;
+  category: string | null;
+  lead_score: number | null;
+  status: string;
+  next_step: string | null;
+  notes: string | null;
+  suggested_message: string | null;
+  suggested_reply?: string | null;
+  offer_notes?: string | null;
+  suggested_license?: string | null;
+  last_response_at?: string | null;
+  management_review_at?: string | null;
+  contacted_at: string | null;
+  follow_up_at: string | null;
+  reminder_type: string | null;
+  b2b_outreach_lead_id: string | null;
+  created_at: string;
+  updated_at: string;
+  campaign?: LinkedInCampaign | null;
+}
+
+export interface LinkedInCampaignResponse {
+  id: string;
+  campaign_id: string | null;
+  lead_id: string | null;
+  company_name: string;
+  response_date: string;
+  response_text: string | null;
+  response_type: string;
+  rating: number | null;
+  notes: string | null;
+  channel?: string | null;
+  response_time?: string | null;
+  contact_name?: string | null;
+  attachments?: unknown;
+  recorded_by?: string | null;
+  auto_classified?: boolean;
+  suggested_reply?: string | null;
+  task_title?: string | null;
+  task_due_at?: string | null;
+  created_at: string;
+}
+
+export interface LinkedInCampaignTask {
+  id: string;
+  campaign_id: string | null;
+  lead_id: string | null;
+  response_id: string | null;
+  title: string;
+  description: string | null;
+  task_type: string;
+  status: string;
+  due_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LinkedInCampaignDemo {
+  id: string;
+  campaign_id: string | null;
+  lead_id: string | null;
+  company_name: string;
+  contact_name: string | null;
+  scheduled_at: string | null;
+  status: string;
+  result: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContentHubSeries {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  hub_area: string;
+  description: string | null;
+  day_count: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContentHubPost {
+  id: string;
+  series_id: string | null;
+  title: string;
+  category: string;
+  hub_area: string;
+  format: string;
+  hook: string | null;
+  body: string;
+  call_to_action: string | null;
+  poll_question: string | null;
+  poll_options: string[] | null;
+  status: string;
+  scheduled_date: string | null;
+  day_number: number | null;
+  word_count: number | null;
+  tags: string[] | null;
+  created_at: string;
+  updated_at: string;
+  series?: Pick<ContentHubSeries, "id" | "name" | "slug"> | null;
+}
+
 export type B2BOutreachStatus =
   | "new"
   | "ready"
