@@ -437,6 +437,14 @@ export interface B2BOutreachLead {
   contact_name: string | null;
   contact_role: string | null;
   contact_email: string | null;
+  contact_phone?: string | null;
+  has_contact_form?: boolean;
+  linkedin_url?: string | null;
+  lead_quality_score?: number | null;
+  lead_quality_reason?: string | null;
+  is_contactable?: boolean;
+  partner_potential?: string | null;
+  outreach_priority?: string | null;
   source: string;
   nis2_likelihood: Nis2Likelihood;
   nis2_relevance_score: number | null;

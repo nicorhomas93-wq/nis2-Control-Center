@@ -3,6 +3,7 @@ export interface WebsiteSnapshot {
   title: string | null;
   description: string | null;
   textSample: string;
+  htmlSample: string;
   fetched: boolean;
   error?: string;
 }
@@ -16,6 +17,7 @@ export async function fetchWebsiteSnapshot(
       title: null,
       description: null,
       textSample: "",
+      htmlSample: "",
       fetched: false,
       error: "Keine Website hinterlegt",
     };
@@ -46,6 +48,7 @@ export async function fetchWebsiteSnapshot(
         title: null,
         description: null,
         textSample: "",
+        htmlSample: "",
         fetched: false,
         error: `HTTP ${res.status}`,
       };
@@ -57,13 +60,14 @@ export async function fetchWebsiteSnapshot(
       extractMeta(html, "description") ?? extractMeta(html, "og:description");
     const textSample = stripHtml(html).slice(0, 4000);
 
-    return { url, title, description, textSample, fetched: true };
+    return { url, title, description, textSample, htmlSample: html.slice(0, 30000), fetched: true };
   } catch (err) {
     return {
       url,
       title: null,
       description: null,
       textSample: "",
+      htmlSample: "",
       fetched: false,
       error: err instanceof Error ? err.message : "Fetch fehlgeschlagen",
     };

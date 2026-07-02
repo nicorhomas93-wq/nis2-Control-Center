@@ -37,9 +37,10 @@ export default async function B2BOutreachPage() {
   const { data, error } = await supabase
     .from("b2b_outreach_leads")
     .select("*")
+    .order("lead_quality_score", { ascending: false, nullsFirst: false })
     .order("partner_score", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(300);
 
   let quota = await getOutreachQuotaInfo(supabase);
 
@@ -59,9 +60,10 @@ export default async function B2BOutreachPage() {
       <JarvisShell>
         <TrafficShell>
           <div className="mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">B2B Outreach Pipeline</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Jarvis Lead Finder</h2>
             <p className="text-sm text-slate-500">
-              B2B-Partner identifizieren, bewerten und ansprechen — IT-Dienstleister, MSP und Berater (intern, kein Auto-Versand).
+              Hochwertige, kontaktierbare B2B-Partner — IT-Dienstleister, MSP, Cybersecurity und
+              Compliance-Berater. Qualität vor Quantität (intern, kein Auto-Versand).
             </p>
           </div>
           {!error && (

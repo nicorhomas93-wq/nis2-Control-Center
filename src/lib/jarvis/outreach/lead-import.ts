@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { SEED_LEADS } from "@/lib/jarvis/outreach/constants";
 import { partnerFieldsFromPartnerScore } from "@/lib/jarvis/outreach/partner-fields";
 import { scorePartnerLead } from "@/lib/jarvis/outreach/partner-scoring";
+import { computeLeadFinderFields } from "@/lib/jarvis/outreach/lead-finder-fields";
 
 export interface ImportLeadInput {
   company_name: string;
@@ -11,6 +12,9 @@ export interface ImportLeadInput {
   contact_name?: string | null;
   contact_role?: string | null;
   contact_email?: string | null;
+  contact_phone?: string | null;
+  has_contact_form?: boolean;
+  linkedin_url?: string | null;
   hints?: string | null;
   source?: string;
 }
@@ -120,6 +124,19 @@ export async function importLeads(
       hints: lead.hints ?? null,
     });
 
+    const finder = computeLeadFinderFields({
+      company_name: lead.company_name,
+      industry: lead.industry ?? null,
+      employee_count: lead.employee_count,
+      contact_email: lead.contact_email,
+      contact_phone: lead.contact_phone,
+      has_contact_form: lead.has_contact_form,
+      linkedin_url: lead.linkedin_url,
+      hints: lead.hints,
+      lead_category: partner.lead_category,
+      deprioritized: partner.deprioritized,
+    });
+
     const { error } = await supabase.from("b2b_outreach_leads").insert({
       company_name: lead.company_name.trim(),
       industry: lead.industry?.trim() || null,
@@ -128,9 +145,17 @@ export async function importLeads(
       contact_name: lead.contact_name?.trim() || null,
       contact_role: lead.contact_role?.trim() || null,
       contact_email: lead.contact_email?.trim() || null,
+      contact_phone: lead.contact_phone?.trim() || null,
+      has_contact_form: lead.has_contact_form ?? false,
+      linkedin_url: lead.linkedin_url?.trim() || null,
       hints: lead.hints?.trim() || null,
       source: lead.source ?? "manual",
       ...partnerFieldsFromPartnerScore(partner),
+      lead_quality_score: finder.lead_quality_score,
+      lead_quality_reason: finder.lead_quality_reason,
+      is_contactable: finder.is_contactable,
+      partner_potential: finder.partner_potential,
+      outreach_priority: finder.outreach_priority,
     });
 
     if (error) {

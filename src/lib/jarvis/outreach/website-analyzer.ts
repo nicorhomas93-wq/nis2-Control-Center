@@ -9,6 +9,10 @@ import {
 import { resolveWebPresence } from "@/lib/jarvis/outreach/web-presence-resolver";
 import type { WebPresenceResult } from "@/lib/jarvis/outreach/web-presence-types";
 import { pickBestContactEmail } from "@/lib/jarvis/outreach/email-extract";
+import {
+  enrichContactFromContent,
+  type ContactEnrichmentResult,
+} from "@/lib/jarvis/outreach/contact-enrichment";
 
 export type { WebsiteSnapshot } from "@/lib/jarvis/outreach/website-snapshot";
 export { fetchWebsiteSnapshot } from "@/lib/jarvis/outreach/website-snapshot";
@@ -26,6 +30,7 @@ export interface LeadAnalysisResult {
   web_presence: WebPresenceResult;
   /** Aus Website/Hinweisen extrahiert — nur wenn noch keine E-Mail hinterlegt */
   discovered_contact_email: string | null;
+  contact_enrichment: ContactEnrichmentResult;
 }
 
 const IT_HIGH = [
@@ -151,9 +156,19 @@ export async function analyzeLeadFromContext(input: {
     input.hints ?? "",
   ].join(" ");
 
+  const contact_enrichment = enrichContactFromContent(
+    snapshot.htmlSample ?? "",
+    emailSource,
+    {
+      website: snapshot.url ?? input.website,
+      companyName: input.company_name,
+    }
+  );
+
   const discovered_contact_email = input.contact_email?.trim()
     ? null
-    : pickBestContactEmail(emailSource, {
+    : contact_enrichment.contact_email ??
+      pickBestContactEmail(emailSource, {
         website: snapshot.url ?? input.website,
         companyName: input.company_name,
       });
@@ -173,5 +188,6 @@ export async function analyzeLeadFromContext(input: {
     observation,
     web_presence: presence,
     discovered_contact_email,
+    contact_enrichment,
   };
 }

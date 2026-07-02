@@ -7,6 +7,10 @@ export interface QualifiedLeadInput {
   employee_count: number;
   website?: string;
   contact_role?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  has_contact_form?: boolean;
+  linkedin_url?: string;
   hints?: string;
 }
 

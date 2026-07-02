@@ -7,6 +7,7 @@ import { mapOutreachLead, webPresenceFieldsFromResult } from "@/lib/jarvis/outre
 import { generateOutreachMessage } from "@/lib/jarvis/outreach/prompt-engine";
 import { partnerFieldsFromPartnerScore } from "@/lib/jarvis/outreach/partner-fields";
 import { scorePartnerLead } from "@/lib/jarvis/outreach/partner-scoring";
+import { computeLeadFinderFields } from "@/lib/jarvis/outreach/lead-finder-fields";
 import {
   OUTREACH_BATCH_ANALYSIS_LIMIT,
   OUTREACH_DAILY_SEND_LIMIT,
@@ -154,9 +155,31 @@ export async function processOutreachLead(
       : "skipped";
 
   const contactEmail =
-    row.contact_email?.trim() || analysis.discovered_contact_email || null;
+    row.contact_email?.trim() ||
+    analysis.discovered_contact_email ||
+    analysis.contact_enrichment.contact_email ||
+    null;
+  const contactPhone =
+    row.contact_phone?.trim() || analysis.contact_enrichment.contact_phone || null;
+  const hasContactForm =
+    row.has_contact_form || analysis.contact_enrichment.has_contact_form || false;
+  const linkedinUrl =
+    row.linkedin_url?.trim() || analysis.contact_enrichment.linkedin_url || null;
   const website =
     row.website?.trim() || analysis.web_presence.detectedWebsiteUrl || null;
+
+  const finder = computeLeadFinderFields({
+    company_name: row.company_name,
+    industry: row.industry,
+    employee_count: row.employee_count,
+    contact_email: contactEmail,
+    contact_phone: contactPhone,
+    has_contact_form: hasContactForm,
+    linkedin_url: linkedinUrl,
+    hints: row.hints,
+    lead_category: partner.lead_category,
+    deprioritized: partner.deprioritized,
+  });
 
   const { data: updated, error: updateError } = await supabase
     .from("b2b_outreach_leads")
@@ -168,7 +191,15 @@ export async function processOutreachLead(
       observation: analysis.observation,
       outreach_message,
       contact_email: contactEmail,
+      contact_phone: contactPhone,
+      has_contact_form: hasContactForm,
+      linkedin_url: linkedinUrl,
       website,
+      lead_quality_score: finder.lead_quality_score,
+      lead_quality_reason: finder.lead_quality_reason,
+      is_contactable: finder.is_contactable,
+      partner_potential: finder.partner_potential,
+      outreach_priority: finder.outreach_priority,
       ...webPresenceFieldsFromResult(analysis.web_presence),
       ...partnerFieldsFromPartnerScore(partner),
       status,

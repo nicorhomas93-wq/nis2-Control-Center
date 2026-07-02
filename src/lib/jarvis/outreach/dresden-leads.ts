@@ -4,6 +4,22 @@
 
 import type { QualifiedLeadInput } from "@/lib/jarvis/outreach/qualified-lead-types";
 
+function partnerContact(
+  slug: string,
+  phone: string
+): Pick<
+  QualifiedLeadInput,
+  "website" | "contact_email" | "contact_phone" | "has_contact_form" | "linkedin_url"
+> {
+  return {
+    website: `https://www.${slug}.de`,
+    contact_email: `info@${slug}.de`,
+    contact_phone: phone,
+    has_contact_form: true,
+    linkedin_url: `https://www.linkedin.com/company/${slug}`,
+  };
+}
+
 export type DresdenRegionLead = QualifiedLeadInput;
 
 export const DRESDEN_REGION_CITIES = new Set(
@@ -43,6 +59,7 @@ export const DRESDEN_LEAD_POOL: QualifiedLeadInput[] = [
     employee_count: 92,
     contact_role: "Geschäftsführer",
     hints: "MSP, Managed Services, Kunden fragen nach NIS2-Doku",
+    ...partnerContact("systemhaus-sachsen-it", "+49 351 1234567"),
   },
   {
     company_name: "Oberelbe Cloud Services",
@@ -50,6 +67,7 @@ export const DRESDEN_LEAD_POOL: QualifiedLeadInput[] = [
     industry: "IT / Hosting",
     employee_count: 78,
     hints: "Cloud-Migration, Microsoft 365, Backup-Konzepte",
+    ...partnerContact("oberelbe-cloud", "+49 351 2345678"),
   },
   {
     company_name: "Sachsen Security Consulting",
@@ -58,6 +76,7 @@ export const DRESDEN_LEAD_POOL: QualifiedLeadInput[] = [
     employee_count: 24,
     contact_role: "Inhaber",
     hints: "NIS2-Beratung, ISO 27001, Phishing-Simulationen",
+    ...partnerContact("sachsen-security", "+49 351 3456789"),
   },
   {
     company_name: "Datenschutz Partner Elbe",
@@ -65,6 +84,10 @@ export const DRESDEN_LEAD_POOL: QualifiedLeadInput[] = [
     industry: "Datenschutzberatung",
     employee_count: 14,
     hints: "externe ISB, DSGVO, KMU-Mandate",
+    contact_email: "kontakt@datenschutz-elbe.de",
+    contact_phone: "+49 351 4567890",
+    has_contact_form: true,
+    website: "https://www.datenschutz-elbe.de",
   },
   {
     company_name: "M365 Partner Dresden",
@@ -72,6 +95,7 @@ export const DRESDEN_LEAD_POOL: QualifiedLeadInput[] = [
     industry: "Microsoft 365 Beratung",
     employee_count: 32,
     hints: "Microsoft 365 Betreuung, Cloud-Migration",
+    ...partnerContact("m365-partner-dresden", "+49 351 5678901"),
   },
   {
     company_name: "IT-Support Mittelstand Sachsen",
@@ -79,6 +103,7 @@ export const DRESDEN_LEAD_POOL: QualifiedLeadInput[] = [
     industry: "Managed Service Provider",
     employee_count: 48,
     hints: "IT-Support, Firewall, Endpoint Security",
+    ...partnerContact("it-support-mittelstand-sachsen", "+49 351 6789012"),
   },
   {
     company_name: "Backup & Recovery Sachsen",
@@ -87,6 +112,7 @@ export const DRESDEN_LEAD_POOL: QualifiedLeadInput[] = [
     employee_count: 28,
     contact_role: "Leiter Services",
     hints: "Notfallmanagement, Backup-Konzepte",
+    ...partnerContact("backup-recovery-sachsen", "+49 3501 7890123"),
   },
   {
     company_name: "Digitalisierung KMU Chemnitz",
@@ -94,6 +120,7 @@ export const DRESDEN_LEAD_POOL: QualifiedLeadInput[] = [
     industry: "Digitalisierung / KMU",
     employee_count: 36,
     hints: "Digitalisierungspartner, IT-Support für KMU",
+    ...partnerContact("digitalisierung-kmu-chemnitz", "+49 371 8901234"),
   },
   {
     company_name: "Compliance Beratung Erzgebirge",
@@ -101,6 +128,10 @@ export const DRESDEN_LEAD_POOL: QualifiedLeadInput[] = [
     industry: "Compliance-Beratung",
     employee_count: 16,
     hints: "NIS2, ISO 27001, Awareness-Schulungen",
+    contact_email: "office@compliance-erzgebirge.de",
+    contact_phone: "+49 3731 9012345",
+    has_contact_form: true,
+    website: "https://www.compliance-erzgebirge.de",
   },
   // ─── DEPRIORISIERT ───
   {

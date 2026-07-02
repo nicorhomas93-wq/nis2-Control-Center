@@ -4,7 +4,7 @@ import {
   QUALIFIED_DEFAULT_LEADS_PER_RUN,
   type QualifiedLeadInput,
 } from "@/lib/jarvis/outreach/qualified-lead-types";
-import { partnerFieldsFromScoreResult } from "@/lib/jarvis/outreach/partner-fields";
+import { buildQualifiedLeadInsert } from "@/lib/jarvis/outreach/qualified-lead-insert";
 import {
   rankQualifiedLeads,
   scoreQualifiedLead,
@@ -38,12 +38,13 @@ export async function discoverGermanyLeads(
     ...scoreQualifiedLead(lead, { scoreLabel: "DE-Score" }),
   }));
   const rejected = allScored.filter((l) => !l.passed).length;
+  let rejectedTotal = rejected;
 
   if (options.previewOnly) {
     return {
       inserted: 0,
       skipped: 0,
-      rejected,
+      rejected: rejectedTotal,
       leads: ranked.map((l) => ({
         company_name: l.company_name,
         city: l.city,
@@ -71,17 +72,17 @@ export async function discoverGermanyLeads(
       continue;
     }
 
+    const scored = scoreQualifiedLead(lead, { scoreLabel: "DE-Score" });
+    const payload = buildQualifiedLeadInsert(lead, scored);
+    if (!payload) {
+      rejectedTotal += 1;
+      continue;
+    }
+
     const { error } = await supabase.from("b2b_outreach_leads").insert({
-      company_name: lead.company_name,
-      industry: lead.industry,
-      city: lead.city,
+      ...payload,
       region: "Deutschland",
-      website: lead.website ?? null,
-      employee_count: String(lead.employee_count),
-      contact_role: lead.contact_role ?? null,
-      hints: lead.hints ?? null,
       source: "germany_discover",
-      ...partnerFieldsFromScoreResult(lead),
     });
 
     if (error) skipped += 1;
@@ -91,35 +92,10 @@ export async function discoverGermanyLeads(
     }
   }
 
-  const deprioritized = allScored.filter((l) => l.deprioritized && !l.passed);
-  for (const lead of deprioritized) {
-    const key = lead.company_name.trim().toLowerCase();
-    if (names.has(key)) continue;
-
-    const { error } = await supabase.from("b2b_outreach_leads").insert({
-      company_name: lead.company_name,
-      industry: lead.industry,
-      city: lead.city,
-      region: "Deutschland",
-      website: lead.website ?? null,
-      employee_count: String(lead.employee_count),
-      contact_role: lead.contact_role ?? null,
-      hints: lead.hints ?? null,
-      source: "germany_discover",
-      ...partnerFieldsFromScoreResult(lead),
-      status: "review_later",
-    });
-
-    if (!error) {
-      names.add(key);
-      inserted += 1;
-    }
-  }
-
   return {
     inserted,
     skipped,
-    rejected,
+    rejected: rejectedTotal,
     leads: ranked.map((l) => ({
       company_name: l.company_name,
       city: l.city,
