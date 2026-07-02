@@ -543,6 +543,43 @@ export interface ContentHubPost {
   series?: Pick<ContentHubSeries, "id" | "name" | "slug"> | null;
 }
 
+export interface LinkedInPublishingAccount {
+  id: string;
+  user_id: string;
+  linkedin_member_id: string | null;
+  profile_name: string | null;
+  profile_picture_url: string | null;
+  profile_headline: string | null;
+  is_active: boolean;
+  connected_at: string;
+  token_expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LinkedInPublishingPost {
+  id: string;
+  user_id: string;
+  content_hub_post_id: string | null;
+  title: string;
+  post_type: string;
+  body_text: string;
+  image_url: string | null;
+  image_storage_path: string | null;
+  target_audience: string | null;
+  call_to_action: string | null;
+  hashtags: string | null;
+  status: string;
+  scheduled_at: string | null;
+  published_at: string | null;
+  linkedin_post_urn: string | null;
+  reach_views: number;
+  response_count: number;
+  publish_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type B2BOutreachStatus =
   | "new"
   | "ready"
