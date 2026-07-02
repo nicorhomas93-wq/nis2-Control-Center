@@ -97,6 +97,7 @@ export async function POST(request: Request) {
       delivery,
       subject: body.subject ?? null,
       body: messageBody,
+      recipientEmail: body.recipientEmail ?? null,
       sentByUserId: user.id,
       sentByEmail: user.email,
       source: "manual",

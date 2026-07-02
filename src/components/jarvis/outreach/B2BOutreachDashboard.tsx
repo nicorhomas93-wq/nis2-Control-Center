@@ -463,6 +463,16 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                     {lead.employee_count ? ` · ${lead.employee_count} MA` : ""}
                     {lead.contact_role ? ` · ${lead.contact_role}` : ""}
                   </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    E-Mail:{" "}
+                    {lead.contact_email ? (
+                      <span className="font-medium text-slate-700">{lead.contact_email}</span>
+                    ) : lead.processed_at ? (
+                      <span className="text-amber-700">nicht gefunden — manuell eintragen</span>
+                    ) : (
+                      <span className="text-slate-400">wird bei Analyse von Website gesucht</span>
+                    )}
+                  </p>
                   {lead.observation && (
                     <p className="mt-2 text-sm text-slate-700">{lead.observation}</p>
                   )}

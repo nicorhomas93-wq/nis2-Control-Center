@@ -60,6 +60,10 @@ export async function PATCH(
     }
   }
 
+  if (typeof body.contact_email === "string") {
+    updates.contact_email = body.contact_email.trim() || null;
+  }
+
   if (typeof body.outreach_message === "string") {
     updates.outreach_message = body.outreach_message;
   }

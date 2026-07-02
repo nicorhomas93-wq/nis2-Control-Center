@@ -8,7 +8,7 @@ import {
 } from "@/lib/jarvis/outreach/assessment-quality";
 import { resolveWebPresence } from "@/lib/jarvis/outreach/web-presence-resolver";
 import type { WebPresenceResult } from "@/lib/jarvis/outreach/web-presence-types";
-import { WEB_PRESENCE_STATUS_LABELS } from "@/lib/jarvis/outreach/web-presence-types";
+import { pickBestContactEmail } from "@/lib/jarvis/outreach/email-extract";
 
 export type { WebsiteSnapshot } from "@/lib/jarvis/outreach/website-snapshot";
 export { fetchWebsiteSnapshot } from "@/lib/jarvis/outreach/website-snapshot";
@@ -24,6 +24,8 @@ export interface LeadAnalysisResult {
   analysis_bullets: string[];
   observation: string;
   web_presence: WebPresenceResult;
+  /** Aus Website/Hinweisen extrahiert — nur wenn noch keine E-Mail hinterlegt */
+  discovered_contact_email: string | null;
 }
 
 const IT_HIGH = [
@@ -142,6 +144,20 @@ export async function analyzeLeadFromContext(input: {
 
   const observation = presence.webPresenceNote;
 
+  const emailSource = [
+    snapshot.textSample,
+    snapshot.title ?? "",
+    snapshot.description ?? "",
+    input.hints ?? "",
+  ].join(" ");
+
+  const discovered_contact_email = input.contact_email?.trim()
+    ? null
+    : pickBestContactEmail(emailSource, {
+        website: snapshot.url ?? input.website,
+        companyName: input.company_name,
+      });
+
   return {
     nis2_relevance_score: nis2.score,
     assessment_confidence: presence.webPresenceConfidence,
@@ -156,5 +172,6 @@ export async function analyzeLeadFromContext(input: {
     ].slice(0, 16),
     observation,
     web_presence: presence,
+    discovered_contact_email,
   };
 }

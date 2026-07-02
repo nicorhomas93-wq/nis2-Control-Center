@@ -153,6 +153,11 @@ export async function processOutreachLead(
       ? "ready"
       : "skipped";
 
+  const contactEmail =
+    row.contact_email?.trim() || analysis.discovered_contact_email || null;
+  const website =
+    row.website?.trim() || analysis.web_presence.detectedWebsiteUrl || null;
+
   const { data: updated, error: updateError } = await supabase
     .from("b2b_outreach_leads")
     .update({
@@ -162,6 +167,8 @@ export async function processOutreachLead(
       analysis_bullets: analysis.analysis_bullets,
       observation: analysis.observation,
       outreach_message,
+      contact_email: contactEmail,
+      website,
       ...webPresenceFieldsFromResult(analysis.web_presence),
       ...partnerFieldsFromPartnerScore(partner),
       status,

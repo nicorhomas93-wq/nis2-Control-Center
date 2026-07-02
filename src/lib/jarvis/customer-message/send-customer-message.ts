@@ -18,6 +18,7 @@ export interface SendCustomerMessageInput {
   delivery: CustomerMessageDelivery;
   subject?: string | null;
   body: string;
+  recipientEmail?: string | null;
   sentByUserId?: string | null;
   sentByEmail?: string | null;
   source?: "manual" | "automatic";
@@ -99,6 +100,18 @@ export async function sendCustomerMessage(
     throw new Error("Kunde nicht gefunden");
   }
 
+  const email =
+    input.recipientEmail?.trim() ||
+    recipient.email?.trim() ||
+    null;
+
+  if (input.entityType === "b2b_outreach_lead" && input.recipientEmail?.trim()) {
+    await supabase
+      .from("b2b_outreach_leads")
+      .update({ contact_email: input.recipientEmail.trim() })
+      .eq("id", input.entityId);
+  }
+
   if (recipient.consentBlocked && delivery !== "internal") {
     throw new Error("Kontakt untersagt (no_contact)");
   }
@@ -111,12 +124,12 @@ export async function sendCustomerMessage(
   if (delivery === "internal") {
     status = "logged";
   } else if (delivery === "mailto") {
-    if (!recipient.email) {
-      throw new Error("Keine E-Mail-Adresse hinterlegt");
+    if (!email) {
+      throw new Error("Keine E-Mail-Adresse — bitte Empfänger eintragen");
     }
     const subject = input.subject?.trim() || `TKND NIS2 — ${recipient.companyName}`;
     const mailBody = `${body}\n\n---\n${JARVIS_DISCLAIMER}`;
-    externalUrl = buildMailtoUrl(recipient.email, subject, mailBody);
+    externalUrl = buildMailtoUrl(email, subject, mailBody);
     status = "logged";
   } else if (delivery === "whatsapp") {
     if (!recipient.phone) {
@@ -128,13 +141,13 @@ export async function sendCustomerMessage(
     }
     status = "logged";
   } else if (delivery === "smtp") {
-    if (!recipient.email) {
-      throw new Error("Keine E-Mail-Adresse hinterlegt");
+    if (!email) {
+      throw new Error("Keine E-Mail-Adresse — bitte Empfänger eintragen");
     }
     const subject = input.subject?.trim() || `TKND NIS2 — ${recipient.companyName}`;
     const mailBody = `${body}\n\n---\n${JARVIS_DISCLAIMER}`;
     const mail = await sendLeadEmail({
-      to: recipient.email,
+      to: email,
       subject,
       body: mailBody,
       replyTo: process.env.PILOT_NOTIFICATION_EMAIL,
@@ -161,7 +174,7 @@ export async function sendCustomerMessage(
       source: input.source ?? "manual",
       trigger_type: input.triggerType ?? null,
       recipient_email:
-        delivery === "smtp" || delivery === "mailto" ? recipient.email : null,
+        delivery === "smtp" || delivery === "mailto" ? email : null,
       recipient_phone: delivery === "whatsapp" ? recipient.phone : null,
       sent_by: input.sentByUserId ?? null,
     })

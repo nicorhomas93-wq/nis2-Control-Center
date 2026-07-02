@@ -43,10 +43,12 @@ export function SendCustomerMessageModal({
   const [success, setSuccess] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [emailConfig, setEmailConfig] = useState<JarvisEmailConfig | null>(null);
+  const [recipientEmail, setRecipientEmail] = useState("");
 
   useEffect(() => {
     if (!open) return;
-    setChannel(target.email ? "email" : target.phone ? "whatsapp" : "internal");
+    setRecipientEmail(target.email?.trim() ?? "");
+    setChannel(target.email ? "email" : target.phone ? "whatsapp" : "email");
     setSubject(`TKND NIS2 — ${target.companyName}`);
     setBody(target.defaultBody?.trim() ?? "");
     setError(null);
@@ -69,9 +71,10 @@ export function SendCustomerMessageModal({
 
   if (!open) return null;
 
-  const canEmail = Boolean(target.email) && !target.consentBlocked;
+  const canEmail = !target.consentBlocked;
   const canWhatsApp = Boolean(target.phone) && !target.consentBlocked;
-  const mailConfigured = emailConfig?.configured ?? false;
+  const mailConfigured = emailConfig?.configured ?? true;
+  const hasRecipient = Boolean(recipientEmail.trim());
 
   function fullEmailBody(): string {
     const text = body.trim();
@@ -88,6 +91,10 @@ export function SendCustomerMessageModal({
 
   async function submit(delivery: CustomerMessageDelivery) {
     if (!body.trim()) return;
+    if ((delivery === "smtp" || delivery === "mailto") && !recipientEmail.trim()) {
+      setError("Bitte Empfänger-E-Mail eintragen.");
+      return;
+    }
 
     setLoading(delivery);
     setError(null);
@@ -104,6 +111,7 @@ export function SendCustomerMessageModal({
           delivery,
           subject: channel === "email" ? subject : null,
           body,
+          recipientEmail: channel === "email" ? recipientEmail.trim() : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -234,9 +242,23 @@ export function SendCustomerMessageModal({
                 onChange={(e) => setSubject(e.target.value)}
                 className="mt-1"
               />
-              {target.email && (
-                <p className="mt-1 text-xs text-slate-500">An: {target.email}</p>
-              )}
+              <div className="mt-3">
+                <Label htmlFor="msg-recipient">An (E-Mail)</Label>
+                <Input
+                  id="msg-recipient"
+                  type="email"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  placeholder="z. B. info@partner.de"
+                  className="mt-1"
+                />
+                {!hasRecipient && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Keine E-Mail am Lead — nach Analyse wird sie von der Website übernommen,
+                    oder hier manuell eintragen.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -304,7 +326,7 @@ export function SendCustomerMessageModal({
                   type="button"
                   variant="outline"
                   onClick={() => submit("mailto")}
-                  disabled={!!loading || !body.trim()}
+                  disabled={!!loading || !body.trim() || !hasRecipient}
                 >
                   {loading === "mailto" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -316,12 +338,8 @@ export function SendCustomerMessageModal({
                 <Button
                   type="button"
                   onClick={() => submit("smtp")}
-                  disabled={!!loading || !body.trim()}
-                  title={
-                    !mailConfigured
-                      ? "Versand über zentrale SMTP-Konfiguration (wie Pilotanfragen)"
-                      : undefined
-                  }
+                  disabled={!!loading || !body.trim() || !hasRecipient}
+                  title="Versand über zentrale SMTP-Konfiguration (wie Pilotanfragen)"
                 >
                   {loading === "smtp" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
