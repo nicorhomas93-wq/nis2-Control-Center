@@ -106,8 +106,8 @@ export function EmailDraftsList({
     <div className="space-y-4">
       {!emailConfig.configured && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          E-Mail-Versand nicht eingerichtet auf diesem Server.
-          {emailConfig.hint ? ` ${emailConfig.hint}` : ""}
+          Zentrale SMTP-Konfiguration nicht erkannt. Gleiche Variablen wie bei Pilotanfragen:
+          SMTP_HOST, SMTP_USER, SMTP_PASS.
         </p>
       )}
 
@@ -160,7 +160,7 @@ export function EmailDraftsList({
                 }
                 title={
                   !emailConfig.configured
-                    ? "Versand wird versucht — falls nicht konfiguriert, erscheint eine Fehlermeldung"
+                    ? "Versand über zentrale SMTP-Konfiguration (wie Pilotanfragen)"
                     : undefined
                 }
               >
@@ -170,7 +170,9 @@ export function EmailDraftsList({
             </div>
             <p className="text-xs text-slate-400">
               Intern gespeichert · Erstellt: {formatDate(draft.created_at)}
-              {emailConfig.configured ? ` · Versand: ${emailConfig.label}` : ""}
+              {emailConfig.configured
+                ? ` · Versand: ${emailConfig.label} (${emailConfig.sharedWith})`
+                : ""}
             </p>
           </CardContent>
         </Card>

@@ -12,20 +12,21 @@ export interface OutboundEmailPayload {
   to: string;
   subject: string;
   body: string;
+  html?: string;
   replyTo?: string;
+  from?: string;
 }
 
 function parseSmtpPass(raw?: string): string {
   return raw?.trim().replace(/^["']|["']$/g, "") ?? "";
 }
 
-function getFromAddress(): string {
+/** Wie Pilot-Benachrichtigungen: SMTP_USER hat Vorrang (M365/Strato). */
+function getFromAddress(override?: string): string {
+  if (override?.trim()) return override.trim();
   const user = process.env.SMTP_USER?.trim() ?? "";
-  return (
-    process.env.PILOT_EMAIL_FROM?.trim() ||
-    user ||
-    PILOT_NOTIFICATION_EMAIL
-  );
+  const configured = process.env.PILOT_EMAIL_FROM?.trim();
+  return user || configured || PILOT_NOTIFICATION_EMAIL;
 }
 
 function getFromName(): string {
@@ -62,13 +63,14 @@ async function sendViaResend(payload: OutboundEmailPayload): Promise<OutboundEma
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        from: getFromAddress(),
-        to: [payload.to],
-        reply_to: payload.replyTo,
-        subject: payload.subject,
-        text: payload.body,
-      }),
+        body: JSON.stringify({
+          from: getFromAddress(payload.from),
+          to: [payload.to],
+          reply_to: payload.replyTo,
+          subject: payload.subject,
+          text: payload.body,
+          html: payload.html,
+        }),
     });
 
     if (!res.ok) {
@@ -144,7 +146,10 @@ async function sendViaGraph(payload: OutboundEmailPayload): Promise<OutboundEmai
             subject: payload.subject,
             body: { contentType: "Text", content: payload.body },
             from: {
-              emailAddress: { address: getFromAddress(), name: getFromName() },
+              emailAddress: {
+                address: getFromAddress(payload.from),
+                name: getFromName(),
+              },
             },
             toRecipients: [{ emailAddress: { address: payload.to } }],
             replyTo: payload.replyTo
@@ -195,11 +200,12 @@ async function sendViaSmtpHost(
 
   try {
     await transporter.sendMail({
-      from: getFromAddress(),
+      from: getFromAddress(payload.from),
       to: payload.to,
       replyTo: payload.replyTo ?? PILOT_NOTIFICATION_EMAIL,
       subject: payload.subject,
       text: payload.body,
+      html: payload.html,
     });
     return { sent: true, method: "smtp" };
   } catch (error) {
@@ -260,5 +266,48 @@ export async function sendOutboundEmail(
   return {
     sent: false,
     error: combinedError || "E-Mail-Versand fehlgeschlagen",
+  };
+}
+
+export interface OutboundEmailConfig {
+  configured: boolean;
+  provider: OutboundEmailMethod | null;
+  providers: OutboundEmailMethod[];
+  label: string;
+}
+
+/** Zentrale Konfiguration — dieselben Env-Variablen wie Pilot & Einladungen. */
+export function getOutboundEmailConfig(): OutboundEmailConfig {
+  const providers: OutboundEmailMethod[] = [];
+  const labels: string[] = [];
+
+  if (hasResendConfig()) {
+    providers.push("resend");
+    labels.push("Resend");
+  }
+  if (hasGraphConfig()) {
+    providers.push("graph");
+    labels.push("Microsoft Graph");
+  }
+  if (hasSmtpConfig()) {
+    providers.push("smtp");
+    const host = process.env.SMTP_HOST?.trim();
+    labels.push(host ? `SMTP ${host}` : "SMTP");
+  }
+
+  if (providers.length === 0) {
+    return {
+      configured: false,
+      provider: null,
+      providers: [],
+      label: "E-Mail-Versand nicht eingerichtet",
+    };
+  }
+
+  return {
+    configured: true,
+    provider: providers[0] ?? null,
+    providers,
+    label: labels.join(" → "),
   };
 }

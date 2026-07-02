@@ -56,14 +56,7 @@ export function SendCustomerMessageModal({
     fetch("/api/jarvis/email-config")
       .then((res) => res.json())
       .then((data) => setEmailConfig(data))
-      .catch(() =>
-        setEmailConfig({
-          configured: false,
-          provider: null,
-          providers: [],
-          label: "E-Mail-Versand nicht eingerichtet",
-        })
-      );
+      .catch(() => setEmailConfig(null));
   }, [open, target]);
 
   useEffect(() => {
@@ -214,16 +207,21 @@ export function SendCustomerMessageModal({
 
           {channel === "email" && emailConfig && !mailConfigured && (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              E-Mail-Versand nicht eingerichtet auf diesem Server.
-              {emailConfig.hint ? ` ${emailConfig.hint}` : ""}
-              {" "}Nutzen Sie Kopieren oder Mailprogramm öffnen, oder konfigurieren Sie die
-              Umgebungsvariablen in Vercel.
+              Zentrale SMTP-Konfiguration auf diesem Server nicht erkannt. Nutzen Sie
+              Kopieren oder Mailprogramm öffnen — oder prüfen Sie SMTP_HOST, SMTP_USER und
+              SMTP_PASS (gleiche Variablen wie bei Pilotanfragen).
             </p>
           )}
 
           {channel === "email" && emailConfig?.configured && (
             <p className="text-xs text-slate-500">
-              Versand aktiv: {emailConfig.label}
+              Versand über {emailConfig.label} — {emailConfig.sharedWith}
+            </p>
+          )}
+
+          {channel === "email" && !emailConfig && (
+            <p className="text-xs text-slate-500">
+              Versand über die zentrale SMTP-Konfiguration (wie Pilotanfragen).
             </p>
           )}
 
@@ -321,7 +319,7 @@ export function SendCustomerMessageModal({
                   disabled={!!loading || !body.trim()}
                   title={
                     !mailConfigured
-                      ? "Versand wird versucht — falls nicht konfiguriert, erscheint eine Fehlermeldung"
+                      ? "Versand über zentrale SMTP-Konfiguration (wie Pilotanfragen)"
                       : undefined
                   }
                 >
