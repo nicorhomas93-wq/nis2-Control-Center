@@ -12,6 +12,8 @@ import { applyDataQualityCap, calculateDataQuality } from "@/lib/compliance/data
 import { applyTaskAuditImpact } from "@/lib/compliance/task-score-impact";
 import type { TaskItem } from "@/lib/tasks/types";
 import type { Document, Incident, Measure, Risk } from "@/lib/types";
+import type { ComplianceEvidenceEntryWithFiles } from "@/lib/compliance-evidence/types";
+import { getAuditReadinessDeduction } from "@/lib/compliance-evidence/scoring";
 
 export const AUDIT_READINESS_LABELS: Record<AuditReadinessLevel, string> = {
   ready: "auditbereit",
@@ -34,6 +36,7 @@ export function calculateAuditReadiness(
     incidents: Incident[];
     tasks?: TaskItem[];
     vendors?: import("@/lib/vendors/types").VendorWithDetails[];
+    complianceEvidence?: ComplianceEvidenceEntryWithFiles[];
   },
   securityScore?: number
 ): AuditReadinessResult {
@@ -156,6 +159,17 @@ export function calculateAuditReadiness(
     score = applyTaskAuditImpact(score, input.tasks, reasons);
   }
 
+  const evidenceImpact = getAuditReadinessDeduction(
+    input.complianceEvidence ?? [],
+    input.company ?? null
+  );
+  if (evidenceImpact.deduction > 0) {
+    score -= evidenceImpact.deduction;
+    for (const reason of evidenceImpact.reasons.slice(0, 3)) {
+      reasons.push(reason);
+    }
+  }
+
   const dataQuality = calculateDataQuality({
     company: input.company ?? null,
     risks: input.risks,
@@ -163,6 +177,7 @@ export function calculateAuditReadiness(
     documents: input.documents,
     tasks: input.tasks,
     vendors: input.vendors,
+    complianceEvidence: input.complianceEvidence,
   });
   score = applyDataQualityCap(score, dataQuality);
 

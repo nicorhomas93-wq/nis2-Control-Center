@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createTaskIfNotExists } from "@/lib/tasks/service";
 import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
+import type { ComplianceEvidenceEntryWithFiles } from "@/lib/compliance-evidence/types";
+import { deriveEntryStatus } from "@/lib/compliance-evidence/scoring";
+import {
+  getNis2EvidenceScope,
+  isEntryMandatoryForCompany,
+  isNis2StatusUnknown,
+} from "@/lib/compliance-evidence/types";
 import { isWorkComplete } from "@/lib/compliance/obligations";
 import { getMissingAuditDocumentTypes } from "@/lib/audit/audit-folders";
 import { deriveRiskProblemTitle } from "@/lib/compliance/risk-display";
@@ -153,15 +160,72 @@ export async function autoTaskFromAuditGaps(
   }
 }
 
+export async function autoTaskClarifyNis2Status(
+  supabase: SupabaseClient,
+  company: Pick<Company, "id" | "nis2_status">,
+  createdBy?: string
+): Promise<void> {
+  if (!isNis2StatusUnknown(company.nis2_status)) return;
+  await createTaskIfNotExists(supabase, {
+    companyId: company.id,
+    title: "NIS2-Betroffenheit klären",
+    description:
+      "Der NIS2-Betroffenheitsstatus ist unklar. Bitte den Betroffenheitscheck durchführen.",
+    taskType: "document",
+    priority: "high",
+    createdBy,
+    relatedType: "nis2_assessment",
+    relatedId: company.id,
+    evidenceRequired: false,
+  });
+}
+
+export async function autoTaskFromComplianceEvidenceGaps(
+  supabase: SupabaseClient,
+  company: Pick<Company, "id" | "nis2_status">,
+  entries: ComplianceEvidenceEntryWithFiles[],
+  createdBy?: string
+): Promise<void> {
+  const scope = getNis2EvidenceScope(company);
+  if (scope === "voluntary") return;
+
+  await autoTaskClarifyNis2Status(supabase, company, createdBy);
+
+  for (const entry of entries) {
+    if (!isEntryMandatoryForCompany(entry, company)) continue;
+    const status = deriveEntryStatus(entry, entry.files, company);
+    if (
+      status !== "nachweis_fehlt" &&
+      status !== "unvollstaendig" &&
+      status !== "abgelaufen" &&
+      status !== "review_faellig"
+    ) {
+      continue;
+    }
+    await createTaskIfNotExists(supabase, {
+      companyId: company.id,
+      title: "Nachweis hochladen",
+      description: `Schulungen & Nachweise: ${entry.title}`,
+      taskType: "evidence",
+      priority: status === "abgelaufen" ? "high" : "medium",
+      createdBy,
+      relatedType: "compliance_evidence",
+      relatedId: entry.id,
+      evidenceRequired: true,
+    });
+  }
+}
+
 export async function runAutoTasksForCompany(
   supabase: SupabaseClient,
   companyId: string,
   data: {
-    company?: Pick<Company, "vendors_applicability"> | null;
+    company?: Pick<Company, "id" | "nis2_status" | "vendors_applicability"> | null;
     risks: Risk[];
     measures: Measure[];
     documents: Document[];
     incidents: Incident[];
+    complianceEvidence?: ComplianceEvidenceEntryWithFiles[];
   },
   createdBy?: string
 ): Promise<void> {
@@ -180,4 +244,12 @@ export async function runAutoTasksForCompany(
     await autoTaskFromIncident(supabase, incident, createdBy);
   }
   await autoTaskFromAuditGaps(supabase, companyId, data.documents, createdBy, data.company);
+  if (data.company) {
+    await autoTaskFromComplianceEvidenceGaps(
+      supabase,
+      data.company,
+      data.complianceEvidence ?? [],
+      createdBy
+    );
+  }
 }

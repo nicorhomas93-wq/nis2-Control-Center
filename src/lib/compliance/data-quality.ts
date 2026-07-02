@@ -11,6 +11,16 @@ import { isWorkComplete } from "@/lib/compliance/obligations";
 import type { TaskItem } from "@/lib/tasks/types";
 import { isTaskOpen } from "@/lib/tasks/types";
 import { countMissingEvidence, isReviewDue } from "@/lib/vendors/scoring";
+import type { ComplianceEvidenceEntryWithFiles } from "@/lib/compliance-evidence/types";
+import {
+  deriveEntryStatus,
+  countMandatoryGaps,
+} from "@/lib/compliance-evidence/scoring";
+import {
+  getNis2EvidenceScope,
+  isEntryMandatoryForCompany,
+  isNis2StatusUnknown,
+} from "@/lib/compliance-evidence/types";
 
 export type DataQualityStatus =
   | "confirmed_with_evidence"
@@ -54,6 +64,7 @@ export function calculateDataQuality(input: {
   documents: Document[];
   tasks?: TaskItem[];
   vendors?: VendorWithDetails[];
+  complianceEvidence?: ComplianceEvidenceEntryWithFiles[];
 }): DataQualityResult {
   const checks: DataQualityCheck[] = [];
   const hints: string[] = [];
@@ -218,6 +229,69 @@ export function calculateDataQuality(input: {
     hints.push(
       `${vendorReviewsDue} Lieferantenbewertung${vendorReviewsDue === 1 ? "" : "en"} fällig.`
     );
+  }
+
+  if (vendorReviewsDue > 0) {
+    hints.push(
+      `${vendorReviewsDue} Lieferantenbewertung${vendorReviewsDue === 1 ? "" : "en"} fällig.`
+    );
+  }
+
+  const evidenceScope = getNis2EvidenceScope(input.company);
+  const complianceEntries = input.complianceEvidence ?? [];
+
+  if (isNis2StatusUnknown(input.company?.nis2_status)) {
+    checks.push({
+      checkKey: "nis2_evidence_scope",
+      status: "missing",
+      qualityLevel: "medium",
+      reason: "NIS2-Betroffenheit nicht geklärt — Schulungsnachweise unklar",
+    });
+    hints.push("Bitte NIS2-Betroffenheit klären (Betroffenheitscheck).");
+  } else if (evidenceScope === "voluntary") {
+    checks.push({
+      checkKey: "compliance_evidence_voluntary",
+      status: "confirmed",
+      qualityLevel: "low",
+      reason: "Schulungen & Nachweise — freiwillig empfohlen",
+    });
+  }
+
+  if (evidenceScope === "mandatory" || evidenceScope === "unknown") {
+    const mandatoryGaps = countMandatoryGaps(complianceEntries, input.company);
+    if (mandatoryGaps > 0) {
+      checks.push({
+        checkKey: "compliance_evidence_gaps",
+        status: "missing",
+        qualityLevel: mandatoryGaps >= 3 ? "high" : "medium",
+        reason: `${mandatoryGaps} fehlende oder abgelaufene Schulungs-/Nachweis-Einträge`,
+      });
+      hints.push(
+        `${mandatoryGaps} Pflichtnachweis${mandatoryGaps === 1 ? "" : "e"} im Modul Schulungen & Nachweise fehlen.`
+      );
+    } else if (complianceEntries.length > 0) {
+      checks.push({
+        checkKey: "compliance_evidence",
+        status: "confirmed_with_evidence",
+        qualityLevel: "medium",
+        reason: `${complianceEntries.length} Nachweis-Einträge dokumentiert`,
+      });
+    }
+
+    for (const entry of complianceEntries) {
+      if (!isEntryMandatoryForCompany(entry, input.company)) continue;
+      const status = deriveEntryStatus(entry, entry.files, input.company);
+      if (status === "abgelaufen" || status === "review_faellig") {
+        checks.push({
+          checkKey: `compliance-evidence-${entry.id}`,
+          status: "missing",
+          qualityLevel: "medium",
+          reason: `${entry.title}: ${status === "abgelaufen" ? "abgelaufen" : "Review fällig"}`,
+          relatedType: "compliance_evidence",
+          relatedId: entry.id,
+        });
+      }
+    }
   }
 
   if (unconfirmedRisks > 0) {

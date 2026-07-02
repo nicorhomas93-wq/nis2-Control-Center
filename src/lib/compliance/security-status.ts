@@ -20,6 +20,12 @@ import { applyTaskScoreImpact } from "@/lib/compliance/task-score-impact";
 import type { TaskItem } from "@/lib/tasks/types";
 import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
 import type { VendorWithDetails } from "@/lib/vendors/types";
+import type { ComplianceEvidenceEntryWithFiles } from "@/lib/compliance-evidence/types";
+import { deriveEntryStatus } from "@/lib/compliance-evidence/scoring";
+import {
+  isEntryMandatoryForCompany,
+  isNis2StatusUnknown,
+} from "@/lib/compliance-evidence/types";
 import { getDocumentTypeLabel } from "@/lib/nis2/document-types";
 
 function securityLevelFromScore(score: number): SecurityLevel {
@@ -41,6 +47,7 @@ export function calculateSecurityStatus(input: {
   incidents: Incident[];
   tasks?: TaskItem[];
   vendors?: VendorWithDetails[];
+  complianceEvidence?: ComplianceEvidenceEntryWithFiles[];
 }): SecurityStatusResult {
   const drivers: ScoreDriver[] = [];
   let score = 100;
@@ -233,6 +240,45 @@ export function calculateSecurityStatus(input: {
 
   if (input.tasks?.length) {
     score = applyTaskScoreImpact(score, input.tasks, (driver) => addDriver(drivers, driver));
+  }
+
+  if (input.complianceEvidence?.length && input.company) {
+    for (const entry of input.complianceEvidence) {
+      if (!isEntryMandatoryForCompany(entry, input.company)) continue;
+      const status = deriveEntryStatus(entry, entry.files, input.company);
+      if (
+        status === "nachweis_fehlt" ||
+        status === "unvollstaendig" ||
+        status === "abgelaufen"
+      ) {
+        const impact = status === "abgelaufen" ? 6 : 4;
+        score -= impact;
+        addDriver(drivers, {
+          id: `compliance-evidence-${entry.id}`,
+          title: `Nachweis fehlt oder abgelaufen: ${entry.title}`,
+          asset: "Schulungen & Nachweise",
+          severity: status === "abgelaufen" ? "Hoch" : "Mittel",
+          impact,
+          recommendation: `Nachweis im Modul Schulungen & Nachweise hochladen: ${entry.title}`,
+          category: "documents",
+          label: entry.title,
+        });
+      }
+    }
+  }
+
+  if (isNis2StatusUnknown(input.company?.nis2_status)) {
+    score -= 3;
+    addDriver(drivers, {
+      id: "nis2-status-unknown",
+      title: "NIS2-Betroffenheit nicht geklärt",
+      asset: "Betroffenheitscheck",
+      severity: "Mittel",
+      impact: 3,
+      recommendation: "Betroffenheitscheck durchführen, um Pflichtlogik für Nachweise zu klären",
+      category: "documents",
+      label: "NIS2-Status unklar",
+    });
   }
 
   score = Math.max(0, Math.min(100, score));

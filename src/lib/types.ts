@@ -8,6 +8,18 @@ import type { VendorApplicability } from "@/lib/vendors/types";
 export type { DetectedWebsiteType, WebPresenceEvidence, WebPresenceStatus };
 export type { CompanyAsset, AssetCategory, AssetCriticality } from "@/lib/assets/types";
 export type {
+  ComplianceEvidenceEntry,
+  ComplianceEvidenceFile,
+  ComplianceEvidenceEntryWithFiles,
+  ComplianceEvidenceDashboardStats,
+  EvidenceCategory,
+  EvidenceEntryType,
+  EvidenceEntryStatus,
+  EvidenceMandatoryRelevance,
+  EvidenceExternalLink,
+  Nis2EvidenceScope,
+} from "@/lib/compliance-evidence/types";
+export type {
   CompanyVendor,
   VendorEvidence,
   VendorAssessment,

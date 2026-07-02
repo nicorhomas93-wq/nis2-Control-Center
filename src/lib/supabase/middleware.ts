@@ -29,6 +29,8 @@ const PROTECTED_PREFIXES = [
   "/measures",
   "/incidents",
   "/audit",
+  "/schulungen",
+  "/lieferanten",
   "/export",
   "/jarvis",
   "/settings",

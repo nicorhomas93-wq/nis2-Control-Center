@@ -11,6 +11,7 @@ import {
 import type { OnboardingDataInput } from "@/lib/onboarding/evaluate";
 import type { CompanyAsset } from "@/lib/assets/types";
 import type { VendorWithDetails } from "@/lib/vendors/types";
+import type { ComplianceEvidenceEntryWithFiles } from "@/lib/compliance-evidence/types";
 
 export interface ComplianceDataInput {
   company: Company | null;
@@ -21,6 +22,7 @@ export interface ComplianceDataInput {
   tasks?: TaskItem[];
   assets?: CompanyAsset[];
   vendors?: VendorWithDetails[];
+  complianceEvidence?: ComplianceEvidenceEntryWithFiles[];
   onboarding?: Pick<
     OnboardingDataInput,
     "evidenceCount" | "assessmentCount" | "auditExportCount" | "teamMemberCount"
@@ -42,10 +44,12 @@ export function buildComplianceSnapshot(input: ComplianceDataInput): ComplianceS
     documents: input.documents,
     tasks: input.tasks,
     vendors: input.vendors,
+    complianceEvidence: input.complianceEvidence,
   });
   const securityStatus = calculateSecurityStatus({
     ...input,
     vendors: input.vendors,
+    complianceEvidence: input.complianceEvidence,
   });
   let nextSteps = buildNextSteps(
     {
