@@ -13,7 +13,7 @@ import {
   getAuditFolderStatuses,
 } from "@/lib/audit/audit-folders";
 import { AUDIT_STATUS_LABELS } from "@/lib/audit/audit-folder-quality";
-import { buildStructuredAuditSummary } from "@/lib/audit/audit-summary";
+import { buildStructuredAuditSummary, buildAuditSummaryReportData } from "@/lib/audit/audit-summary";
 import { buildComplianceSnapshot } from "@/lib/compliance/snapshot";
 import { syncCompanySecurityScore } from "@/lib/compliance/sync";
 import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
@@ -99,6 +99,19 @@ export async function POST(request: Request) {
     aiNarrative,
     securityScore: snapshot.securityStatus.score,
     auditReadinessPercent: auditReadiness.percent,
+    dataQualityPercent: snapshot.dataQuality.percent,
+    nextSteps,
+  });
+
+  const reportData = buildAuditSummaryReportData({
+    company: companyWithScore,
+    documents: docs,
+    measures: meas,
+    risks: riskList,
+    aiNarrative,
+    securityScore: snapshot.securityStatus.score,
+    auditReadinessPercent: auditReadiness.percent,
+    dataQualityPercent: snapshot.dataQuality.percent,
     nextSteps,
   });
 
@@ -107,6 +120,7 @@ export async function POST(request: Request) {
     company: companyWithScore,
     summary: aiNarrative,
     summary_text: summaryText,
+    report_data: reportData,
     audit_score: auditScore,
     security_score: securityScore,
     audit_readiness: auditReadiness,
@@ -150,6 +164,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     export: exportPayload,
     summary_text: summaryText,
+    report_data: reportData,
     audit_score: auditScore,
     folder_statuses: folderStatuses,
     mode: aiContent ? "openai" : "demo",

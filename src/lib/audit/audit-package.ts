@@ -3,23 +3,33 @@ import { saveAs } from "file-saver";
 import type { Company, Document, Measure, Risk } from "@/lib/types";
 import { AUDIT_FOLDERS } from "@/lib/audit/audit-folders";
 import { getAuditFolderPdfBasename } from "@/lib/audit/audit-folder-quality";
-import { buildAuditReadme } from "@/lib/audit/audit-summary";
+import {
+  buildAuditReadme,
+  buildStructuredAuditSummary,
+  type AuditSummaryReportData,
+} from "@/lib/audit/audit-summary";
 import {
   buildAuditDocumentPdfHtml,
   buildAuditSummaryPdfHtml,
   buildPlaceholderAuditPdfHtml,
 } from "@/lib/audit/audit-pdf";
-import { generateAuditPackageFileName } from "@/lib/fileNaming";
+import {
+  generateAuditPackageFileName,
+  generateAuditSummaryPdfFileName,
+} from "@/lib/fileNaming";
 import { generatePdfBlobFromHtml } from "@/lib/documents/pdf-export";
+import type { ResolvedBranding } from "@/lib/white-label/types";
+import { DEFAULT_BRANDING } from "@/lib/white-label/types";
 
 export interface DownloadAuditPackageOptions {
   documents: Document[];
   companyName?: string;
   company?: Pick<Company, "company_name" | "nis2_status" | "security_contact_name"> | null;
-  summaryText: string;
+  reportData: AuditSummaryReportData;
   risks?: Risk[];
   measures?: Measure[];
   folderStatuses?: ReturnType<typeof import("@/lib/audit/audit-folders").getAuditFolderStatuses>;
+  branding?: ResolvedBranding;
   onProgress?: (message: string) => void;
 }
 
@@ -30,29 +40,52 @@ export async function downloadAuditPackage({
   documents,
   companyName,
   company,
-  summaryText,
+  reportData,
   risks = [],
   measures = [],
   folderStatuses,
+  branding = DEFAULT_BRANDING,
   onProgress,
 }: DownloadAuditPackageOptions): Promise<string> {
   const zip = new JSZip();
-  const exportDate = new Date();
+  const exportDate = new Date(reportData.generatedAt);
 
   onProgress?.("Audit-Paket wird vorbereitet…");
 
+  const summaryText = buildStructuredAuditSummary({
+    company: {
+      ...(company as Company),
+      company_name: reportData.companyName,
+      nis2_status: reportData.nis2StatusKey,
+      security_score: reportData.securityScore,
+      compliance_score: reportData.complianceScore,
+    },
+    documents,
+    measures,
+    risks,
+    aiNarrative: reportData.aiNarrative,
+    generatedAt: reportData.generatedAt,
+    securityScore: reportData.securityScore,
+    auditReadinessPercent: reportData.auditReadinessPercent,
+    dataQualityPercent: reportData.dataQualityPercent,
+    nextSteps: reportData.nextSteps,
+  });
+
   zip.file(
     "README_Audit_Ordner.txt",
-    buildAuditReadme(companyName, folderStatuses, exportDate)
+    `${buildAuditReadme(companyName, folderStatuses, exportDate)}\n\nTECHNISCHER ANHANG — TEXTVERSION\n================================\n\n${summaryText}`
   );
-  zip.file("Audit_Zusammenfassung.txt", summaryText);
 
-  onProgress?.("Audit-Zusammenfassung als PDF wird erstellt…");
+  onProgress?.("Audit-Report wird erstellt…");
+  const summaryPdfName = generateAuditSummaryPdfFileName({
+    companyName: reportData.companyName,
+    date: exportDate,
+  });
   const summaryPdf = await generatePdfBlobFromHtml(
-    buildAuditSummaryPdfHtml(summaryText, companyName),
-    "Audit_Zusammenfassung.pdf"
+    buildAuditSummaryPdfHtml(reportData, branding),
+    summaryPdfName
   );
-  zip.file("Audit_Zusammenfassung.pdf", summaryPdf.blob);
+  zip.file(summaryPdfName, summaryPdf.blob);
 
   for (const folder of AUDIT_FOLDERS) {
     const doc = documents.find((d) => d.document_type === folder.documentType);

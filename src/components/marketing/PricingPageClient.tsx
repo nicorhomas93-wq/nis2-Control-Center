@@ -21,11 +21,21 @@ import { PilotStartButton } from "@/components/billing/PilotStartButton";
 import { cn } from "@/lib/utils";
 
 const VALUE_PROPOSITIONS = [
-  "Sie sehen jederzeit Ihren aktuellen Sicherheitsstatus",
-  "Sie wissen sofort, was zu tun ist",
-  "Risiken, Maßnahmen und Dokumentation sind automatisch verknüpft",
-  "Ihr System ist jederzeit auditbereit vorbereitet",
-  "Prüfungsunterlagen mit einem Klick exportieren",
+  "Live Sicherheitsstatus und Audit-Bereitschaft auf einen Blick",
+  "Risiken, Maßnahmen, Aufgaben und Nachweise zentral verknüpft",
+  "Schulungen, Lieferanten und Compliance-Nachweise in einem System",
+  "Professionelle Audit-Reports als PDF — jederzeit exportierbar",
+  "10 Audit-Bereiche strukturiert für Prüfungen vorbereitet",
+  "NIS2-Pflichtlogik: betroffen, freiwillig oder Status unklar",
+];
+
+const PRODUCT_MODULES = [
+  { title: "Betroffenheit & Profil", text: "NIS2-Einstufung, Unternehmensprofil und Asset-Basis" },
+  { title: "Risiken & Maßnahmen", text: "Risikoanalyse, Maßnahmenplan und Aufgabensteuerung" },
+  { title: "Schulungen & Nachweise", text: "Nachweiscenter mit Vorlagen, Reviews und Audit-Export" },
+  { title: "Lieferanten", text: "Lieferantenbewertung, Nachweise und Audit-Bereich 08" },
+  { title: "Audit-Ordner", text: "10 Bereiche, PDF-Reports und ZIP-Paket für Prüfungen" },
+  { title: "Incidents & Fragebögen", text: "Vorfall-Dokumentation und Compliance-Fragebögen" },
 ];
 
 export function PricingPageClient() {
@@ -94,8 +104,8 @@ export function PricingPageClient() {
             Steuern Sie Ihre NIS2-Compliance aktiv – statt sie nur zu dokumentieren.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-600">
-            Live Sicherheitsstatus, klare nächste Schritte und vollständige Audit-Bereitschaft in
-            einem System.
+            Von der NIS2-Einstufung über Risiken und Nachweise bis zum professionellen Audit-Report —
+            alles in einer Plattform.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link href="/check">
@@ -237,11 +247,31 @@ export function PricingPageClient() {
           </ul>
         </section>
 
+        <section className="mt-12 rounded-2xl border border-slate-200 bg-slate-50 p-8 sm:p-10">
+          <h2 className="text-center text-2xl font-bold text-slate-900">
+            Enthaltene Module
+          </h2>
+          <p className="mx-auto mt-3 max-w-2xl text-center text-slate-600">
+            Ein durchgängiges System — von der Erfassung bis zum auditfähigen Export.
+          </p>
+          <div className="mx-auto mt-8 grid max-w-4xl gap-4 sm:grid-cols-2">
+            {PRODUCT_MODULES.map((module) => (
+              <div
+                key={module.title}
+                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <p className="font-semibold text-slate-900">{module.title}</p>
+                <p className="mt-1 text-sm text-slate-600">{module.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Vertrauen */}
         <p className="mx-auto mt-12 max-w-2xl text-center text-lg leading-relaxed text-slate-600">
           Kein Chaos bei Prüfungen. Keine unklaren Zustände.
           <br />
-          Volle Kontrolle über Ihre NIS2-Compliance – jederzeit.
+          Volle Kontrolle über Risiken, Nachweise und Audit-Bereitschaft — jederzeit.
         </p>
 
         <p className="mt-10 text-center text-sm text-slate-500">

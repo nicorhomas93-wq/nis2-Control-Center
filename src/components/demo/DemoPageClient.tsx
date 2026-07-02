@@ -7,7 +7,7 @@ import {
   getAuditFolderStatuses,
 } from "@/lib/audit/audit-folders";
 import { downloadAuditPackage } from "@/lib/audit/audit-package";
-import { buildStructuredAuditSummary } from "@/lib/audit/audit-summary";
+import { buildAuditSummaryReportData } from "@/lib/audit/audit-summary";
 import {
   DEMO_ASSESSMENT,
   DEMO_COMPANY,
@@ -56,7 +56,7 @@ export function DemoPageClient() {
     setZipLoading(true);
     setZipProgress("Demo-Audit-Paket wird erstellt…");
     try {
-      const summary = buildStructuredAuditSummary({
+      const report = buildAuditSummaryReportData({
         company: DEMO_COMPANY,
         documents: DEMO_DOCUMENTS,
         measures: DEMO_MEASURES,
@@ -65,7 +65,8 @@ export function DemoPageClient() {
       await downloadAuditPackage({
         documents: DEMO_DOCUMENTS,
         companyName: DEMO_COMPANY.company_name ?? undefined,
-        summaryText: summary,
+        company: DEMO_COMPANY,
+        reportData: report,
         onProgress: setZipProgress,
       });
       setZipProgress("Demo-ZIP heruntergeladen.");

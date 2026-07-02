@@ -129,3 +129,15 @@ export function generateAuditPackageFileName({
   const datePart = formatFileNameDate(date);
   return `TKND_NIS2_${company}_Audit_Ordner_${datePart}.zip`;
 }
+
+/**
+ * Audit_Zusammenfassung_[Unternehmen]_[Datum].pdf
+ */
+export function generateAuditSummaryPdfFileName({
+  companyName,
+  date = new Date(),
+}: GenerateAuditPackageFileNameParams): string {
+  const company = normalizeFileNamePart(companyName || "Unternehmen");
+  const datePart = formatFileNameDate(date);
+  return `Audit_Zusammenfassung_${company}_${datePart}.pdf`;
+}

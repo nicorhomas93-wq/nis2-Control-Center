@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Company, Document, DocumentType, Measure, Nis2Status, Risk } from "@/lib/types";
@@ -13,8 +13,13 @@ import {
   getMissingAuditDocumentTypes,
 } from "@/lib/audit/audit-folders";
 import { downloadAuditPackage } from "@/lib/audit/audit-package";
-import { downloadAuditAreaPdf } from "@/lib/audit/audit-pdf";
-import { buildStructuredAuditSummary } from "@/lib/audit/audit-summary";
+import { downloadAuditAreaPdf, downloadAuditSummaryPdf } from "@/lib/audit/audit-pdf";
+import {
+  buildAuditSummaryReportData,
+  type AuditSummaryReportData,
+} from "@/lib/audit/audit-summary";
+import { generateAuditSummaryPdfFileName } from "@/lib/fileNaming";
+import { useBranding } from "@/components/layout/BrandingProvider";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -45,10 +50,12 @@ interface AuditPageClientProps {
   initialRisks: Risk[];
 }
 
-const EXPORT_PREP_MESSAGE = "Audit-Paket wird vorbereitet…";
-const EXPORT_SUCCESS_MESSAGE = "Audit-Paket erfolgreich erstellt.";
-const EXPORT_ERROR_MESSAGE =
-  "Export konnte nicht erstellt werden. Bitte prüfen Sie fehlende Inhalte.";
+const REPORT_PREP_MESSAGE = "Audit-Report wird erstellt…";
+const REPORT_SUCCESS_MESSAGE = "Audit-Report wurde erfolgreich als PDF erstellt.";
+const REPORT_ERROR_PREFIX = "Audit-Report konnte nicht erstellt werden:";
+const ZIP_PREP_MESSAGE = "Audit-Paket wird vorbereitet…";
+const ZIP_SUCCESS_MESSAGE = "Audit-Paket erfolgreich erstellt.";
+const ZIP_ERROR_MESSAGE = "Audit-Paket konnte nicht erstellt werden.";
 
 export function AuditPageClient({
   companyId,
@@ -64,10 +71,13 @@ export function AuditPageClient({
   initialRisks,
 }: AuditPageClientProps) {
   const router = useRouter();
+  const branding = useBranding();
+  const foldersRef = useRef<HTMLDivElement>(null);
   const [documents, setDocuments] = useState(initialDocuments);
   const [measures] = useState(initialMeasures);
   const [risks] = useState(initialRisks);
-  const [summaryText, setSummaryText] = useState<string | null>(null);
+  const [reportData, setReportData] = useState<AuditSummaryReportData | null>(null);
+  const [reportFileName, setReportFileName] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [zipLoading, setZipLoading] = useState(false);
   const [zipProgress, setZipProgress] = useState<string | null>(null);
@@ -174,35 +184,9 @@ export function AuditPageClient({
     router.refresh();
   }
 
-  async function handleCreateSummary() {
-    setSummaryLoading(true);
-    setError(null);
-    setExportSuccess(null);
-    setZipProgress(EXPORT_PREP_MESSAGE);
-
-    const res = await fetch("/api/generate-audit-summary", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ companyId }),
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.error ?? EXPORT_ERROR_MESSAGE);
-      setSummaryLoading(false);
-      setZipProgress(null);
-      return;
-    }
-
-    setSummaryText(data.summary_text ?? data.export?.summary_text ?? null);
-    setExportSuccess(EXPORT_SUCCESS_MESSAGE);
-    setZipProgress(null);
-    setSummaryLoading(false);
-  }
-
-  function getSummaryForExport(): string {
-    if (summaryText) return summaryText;
-    return buildStructuredAuditSummary({
+  function getReportForExport(): AuditSummaryReportData {
+    if (reportData) return reportData;
+    return buildAuditSummaryReportData({
       company: companyCtx,
       documents,
       measures,
@@ -211,38 +195,90 @@ export function AuditPageClient({
     });
   }
 
+  async function handleCreateSummary() {
+    setSummaryLoading(true);
+    setError(null);
+    setExportSuccess(null);
+    setZipProgress(REPORT_PREP_MESSAGE);
+
+    try {
+      const res = await fetch("/api/generate-audit-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error ?? "Unbekannter Fehler");
+      }
+
+      const nextReport =
+        (data.report_data as AuditSummaryReportData | undefined) ??
+        buildAuditSummaryReportData({
+          company: companyCtx,
+          documents,
+          measures,
+          risks,
+          aiNarrative: data.export?.summary,
+          securityScore: data.export?.security_score ?? securityScore,
+          auditReadinessPercent: data.export?.audit_readiness?.percent,
+          dataQualityPercent: data.export?.report_data?.dataQualityPercent ?? 0,
+          nextSteps: data.export?.next_steps,
+        });
+
+      setReportData(nextReport);
+      const filename = await downloadAuditSummaryPdf(nextReport, branding);
+      setReportFileName(filename);
+      setExportSuccess(REPORT_SUCCESS_MESSAGE);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unbekannter Fehler";
+      setError(`${REPORT_ERROR_PREFIX} ${message}`);
+    } finally {
+      setSummaryLoading(false);
+      setZipProgress(null);
+    }
+  }
+
   async function handleDownloadZip() {
     setZipLoading(true);
     setError(null);
     setExportSuccess(null);
-    setZipProgress(EXPORT_PREP_MESSAGE);
+    setZipProgress(ZIP_PREP_MESSAGE);
 
     try {
+      const report = getReportForExport();
       await downloadAuditPackage({
         documents,
         companyName,
         company: companyCtx,
-        summaryText: getSummaryForExport(),
+        reportData: report,
         risks,
         measures,
         folderStatuses,
+        branding,
         onProgress: setZipProgress,
       });
-      setExportSuccess(EXPORT_SUCCESS_MESSAGE);
+      setExportSuccess(ZIP_SUCCESS_MESSAGE);
       setZipProgress(null);
-    } catch {
-      setError(EXPORT_ERROR_MESSAGE);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : ZIP_ERROR_MESSAGE;
+      setError(message);
       setZipProgress(null);
     } finally {
       setZipLoading(false);
     }
   }
 
+  function scrollToFolders() {
+    foldersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function handlePdfDownload(item: (typeof folderStatuses)[number]) {
     setPdfLoadingType(item.documentType);
     setError(null);
     setExportSuccess(null);
-    setZipProgress(EXPORT_PREP_MESSAGE);
+    setZipProgress(REPORT_PREP_MESSAGE);
 
     try {
       await downloadAuditAreaPdf(item.document, item.documentType, companyName, {
@@ -251,9 +287,10 @@ export function AuditPageClient({
         measures,
         quality: item.quality,
       });
-      setExportSuccess(EXPORT_SUCCESS_MESSAGE);
-    } catch {
-      setError(EXPORT_ERROR_MESSAGE);
+      setExportSuccess("PDF erfolgreich heruntergeladen.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "PDF-Export fehlgeschlagen";
+      setError(message);
     } finally {
       setPdfLoadingType(null);
       setZipProgress(null);
@@ -355,6 +392,7 @@ export function AuditPageClient({
           </Card>
         )}
 
+        <div ref={foldersRef}>
         <Card>
           <CardHeader>
             <CardTitle>Dokumentstatus</CardTitle>
@@ -449,12 +487,13 @@ export function AuditPageClient({
             ))}
           </CardContent>
         </Card>
+        </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Export & Zusammenfassung</CardTitle>
+            <CardTitle>Export & Audit-Report</CardTitle>
             <CardDescription>
-              Audit-Zusammenfassung erstellen und strukturiertes ZIP-Paket herunterladen
+              Professionellen Audit-Report als PDF erstellen oder vollständiges Audit-Paket herunterladen
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -475,24 +514,27 @@ export function AuditPageClient({
               <Button onClick={handleCreateSummary} disabled={summaryLoading || zipLoading}>
                 {summaryLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> {EXPORT_PREP_MESSAGE}
+                    <Loader2 className="h-4 w-4 animate-spin" /> {REPORT_PREP_MESSAGE}
                   </>
                 ) : (
                   <>
-                    <FileText className="h-4 w-4" /> Audit-Zusammenfassung erstellen
+                    <FileText className="h-4 w-4" /> Audit-Report als PDF erstellen
                   </>
                 )}
               </Button>
               <Button variant="outline" onClick={handleDownloadZip} disabled={zipLoading || summaryLoading}>
                 {zipLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> {zipProgress ?? EXPORT_PREP_MESSAGE}
+                    <Loader2 className="h-4 w-4 animate-spin" /> {zipProgress ?? ZIP_PREP_MESSAGE}
                   </>
                 ) : (
                   <>
                     <Download className="h-4 w-4" /> Audit-Paket herunterladen
                   </>
                 )}
+              </Button>
+              <Button type="button" variant="outline" onClick={scrollToFolders}>
+                <FolderArchive className="h-4 w-4" /> Audit-Ordner öffnen
               </Button>
             </div>
 
@@ -507,12 +549,10 @@ export function AuditPageClient({
               </p>
             )}
 
-            {summaryText && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <p className="mb-2 text-sm font-medium text-slate-700">Audit-Zusammenfassung</p>
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs text-slate-600">
-                  {summaryText}
-                </pre>
+            {reportFileName && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                <p className="font-medium">Letzter Audit-Report</p>
+                <p className="mt-1">{reportFileName}</p>
               </div>
             )}
 
@@ -523,8 +563,7 @@ export function AuditPageClient({
                   <li key={f.folderName}>{f.folderName}/</li>
                 ))}
                 <li>README_Audit_Ordner.txt</li>
-                <li>Audit_Zusammenfassung.pdf</li>
-                <li>Audit_Zusammenfassung.txt</li>
+                <li>{generateAuditSummaryPdfFileName({ companyName, date: new Date() })}</li>
               </ul>
             </div>
           </CardContent>
