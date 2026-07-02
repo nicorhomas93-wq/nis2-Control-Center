@@ -420,7 +420,8 @@ export type B2BOutreachStatus =
   | "contacted"
   | "replied"
   | "customer"
-  | "skipped";
+  | "skipped"
+  | "review_later";
 
 export type Nis2Likelihood = "yes" | "no" | "uncertain";
 export type ItMaturity = "low" | "medium" | "high" | "unknown";
@@ -439,6 +440,13 @@ export interface B2BOutreachLead {
   source: string;
   nis2_likelihood: Nis2Likelihood;
   nis2_relevance_score: number | null;
+  partner_score: number | null;
+  lead_category: string | null;
+  score_reason: string | null;
+  recommended_pitch: string | null;
+  recommended_next_step: string | null;
+  deprioritized: boolean;
+  deprioritize_reason: string | null;
   it_maturity: ItMaturity;
   hints: string | null;
   analysis_bullets: string[];

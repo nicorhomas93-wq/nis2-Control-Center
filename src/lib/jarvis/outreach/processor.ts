@@ -5,6 +5,8 @@ import {
 } from "@/lib/jarvis/outreach/website-analyzer";
 import { mapOutreachLead, webPresenceFieldsFromResult } from "@/lib/jarvis/outreach/outreach-lead-map";
 import { generateOutreachMessage } from "@/lib/jarvis/outreach/prompt-engine";
+import { partnerFieldsFromPartnerScore } from "@/lib/jarvis/outreach/partner-fields";
+import { scorePartnerLead } from "@/lib/jarvis/outreach/partner-scoring";
 import {
   OUTREACH_BATCH_ANALYSIS_LIMIT,
   OUTREACH_DAILY_SEND_LIMIT,
@@ -122,13 +124,34 @@ export async function processOutreachLead(
     contact_email: row.contact_email,
   });
 
-  const outreach_message = await generateOutreachMessage({
+  const partner = scorePartnerLead({
     company_name: row.company_name,
     industry: row.industry,
+    employee_count: row.employee_count,
+    city: row.city,
+    region: row.region,
+    hints: row.hints,
+    website: row.website,
     contact_role: row.contact_role,
-    contact_name: row.contact_name,
-    analysis,
   });
+
+  const outreach_message = partner.auto_outreach
+    ? await generateOutreachMessage({
+        company_name: row.company_name,
+        industry: row.industry,
+        contact_role: row.contact_role,
+        contact_name: row.contact_name,
+        analysis,
+        partner_score: partner.partner_score,
+        lead_category: partner.lead_category,
+      })
+    : null;
+
+  const status = partner.deprioritized
+    ? "review_later"
+    : outreach_message
+      ? "ready"
+      : "skipped";
 
   const { data: updated, error: updateError } = await supabase
     .from("b2b_outreach_leads")
@@ -140,7 +163,8 @@ export async function processOutreachLead(
       observation: analysis.observation,
       outreach_message,
       ...webPresenceFieldsFromResult(analysis.web_presence),
-      status: outreach_message ? "ready" : "skipped",
+      ...partnerFieldsFromPartnerScore(partner),
+      status,
       processed_at: new Date().toISOString(),
     })
     .eq("id", leadId)

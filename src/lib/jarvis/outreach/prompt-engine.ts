@@ -3,7 +3,11 @@ import type { LeadAnalysisResult } from "@/lib/jarvis/outreach/website-analyzer"
 import {
   OUTREACH_MIN_VISIBLE_SCORE,
   OUTREACH_PRIORITY_SCORE,
+  PARTNER_QUALIFIED_SCORE,
+  PARTNER_PRIORITY_SCORE,
 } from "@/lib/jarvis/outreach/constants";
+import type { PartnerLeadCategory } from "@/lib/jarvis/outreach/partner-categories";
+import { PARTNER_CATEGORY_LABELS } from "@/lib/jarvis/outreach/partner-categories";
 
 export type OutreachMessageMode = "high_value" | "mid_value" | "low";
 
@@ -38,13 +42,13 @@ const HIGH_TEMPLATES: ((ctx: MessageContext) => string)[] = [
 
 const MID_TEMPLATES: ((ctx: MessageContext) => string)[] = [
   (ctx) =>
-    `${ctx.greeting}\n\nbei ${ctx.industry} sehe ich aktuell oft, dass NIS2 plötzlich Thema wird — ${ctx.observation.toLowerCase()}.\nWenn Audits oder Partner fragen, fehlen oft Verantwortlichkeiten und ein prüfbarer Audit-Ordner.\nStrukturierte Dokumentation schafft hier schnell Klarheit.\n\n${ctx.question}`,
+    `${ctx.greeting}\n\nbei Partnern aus ${ctx.industry} höre ich gerade oft: Kunden fragen nach NIS2-Nachweisen — und intern fehlt eine wiederholbare Struktur.\n\n${ctx.question}`,
   (ctx) =>
-    `${ctx.greeting}\n\nmir ist bei ${ctx.company} aufgefallen, dass die NIS2-Struktur dünn wirkt.\nDas passiert oft, wenn Dokumente nicht gebündelt sind und Verantwortlichkeiten unklar bleiben.\nEin klarer NIS2-Ordner beendet das Stochern in Excel und Ordnern.\n\n${ctx.question}`,
+    `${ctx.greeting}\n\n${ctx.observation} — bei ${ctx.company} könnte das relevant sein, wenn Sie KMU-Kunden betreuen.\n\n${ctx.question}`,
   (ctx) =>
-    `${ctx.greeting}\n\nin Unternehmen eurer Größe in ${ctx.industry} passiert gerade häufig: Nachweise kommen, bevor intern alles steht.\n${ctx.observation} — das führt zu Engpässen bei Audits oder Kundenanfragen.\nWer Nachweise gebündelt hat, spart Wochen, wenn die Anfrage kommt.\n\n${ctx.question}`,
+    `${ctx.greeting}\n\nin ${ctx.industry} wird NIS2 zunehmend über Kundenanfragen relevant — nicht nur über Gesetzeslesen.\n\n${ctx.question}`,
   (ctx) =>
-    `${ctx.greeting}\n\nich schaue mir ${ctx.company} an — ${ctx.observation.toLowerCase()}.\nBei ${ctx.industry} fordern Partner und Prüfungen zunehmend NIS2-Nachweise.\nGebündelte Nachweise reduzieren das Risiko, wenn die Anfrage kommt.\n\n${ctx.question}`,
+    `${ctx.greeting}\n\nkurz zu ${ctx.company}: ${ctx.observation.toLowerCase()}.\nPasst NIS2-Nachweis-Thema bei Ihren Kunden gerade — oder eher nicht?\n\n${ctx.question}`,
 ];
 
 const FORBIDDEN_PATTERNS = [
@@ -53,12 +57,28 @@ const FORBIDDEN_PATTERNS = [
   /\bgerne stehen wir\b/gi,
   /\bunverbindlich\b/gi,
   /\bkeine verpflichtung\b/gi,
+  /\bbetroffenheitscheck\b/gi,
+  /\baudit-ordner\b/gi,
+  /\bfunktionen:\b/gi,
+  /\bfeature\b/gi,
+  /\bzip-export\b/gi,
+  /\bpdf-export\b/gi,
+  /\bcontrol center\b/gi,
+  /\bmodul\b/gi,
 ];
 
 export function classifyOutreachMessageMode(
-  score: number | null | undefined
+  score: number | null | undefined,
+  partnerScore?: number | null
 ): OutreachMessageMode {
-  const s = score ?? 0;
+  const s =
+    partnerScore != null
+      ? partnerScore >= PARTNER_PRIORITY_SCORE
+        ? 10
+        : partnerScore >= PARTNER_QUALIFIED_SCORE
+          ? 7
+          : 3
+      : (score ?? 0);
   if (s >= OUTREACH_PRIORITY_SCORE) return "high_value";
   if (s >= OUTREACH_MIN_VISIBLE_SCORE) return "mid_value";
   return "low";
@@ -70,12 +90,17 @@ export interface OutreachPromptInput {
   contact_role: string | null;
   contact_name: string | null;
   analysis: LeadAnalysisResult;
+  partner_score?: number | null;
+  lead_category?: PartnerLeadCategory | string | null;
 }
 
 export async function generateOutreachMessage(
   input: OutreachPromptInput
 ): Promise<string | null> {
-  const mode = classifyOutreachMessageMode(input.analysis.nis2_relevance_score);
+  const mode = classifyOutreachMessageMode(
+    input.analysis.nis2_relevance_score,
+    input.partner_score
+  );
   if (mode === "low") return null;
 
   const variant = pickVariantIndex(input.company_name, mode === "high_value" ? 5 : 4);
@@ -141,45 +166,47 @@ function buildSystemPrompt(mode: OutreachMessageMode, variant: number): string {
   const variantHint = `Variante ${variant + 1} — nutze abweichende Satzstruktur zu anderen Varianten.`;
 
   if (mode === "high_value") {
-    return `Du schreibst B2B-Erstnachrichten für NIS2-Compliance (TKND).
+    return `Du schreibst B2B-Partner-Erstnachrichten für IT-Dienstleister, MSP und Berater (TKND intern).
 
 Modus: HIGH VALUE — extrem kurz (2–3 Sätze nach der Anrede).
 
 ${variantHint}
 
+Zielgruppe: Systemhäuser, MSP, Security-/Datenschutz-/Compliance-Berater — keine Endkunden-Pitch.
+
 Struktur:
-1. Branchenbezug oder Firma (wechselnde Einstiege, z. B. „bei {{Branche}} sehe ich aktuell oft…“, „mir ist bei {{Firma}} aufgefallen…“)
-2. Risiko klar benennen — sachlich, ohne Panik
+1. Partner-/Branchenbezug (Kunden fragen nach NIS2-Nachweisen)
+2. Sachliches Problem — ohne Panik, ohne Produktfeatures
 3. Direkte Frage am Ende
 
 Regeln:
 - Deutsch, unter 10 Sekunden Lesezeit
-- KEIN Erklären, KEIN Produktpitch, KEIN „wir helfen/unterstützen“
-- Vermeide: könnte, würde, eventuell, vielleicht
-- Nutze: fehlt, passiert, führt, kommt, steht an
-- Keine Betreffzeile. Nur Nachrichtentext.
-- Anrede: „Hallo [Name],“ oder „Hallo,“`;
+- KEIN Feature-Listing, KEIN Produktpitch, KEIN Software-Verkauf
+- KEIN „wir helfen/unterstützen“
+- Keine Begriffe: Betroffenheitscheck, Audit-Ordner, ZIP, PDF, Funktionen, Control Center
+- Nutze: Kunden fragen, Nachweise, Partner, Mandate, KMU-Kunden
+- Keine Betreffzeile. Nur Nachrichtentext.`;
   }
 
-  return `Du schreibst B2B-Erstnachrichten für NIS2-Compliance (TKND).
+  return `Du schreibst B2B-Partner-Erstnachrichten für IT-Dienstleister, MSP und Berater (TKND intern).
 
 Modus: MID VALUE — 3–4 Sätze nach der Anrede.
 
 ${variantHint}
 
+Zielgruppe: Partner, die NIS2 für Kunden umsetzen oder anbieten könnten.
+
 Struktur:
-1. Kurzer Kontext (Firma/Branche/Beobachtung)
-2. Problem klar benennen
-3. Genau 1 Satz Lösungsansatz — ohne Software zu erklären, ohne „wir helfen“
-4. Direkte Frage (wechselnd, z. B. „Wie ist das bei euch gelöst?“, „Ist das bei Ihnen aktuell Thema?“)
+1. Kurzer Partner-Kontext
+2. Problem bei Kundenanfragen klar benennen
+3. Genau 1 Satz Nutzenhypothese — ohne Features aufzuzählen
+4. Direkte Frage
 
 Regeln:
 - Deutsch, schnell lesbar
-- KEIN Marketing, KEIN Sales-Blabla, KEINE lange Texte
-- Vermeide: könnte, würde, eventuell
-- Nutze: fehlt, passiert, führt
-- Keine Betreffzeile. Nur Nachrichtentext.
-- Anrede: „Hallo [Name],“ oder „Hallo,“`;
+- KEIN Marketing, KEINE Feature-Listen, KEIN Produktpitch
+- Keine Begriffe: Betroffenheitscheck, Audit-Ordner, ZIP, PDF, Funktionen
+- Keine Betreffzeile. Nur Nachrichtentext.`;
 }
 
 async function generateWithOpenAI(
@@ -192,11 +219,17 @@ async function generateWithOpenAI(
   const ctx = buildContext(input);
   const bullets = input.analysis.analysis_bullets.map((b) => `- ${b}`).join("\n");
 
+  const categoryLabel = input.lead_category
+    ? PARTNER_CATEGORY_LABELS[input.lead_category as PartnerLeadCategory] ?? input.lead_category
+    : input.industry ?? "unbekannt";
+
   const userPrompt = `Firma: ${input.company_name}
+Partner-Kategorie: ${categoryLabel}
 Branche: ${input.industry ?? "unbekannt"}
 Rolle: ${input.contact_role ?? "Entscheider"}
 Ansprechpartner: ${input.contact_name ?? "—"}
-NIS2-Score: ${input.analysis.nis2_relevance_score ?? "?"}/10
+Partner-Score: ${input.partner_score ?? "?"}/100
+NIS2-Score (legacy): ${input.analysis.nis2_relevance_score ?? "?"}/10
 Modus: ${mode}
 Variante: ${variant + 1}
 Bevorzugte Schlussfrage (oder gleichwertige Variante): „${ctx.question}“
@@ -225,16 +258,29 @@ Schreibe NUR die sendbare Nachricht — kein Kommentar, keine Erklärung.`;
   }
 }
 
-/** 1-Satz-Hook für Lead-Listen (gleicher Ton wie Erstnachricht) */
+/** 1-Satz-Hook für Lead-Listen — Partner-Fokus */
+export function buildPartnerOutreachHook(input: {
+  company_name: string;
+  category: PartnerLeadCategory | string;
+  partner_score: number;
+}): string {
+  const label =
+    PARTNER_CATEGORY_LABELS[input.category as PartnerLeadCategory] ?? String(input.category);
+  if (input.partner_score >= 80) {
+    return `${label}: ${input.company_name} — starker Partner-Lead (${input.partner_score}/100). Kunden-NIS2-Nachweise relevant?`;
+  }
+  if (input.partner_score >= 60) {
+    return `${label}: ${input.company_name} — Partner-Lead prüfen (${input.partner_score}/100).`;
+  }
+  return `${input.company_name} — später prüfen (${input.partner_score}/100).`;
+}
+
+/** @deprecated Nutze buildPartnerOutreachHook */
 export function buildOutreachHook(input: {
   company_name: string;
   industry: string;
   employee_count: number;
   hasSecurity?: boolean;
 }): string {
-  const industry = input.industry;
-  if (!input.hasSecurity) {
-    return `Bei ${input.company_name} fehlt online die sichtbare NIS2-Struktur — ist das bei Ihnen bereits adressiert?`;
-  }
-  return `Als ${industry}-Unternehmen mit ${input.employee_count} MA fehlt oft die prüfbare NIS2-Basis — wie sieht das bei ${input.company_name} aus?`;
+  return `Partner-Kontext ${input.industry}: Fragen Ihre Kunden zu NIS2-Nachweisen — wie lösen Sie das bei ${input.company_name}?`;
 }

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { SEED_LEADS } from "@/lib/jarvis/outreach/constants";
-import { calculateNis2RelevanceScore } from "@/lib/jarvis/outreach/nis2-relevance-score";
+import { partnerFieldsFromPartnerScore } from "@/lib/jarvis/outreach/partner-fields";
+import { scorePartnerLead } from "@/lib/jarvis/outreach/partner-scoring";
 
 export interface ImportLeadInput {
   company_name: string;
@@ -85,6 +86,12 @@ function splitCsvLine(line: string): string[] {
   return result;
 }
 
+function parseEmployeeCount(value: string | null | undefined): number | undefined {
+  if (!value?.trim()) return undefined;
+  const n = Number.parseInt(value.replace(/\D/g, ""), 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 export async function importLeads(
   supabase: SupabaseClient,
   leads: ImportLeadInput[]
@@ -106,11 +113,11 @@ export async function importLeads(
       continue;
     }
 
-    const scored = calculateNis2RelevanceScore({
+    const partner = scorePartnerLead({
       company_name: lead.company_name,
-      industry: lead.industry,
-      employee_count: lead.employee_count,
-      hints: lead.hints,
+      industry: lead.industry ?? null,
+      employee_count: parseEmployeeCount(lead.employee_count),
+      hints: lead.hints ?? null,
     });
 
     const { error } = await supabase.from("b2b_outreach_leads").insert({
@@ -123,10 +130,7 @@ export async function importLeads(
       contact_email: lead.contact_email?.trim() || null,
       hints: lead.hints?.trim() || null,
       source: lead.source ?? "manual",
-      status: "new",
-      nis2_relevance_score: scored.score,
-      nis2_likelihood: scored.nis2_likelihood,
-      analysis_bullets: scored.breakdown,
+      ...partnerFieldsFromPartnerScore(partner),
     });
 
     if (error) {

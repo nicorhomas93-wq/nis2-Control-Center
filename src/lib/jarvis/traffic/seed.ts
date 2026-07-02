@@ -4,13 +4,11 @@ import { logJarvisEvent } from "@/lib/jarvis/jarvis-events";
 const DEFAULT_TARGET_GROUPS = [
   {
     name: "IT-Systemhäuser",
-    description: "MSP-artige IT-Dienstleister mit KMU-Kunden",
+    description: "Systemhäuser und IT-Dienstleister mit KMU-Kunden",
     industry: "IT-Systemhaus",
     company_size: "10–250 MA",
-    pain_points:
-      "NIS2-Dokumentation für Kunden, Audit-Vorbereitung, fehlende Compliance-Templates",
-    value_proposition:
-      "White-Label-fähiges NIS2 Control Center für Kundenprojekte",
+    pain_points: "Kunden fragen nach NIS2-Nachweisen, wiederkehrende Audit-Vorbereitung",
+    value_proposition: "Partner-Modell für skalierbare NIS2-Nachweise bei Kunden",
     priority: "high",
   },
   {
@@ -18,10 +16,17 @@ const DEFAULT_TARGET_GROUPS = [
     description: "Managed Service Provider mit Microsoft-365-Fokus",
     industry: "MSP",
     company_size: "10–500 MA",
-    pain_points:
-      "Skalierbare Compliance-Dokumentation, wiederkehrende Audit-Anforderungen",
-    value_proposition:
-      "Schnelle NIS2-Dokumente + Audit-Ordner-Export für Kunden",
+    pain_points: "NIS2-Anfragen von Kunden, fehlende wiederholbare Struktur",
+    value_proposition: "Ergänzendes Angebot neben Managed Services",
+    priority: "high",
+  },
+  {
+    name: "Cybersecurity-Beratung",
+    description: "IT-Sicherheits- und Cybersecurity-Berater",
+    industry: "Cybersecurity",
+    company_size: "5–100 MA",
+    pain_points: "Nachweise und Reviews für Kundenprojekte",
+    value_proposition: "Partner für strukturierte Kunden-Nachweise",
     priority: "high",
   },
   {
@@ -29,66 +34,45 @@ const DEFAULT_TARGET_GROUPS = [
     description: "Externe DSB und Datenschutz-Consultants",
     industry: "Datenschutz",
     company_size: "1–50 MA",
-    pain_points: "NIS2-Überschneidung mit DSGVO, fehlende IT-Security-Dokumente",
-    value_proposition:
-      "Ergänzung zum Datenschutz-Portfolio mit NIS2-Dokumentgenerator",
+    pain_points: "NIS2-Überschneidung mit DSGVO bei Kunden",
+    value_proposition: "Ergänzung zum Datenschutz-Portfolio",
     priority: "high",
   },
   {
-    name: "Compliance-Berater",
-    description: "GRC- und Compliance-Beratung",
+    name: "Compliance-/NIS2-Beratung",
+    description: "GRC-, Compliance- und NIS2-Beratung",
     industry: "Compliance",
     company_size: "5–100 MA",
-    pain_points: "Kunden brauchen NIS2-Nachweise, manuelle Dokumentenerstellung",
-    value_proposition:
-      "Strukturierte Audit-Ordner und Compliance-Score für Beratungsmandate",
+    pain_points: "Kunden brauchen wiederholbare Nachweisstruktur",
+    value_proposition: "Skalierbare Umsetzung in Beratungsmandaten",
     priority: "high",
   },
   {
-    name: "Mittelstand mit Microsoft 365",
-    description: "KMU mit M365, oft ohne dedizierte IT-Security",
-    industry: "Allgemein",
-    company_size: "50–500 MA",
-    pain_points: "Unklare NIS2-Betroffenheit, fehlende Policies, Audit-Druck",
-    value_proposition:
-      "Betroffenheitscheck + Dokumente + Audit-Paket aus einer Hand",
-    priority: "medium",
-  },
-  {
-    name: "ICT-Dienstleister",
-    description: "Telekommunikation und ICT nach NIS2",
-    industry: "ICT-Dienstleistungen",
-    company_size: "100+ MA",
-    pain_points: "Meldepflichten, Risikoanalyse, Lieferketten-Themen",
-    value_proposition: "NIS2 Control Center für ICT-relevante Dokumentation",
+    name: "Cloud-/Microsoft-365-Beratung",
+    description: "Cloud- und M365-Berater für KMU",
+    industry: "Cloud / M365",
+    company_size: "10–200 MA",
+    pain_points: "Zugriffssicherheit und NIS2-Nachweise bei M365-Kunden",
+    value_proposition: "Logische Erweiterung der Cloud-Betreuung",
     priority: "high",
   },
   {
-    name: "Produktionsunternehmen",
-    description: "Industrie mit OT/IT-Schnittstelle",
-    industry: "Industrie",
-    company_size: "100–1000 MA",
-    pain_points: "KRITIS-Nähe, Lieferanten-Compliance, Incident-Prozesse",
-    value_proposition: "Incident-Response-Plan, Risikoanalyse, Audit-Ordner",
+    name: "Backup-/Notfallmanagement",
+    description: "Backup, BCM und Notfallmanagement-Dienstleister",
+    industry: "Backup & BCM",
+    company_size: "10–200 MA",
+    pain_points: "Wiederherstellungsnachweise für Audits",
+    value_proposition: "Strukturierte Nachweisablage für Kunden",
     priority: "medium",
   },
   {
-    name: "Logistikunternehmen",
-    description: "Transport und Logistik mit digitalen Systemen",
-    industry: "Logistik",
-    company_size: "50–500 MA",
-    pain_points: "Lieferketten-Sicherheit, NIS2-Betroffenheit unklar",
-    value_proposition: "Betroffenheitscheck und Maßnahmenplan für Logistik",
-    priority: "medium",
-  },
-  {
-    name: "Gesundheitsnahe Dienstleister",
-    description: "Gesundheitswesen und nahe Branchen",
-    industry: "Gesundheitswesen",
-    company_size: "20–500 MA",
-    pain_points: "Hohe Regulierungsdichte, Datenschutz + NIS2",
-    value_proposition: "Dokumentation für Gesundheits-IT und Compliance",
-    priority: "medium",
+    name: "Sonstiger Partner",
+    description: "Digitalisierungspartner und verwandte B2B-Anbieter",
+    industry: "B2B-Dienstleistung",
+    company_size: "5–250 MA",
+    pain_points: "NIS2 wird über Kundenanfragen relevant",
+    value_proposition: "Partner-Prüfung im Einzelfall",
+    priority: "low",
   },
 ];
 
@@ -128,13 +112,9 @@ const DEFAULT_OUTREACH = [
     tone: "professionell, partnerschaftlich",
     body: `Hallo {{name}},
 
-ich sehe, dass Sie als IT-Systemhaus KMU-Kunden in Sachen IT betreuen. Viele Ihrer Kunden fragen aktuell nach NIS2-Dokumentation und Audit-Vorbereitung.
+ich sehe, dass Sie als IT-Systemhaus KMU-Kunden betreuen. Aktuell fragen viele Kunden nach NIS2-Nachweisen — oft ohne klare interne Struktur beim Dienstleister.
 
-Wir haben das TKND NIS2 Control Center entwickelt — ein Tool für Betroffenheitscheck, Dokumentgenerierung und Audit-Ordner-Export.
-
-Hätten Sie Interesse an einem kurzen Austausch oder Pilotzugang?
-
-Hinweis: Keine Rechtsberatung. Unterstützung bei Dokumentation und Organisation.
+Ist das bei Ihnen gerade ein Thema bei Kundenanfragen — oder eher nicht?
 
 Freundliche Grüße
 TKND Unity GbR`,
@@ -147,13 +127,9 @@ TKND Unity GbR`,
     tone: "sachlich, B2B",
     body: `Guten Tag {{name}},
 
-für MSPs mit Microsoft-365-Kunden bieten wir einen Pilotzugang zum TKND NIS2 Control Center an.
+bei MSPs mit Microsoft-365-Kunden höre ich gerade oft: NIS2-Nachweise werden angefragt, bevor intern eine wiederholbare Antwort da ist.
 
-Funktionen: Betroffenheitscheck, NIS2-Dokumente als PDF, Audit-Ordner-ZIP.
-
-Gerne stellen wir Ihnen einen Demo-Termin vor.
-
-Hinweis: Unterstützungstool — keine Garantie auf vollständige Compliance.
+Wie lösen Sie das heute bei Ihren Kunden — oder ist das noch kein Schwerpunkt?
 
 Freundliche Grüße
 TKND Unity GbR`,
@@ -176,8 +152,8 @@ const DEFAULT_CONTENT = [
     content_type: "checklist",
     hook: "5 Punkte, die Ihre Kunden vor dem NIS2-Audit prüfen sollten",
     outline:
-      "Betroffenheit, Dokumentation, Maßnahmenplan, Incident-Prozess, Lieferanten",
-    call_to_action: "Kostenlosen Betroffenheitscheck testen",
+      "Kundenanfragen, Dokumentation, Maßnahmenplan, Incident-Prozess, Lieferanten",
+    call_to_action: "Partner-Pilot anfragen",
   },
 ];
 

@@ -13,6 +13,7 @@ const VALID_STATUS: B2BOutreachStatus[] = [
   "replied",
   "customer",
   "skipped",
+  "review_later",
 ];
 
 function mapLead(row: Record<string, unknown>): B2BOutreachLead {

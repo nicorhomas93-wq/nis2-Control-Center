@@ -9,7 +9,12 @@ export const OUTREACH_DAILY_SEND_LIMIT =
       "15"
   ) || 15;
 
-/** Score-Schwellen für Priorisierung in der UI */
+/** Partner-Score-Schwellen (0–100) */
+export const PARTNER_PRIORITY_SCORE = 80;
+export const PARTNER_QUALIFIED_SCORE = 60;
+export const PARTNER_REVIEW_SCORE = 40;
+
+/** Legacy 0–10 UI-Kompatibilität (partner_score / 10) */
 export const OUTREACH_PRIORITY_SCORE = 8;
 export const OUTREACH_MIN_VISIBLE_SCORE = 6;
 
@@ -23,6 +28,7 @@ export const B2B_OUTREACH_STATUS_LABELS: Record<string, string> = {
   replied: "Antwort",
   customer: "Kunde",
   skipped: "Übersprungen",
+  review_later: "Später prüfen",
 };
 
 export const NIS2_LIKELIHOOD_LABELS: Record<string, string> = {
@@ -46,67 +52,55 @@ export interface SeedLeadInput {
   contact_role?: string;
 }
 
-/** Kuratierte Mittelstands-Leads — manuell erweiterbar / später durch API ersetzen */
+/** Kuratierte Partner-Leads — IT-Dienstleister, MSP, Berater */
 export const SEED_LEADS: SeedLeadInput[] = [
   {
-    company_name: "Müller Maschinenbau GmbH",
-    industry: "Maschinenbau",
-    website: "https://www.mueller-maschinenbau.de",
-    employee_count: "120",
-    contact_role: "Geschäftsführer",
-  },
-  {
-    company_name: "Autohaus Schneider",
-    industry: "Automobilhandel",
+    company_name: "NordIT Systemhaus GmbH",
+    industry: "IT-Systemhaus",
+    website: "https://www.nordit-systemhaus.de",
     employee_count: "45",
     contact_role: "Geschäftsführer",
   },
   {
-    company_name: "Pflegezentrum Dresden",
-    industry: "Gesundheitswesen",
-    employee_count: "85",
-    contact_role: "Einrichtungsleitung",
-  },
-  {
-    company_name: "Bauunternehmen Weber",
-    industry: "Bauwesen",
-    employee_count: "200",
+    company_name: "SecureCloud MSP",
+    industry: "Managed Service Provider",
+    employee_count: "28",
     contact_role: "Geschäftsführer",
   },
   {
-    company_name: "Logistik Nord GmbH",
-    industry: "Logistik",
-    employee_count: "150",
-    contact_role: "IT-Leiter",
+    company_name: "Datenschutz & Compliance Beratung Schmidt",
+    industry: "Datenschutzberatung",
+    employee_count: "12",
+    contact_role: "Inhaber",
   },
   {
-    company_name: "TechSupport Mittelstand",
-    industry: "IT-Systemhaus",
+    company_name: "CyberGuard Consulting",
+    industry: "IT-Sicherheitsberatung",
+    employee_count: "18",
+    contact_role: "Partner",
+  },
+  {
+    company_name: "M365 Cloud Partner Dresden",
+    industry: "Microsoft 365 Beratung",
+    employee_count: "22",
+    contact_role: "Geschäftsführer",
+  },
+  {
+    company_name: "BackupPro Notfallmanagement",
+    industry: "Backup & Wiederherstellung",
     employee_count: "35",
-    contact_role: "Geschäftsführer",
+    contact_role: "Leiter Services",
   },
   {
-    company_name: "ChemieProdukt AG",
-    industry: "Chemie",
-    employee_count: "320",
-    contact_role: "Compliance-Beauftragter",
+    company_name: "GRC Solutions Mittelstand",
+    industry: "Compliance-Beratung",
+    employee_count: "15",
+    contact_role: "Senior Consultant",
   },
   {
-    company_name: "EnergieWerk Süd",
-    industry: "Energie",
-    employee_count: "180",
-    contact_role: "Leiter IT",
-  },
-  {
-    company_name: "FoodProcess GmbH",
-    industry: "Lebensmittel",
-    employee_count: "95",
-    contact_role: "Qualitätsmanagement",
-  },
-  {
-    company_name: "PrintMedia Solutions",
-    industry: "Medien/Druck",
-    employee_count: "60",
+    company_name: "IT-Security Partner Süd",
+    industry: "Cybersecurity-Beratung",
+    employee_count: "40",
     contact_role: "Geschäftsführer",
   },
 ];

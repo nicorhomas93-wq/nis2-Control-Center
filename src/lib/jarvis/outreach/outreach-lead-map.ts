@@ -4,6 +4,7 @@ import type { WebPresenceEvidence } from "@/lib/jarvis/outreach/web-presence-typ
 export function mapOutreachLead(row: Record<string, unknown>): B2BOutreachLead {
   return {
     ...(row as unknown as B2BOutreachLead),
+    deprioritized: Boolean(row.deprioritized),
     analysis_bullets: Array.isArray(row.analysis_bullets)
       ? (row.analysis_bullets as string[])
       : [],

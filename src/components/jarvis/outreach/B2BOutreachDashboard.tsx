@@ -21,11 +21,13 @@ import {
   IT_MATURITY_LABELS,
   NIS2_LIKELIHOOD_LABELS,
   OUTREACH_DAILY_SEND_LIMIT,
-  OUTREACH_MIN_VISIBLE_SCORE,
-  OUTREACH_PRIORITY_SCORE,
+  PARTNER_PRIORITY_SCORE,
+  PARTNER_QUALIFIED_SCORE,
+  PARTNER_REVIEW_SCORE,
 } from "@/lib/jarvis/outreach/constants";
+import { PARTNER_CATEGORY_LABELS } from "@/lib/jarvis/outreach/partner-categories";
 import { OUTREACH_DAY_TIMEZONE } from "@/lib/jarvis/outreach/day-boundary";
-import { scoreBadgeClass, confidenceBadgeClass } from "@/lib/jarvis/outreach/nis2-relevance-score";
+import { confidenceBadgeClass } from "@/lib/jarvis/outreach/nis2-relevance-score";
 import { splitAnalysisBullets } from "@/lib/jarvis/outreach/assessment-quality";
 import {
   DETECTED_WEBSITE_TYPE_LABELS,
@@ -50,7 +52,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
   const [showForm, setShowForm] = useState(false);
   const [showCsv, setShowCsv] = useState(false);
   const [filter, setFilter] = useState<B2BOutreachStatus | "all">("all");
-  const [scoreFilter, setScoreFilter] = useState<"all" | "top" | "qualified">("all");
+  const [scoreFilter, setScoreFilter] = useState<"all" | "top" | "qualified" | "review">("all");
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     company_name: "",
@@ -66,37 +68,44 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
     "Firma,Branche,Website,Mitarbeiter,Ansprechpartner,Rolle,E-Mail,Hinweise\n"
   );
 
+  const getPartnerScore = (lead: B2BOutreachLead) =>
+    lead.partner_score ?? (lead.nis2_relevance_score != null ? lead.nis2_relevance_score * 10 : null);
+
   const leads = initialLeads
     .filter((l) => filter === "all" || l.status === filter)
     .filter((l) => {
       if (scoreFilter === "all") return true;
-      if (l.nis2_relevance_score == null) {
-        // Noch nicht bewertet — immer sichtbar, damit Analyse möglich bleibt
-        return scoreFilter === "qualified";
-      }
-      const score = l.nis2_relevance_score;
-      if (scoreFilter === "top") return score >= OUTREACH_PRIORITY_SCORE;
-      return score >= OUTREACH_MIN_VISIBLE_SCORE;
+      const score = getPartnerScore(l);
+      if (score == null) return scoreFilter === "qualified";
+      if (scoreFilter === "top") return score >= PARTNER_PRIORITY_SCORE;
+      if (scoreFilter === "qualified") return score >= PARTNER_QUALIFIED_SCORE;
+      if (scoreFilter === "review") return score < PARTNER_QUALIFIED_SCORE || l.deprioritized;
+      return true;
     })
     .sort((a, b) => {
-      const scoreA = a.nis2_relevance_score ?? 0;
-      const scoreB = b.nis2_relevance_score ?? 0;
+      const scoreA = getPartnerScore(a) ?? 0;
+      const scoreB = getPartnerScore(b) ?? 0;
       if (scoreB !== scoreA) return scoreB - scoreA;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
   const scoreSummary = {
-    top: initialLeads.filter((l) => (l.nis2_relevance_score ?? 0) >= OUTREACH_PRIORITY_SCORE)
-      .length,
-    qualified: initialLeads.filter(
+    top: initialLeads.filter((l) => (getPartnerScore(l) ?? 0) >= PARTNER_PRIORITY_SCORE).length,
+    qualified: initialLeads.filter((l) => {
+      const s = getPartnerScore(l) ?? 0;
+      return s >= PARTNER_QUALIFIED_SCORE && s < PARTNER_PRIORITY_SCORE;
+    }).length,
+    review: initialLeads.filter(
       (l) =>
-        (l.nis2_relevance_score ?? 0) >= OUTREACH_MIN_VISIBLE_SCORE &&
-        (l.nis2_relevance_score ?? 0) < OUTREACH_PRIORITY_SCORE
+        l.deprioritized ||
+        l.status === "review_later" ||
+        ((getPartnerScore(l) ?? 0) >= PARTNER_REVIEW_SCORE &&
+          (getPartnerScore(l) ?? 0) < PARTNER_QUALIFIED_SCORE)
     ).length,
     hidden: initialLeads.filter(
-      (l) => l.nis2_relevance_score != null && l.nis2_relevance_score < OUTREACH_MIN_VISIBLE_SCORE
+      (l) => (getPartnerScore(l) ?? 0) < PARTNER_REVIEW_SCORE && !l.deprioritized
     ).length,
-    unscored: initialLeads.filter((l) => l.nis2_relevance_score == null).length,
+    unscored: initialLeads.filter((l) => getPartnerScore(l) == null).length,
   };
 
   async function apiCall(url: string, method = "POST", body?: unknown) {
@@ -178,13 +187,24 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
         </CardContent>
       </Card>
 
+      <Card className="border-brand-200 bg-brand-50/40">
+        <CardContent className="pt-4 text-sm text-slate-700">
+          <p className="font-medium text-slate-900">Partner-Fokus (intern)</p>
+          <p className="mt-1">
+            Jarvis priorisiert IT-Dienstleister, MSP und Berater — keine Krankenhäuser, Behörden
+            oder langsame Großorganisationen. Ausschluss-Leads landen unter „Später prüfen“.
+          </p>
+        </CardContent>
+      </Card>
+
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2 text-sm text-slate-600">
           <span>
-            Priorität:{" "}
-            <strong className="text-red-700">{scoreSummary.top}</strong> Top (8+) ·{" "}
-            <strong className="text-amber-700">{scoreSummary.qualified}</strong> normal (6–7) ·{" "}
-            {scoreSummary.hidden} niedrig (&lt;6)
+            Partner-Score:{" "}
+            <strong className="text-red-700">{scoreSummary.top}</strong> Top (80+) ·{" "}
+            <strong className="text-amber-700">{scoreSummary.qualified}</strong> gut (60–79) ·{" "}
+            <strong className="text-slate-600">{scoreSummary.review}</strong> prüfen/später ·{" "}
+            {scoreSummary.hidden} niedrig
             {scoreSummary.unscored > 0 ? ` · ${scoreSummary.unscored} ohne Score` : ""}
           </span>
           <span className="text-slate-300">|</span>
@@ -286,8 +306,8 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <span className="self-center text-xs font-medium text-slate-500">NIS2-Score:</span>
-        {(["all", "top", "qualified"] as const).map((s) => (
+        <span className="self-center text-xs font-medium text-slate-500">Partner-Score:</span>
+        {(["all", "top", "qualified", "review"] as const).map((s) => (
           <button
             key={s}
             type="button"
@@ -299,10 +319,12 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
             }`}
           >
             {s === "top"
-              ? "Top (8+)"
+              ? "Top (80+)"
               : s === "qualified"
-                ? "Qualifiziert (6+)"
-                : "Alle Scores"}
+                ? "Gut (60+)"
+                : s === "review"
+                  ? "Prüfen / später"
+                  : "Alle Scores"}
           </button>
         ))}
       </div>
@@ -404,7 +426,13 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
       ) : (
         <div className="space-y-4">
           {leads.map((lead) => {
-            const isTopLead = (lead.nis2_relevance_score ?? 0) >= OUTREACH_PRIORITY_SCORE;
+            const partnerScore = getPartnerScore(lead);
+            const isTopLead = (partnerScore ?? 0) >= PARTNER_PRIORITY_SCORE;
+            const categoryLabel =
+              lead.lead_category &&
+              PARTNER_CATEGORY_LABELS[lead.lead_category as keyof typeof PARTNER_CATEGORY_LABELS]
+                ? PARTNER_CATEGORY_LABELS[lead.lead_category as keyof typeof PARTNER_CATEGORY_LABELS]
+                : lead.lead_category;
             const bullets = Array.isArray(lead.analysis_bullets) ? lead.analysis_bullets : [];
             const { assessment, webPresence, scoring } = splitAnalysisBullets(bullets);
             const stammdatenLine = scoring.find((l) => l.includes("Stammdaten:"));
@@ -432,12 +460,36 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                       Hook: {lead.outreach_hook}
                     </p>
                   )}
+                  {lead.recommended_pitch && (
+                    <p className="mt-2 rounded-lg bg-violet-50 px-3 py-2 text-sm text-violet-900">
+                      Pitch: {lead.recommended_pitch}
+                    </p>
+                  )}
+                  {lead.recommended_next_step && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Nächster Schritt: {lead.recommended_next_step}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {lead.nis2_relevance_score != null && (
-                    <Badge className={scoreBadgeClass(lead.nis2_relevance_score)}>
-                      NIS2 {lead.nis2_relevance_score}/10
+                  {partnerScore != null && (
+                    <Badge
+                      className={
+                        partnerScore >= PARTNER_PRIORITY_SCORE
+                          ? "bg-red-100 text-red-800"
+                          : partnerScore >= PARTNER_QUALIFIED_SCORE
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-slate-100 text-slate-700"
+                      }
+                    >
+                      Partner {partnerScore}/100
                     </Badge>
+                  )}
+                  {categoryLabel && (
+                    <Badge className="bg-brand-100 text-brand-800">{categoryLabel}</Badge>
+                  )}
+                  {lead.deprioritized && (
+                    <Badge className="bg-slate-200 text-slate-700">Später prüfen</Badge>
                   )}
                   {lead.web_presence_status && (
                     <Badge className={webPresenceBadgeClass(lead.web_presence_status)}>
