@@ -95,7 +95,18 @@ export async function POST(
 
   const { id } = await params;
   const supabase = await createClient();
-  const { lead, error } = await processOutreachLead(supabase, id);
+
+  const { data: existing } = await supabase
+    .from("b2b_outreach_leads")
+    .select("status, outreach_message")
+    .eq("id", id)
+    .maybeSingle();
+
+  const enrichOnly = Boolean(existing?.outreach_message && existing.status !== "new");
+  const { lead, error } = await processOutreachLead(supabase, id, {
+    force: enrichOnly,
+    enrichOnly,
+  });
 
   if (error || !lead) {
     return NextResponse.json({ error: error ?? "Verarbeitung fehlgeschlagen" }, { status: 400 });

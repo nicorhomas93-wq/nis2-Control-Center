@@ -2,7 +2,6 @@ import type { B2BOutreachLead } from "@/lib/types";
 import { LEAD_FINDER_MIN_SCORE } from "@/lib/jarvis/outreach/constants";
 import {
   computeLeadFinderFields,
-  resolveLeadQualityScore,
 } from "@/lib/jarvis/outreach/lead-finder-fields";
 import { isLeadContactable } from "@/lib/jarvis/outreach/contact-enrichment";
 import type { PartnerPotential } from "@/lib/jarvis/outreach/lead-quality-scoring";
@@ -22,6 +21,8 @@ export interface LeadFinderViewLead extends B2BOutreachLead {
   resolved_contactable: boolean;
   resolved_partner_potential: PartnerPotential;
   resolved_outreach_priority: string;
+  resolved_qualified: boolean;
+  resolved_breakdown: string[];
 }
 
 function enrichLeadForView(lead: B2BOutreachLead): LeadFinderViewLead {
@@ -40,13 +41,15 @@ function enrichLeadForView(lead: B2BOutreachLead): LeadFinderViewLead {
 
   return {
     ...lead,
-    resolved_quality_score: resolveLeadQualityScore(lead),
+    resolved_quality_score: computed.lead_quality_score,
     resolved_contactable:
       lead.is_contactable ?? computed.is_contactable ?? isLeadContactable(lead),
     resolved_partner_potential:
       (lead.partner_potential as PartnerPotential) ?? computed.partner_potential,
     resolved_outreach_priority:
       lead.outreach_priority ?? computed.outreach_priority ?? "low",
+    resolved_qualified: Boolean(computed.qualifies_for_finder),
+    resolved_breakdown: computed.breakdown ?? [],
   };
 }
 
@@ -83,7 +86,15 @@ export function computeLeadFinderStats(leads: B2BOutreachLead[]): LeadFinderStat
       ? Math.round(
           qualified.reduce((sum, l) => sum + l.resolved_quality_score, 0) / qualified.length
         )
-      : 0;
+      : contactable.length > 0
+        ? Math.round(
+            contactable.reduce((sum, l) => sum + l.resolved_quality_score, 0) / contactable.length
+          )
+        : enriched.length > 0
+          ? Math.round(
+              enriched.reduce((sum, l) => sum + l.resolved_quality_score, 0) / enriched.length
+            )
+          : 0;
 
   return {
     totalFound: leads.length,

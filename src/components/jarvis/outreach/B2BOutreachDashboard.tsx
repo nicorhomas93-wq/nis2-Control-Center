@@ -62,7 +62,9 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
   const [showCsv, setShowCsv] = useState(false);
   const [filter, setFilter] = useState<B2BOutreachStatus | "all">("all");
   const [priorityFilter, setPriorityFilter] = useState<"all" | "high" | "medium">("all");
-  const [showPipeline, setShowPipeline] = useState(false);
+  const [showPipeline, setShowPipeline] = useState(
+    () => initialLeads.length > 0 && filterLeadFinderLeads(initialLeads).length === 0
+  );
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     company_name: "",
@@ -81,6 +83,9 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
   const finderStats = computeLeadFinderStats(initialLeads);
   const qualifiedLeads = filterLeadFinderLeads(initialLeads);
   const allEnriched = enrichLeadsForFinder(initialLeads);
+  const needsEnrichment =
+    initialLeads.length > 0 &&
+    (qualifiedLeads.length === 0 || finderStats.contactable < initialLeads.length);
 
   const leads = (showPipeline ? allEnriched : qualifiedLeads)
     .filter((l) => filter === "all" || l.status === filter)
@@ -217,6 +222,16 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
         </CardContent>
       </Card>
 
+      {needsEnrichment && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>{initialLeads.length} Leads in der Pipeline</strong> — davon{" "}
+          {finderStats.qualified} qualifiziert (≥ {LEAD_FINDER_MIN_SCORE} Punkte, kontaktierbar).
+          Bestands-Leads haben oft noch keine Kontaktdaten.{" "}
+          <strong>„Kontaktdaten nachtragen“</strong> durchsucht Websites nach E-Mail, Telefon und
+          Kontaktformular.
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2 text-sm text-slate-600">
           <span>
@@ -257,6 +272,17 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
           >
             <Search className="h-4 w-4" />
             Demo-Pool
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!!loading}
+            onClick={() =>
+              apiCall("/api/jarvis/outreach/leads/process", "POST", { mode: "enrich", limit: 50 })
+            }
+          >
+            <RefreshCw className="h-4 w-4" />
+            Kontaktdaten nachtragen
           </Button>
           <Button
             size="sm"
@@ -329,6 +355,30 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <span className="self-center text-xs font-medium text-slate-500">Ansicht:</span>
+        <button
+          type="button"
+          onClick={() => setShowPipeline(false)}
+          className={`rounded-full px-3 py-1 text-xs font-medium ${
+            !showPipeline
+              ? "bg-red-600 text-white"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          Qualifiziert ({qualifiedLeads.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowPipeline(true)}
+          className={`rounded-full px-3 py-1 text-xs font-medium ${
+            showPipeline
+              ? "bg-slate-700 text-white"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          Alle Pipeline ({initialLeads.length})
+        </button>
+        <span className="self-center text-xs text-slate-300">|</span>
         <span className="self-center text-xs font-medium text-slate-500">Priorität:</span>
         {(["all", "high", "medium"] as const).map((s) => (
           <button
@@ -344,17 +394,6 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
             {s === "high" ? "Hoch" : s === "medium" ? "Mittel" : "Alle"}
           </button>
         ))}
-        <button
-          type="button"
-          onClick={() => setShowPipeline((v) => !v)}
-          className={`rounded-full px-3 py-1 text-xs font-medium ${
-            showPipeline
-              ? "bg-slate-700 text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-          }`}
-        >
-          {showPipeline ? "Nur Qualifizierte" : "Gesamte Pipeline"}
-        </button>
       </div>
 
       {showForm && (
@@ -458,7 +497,8 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
           {leads.map((lead) => {
             const partnerScore = getPartnerScore(lead);
             const qualityScore = lead.resolved_quality_score;
-            const isTopLead = qualityScore >= 90 || lead.resolved_outreach_priority === "high";
+            const isQualified = lead.resolved_qualified;
+            const isTopLead = isQualified && (qualityScore >= 90 || lead.resolved_outreach_priority === "high");
             const categoryLabel =
               lead.lead_category &&
               PARTNER_CATEGORY_LABELS[lead.lead_category as keyof typeof PARTNER_CATEGORY_LABELS]
@@ -472,7 +512,13 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
             return (
             <Card
               key={lead.id}
-              className={isTopLead ? "border-red-200 ring-1 ring-red-100" : undefined}
+              className={
+                isQualified
+                  ? isTopLead
+                    ? "border-red-200 ring-1 ring-red-100"
+                    : "border-emerald-200"
+                  : "border-slate-200 opacity-95"
+              }
             >
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
                 <div>
@@ -546,6 +592,9 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {!isQualified && (
+                    <Badge className="bg-amber-100 text-amber-800">Noch nicht qualifiziert</Badge>
+                  )}
                   <Badge
                     className={
                       qualityScore >= 90
@@ -639,6 +688,22 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
+                {lead.resolved_breakdown.length > 0 && (
+                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                      Lead Score
+                    </p>
+                    <ul className="list-inside list-disc text-sm text-slate-600">
+                      {lead.resolved_breakdown.map((b) => (
+                        <li key={b}>{b}</li>
+                      ))}
+                    </ul>
+                    {lead.lead_quality_reason && (
+                      <p className="mt-2 text-xs text-slate-500">{lead.lead_quality_reason}</p>
+                    )}
+                  </div>
+                )}
+
                 {assessment.length > 0 && (
                   <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -741,6 +806,17 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                     >
                       <RefreshCw className="h-4 w-4" />
                       Analysieren
+                    </Button>
+                  )}
+                  {lead.status !== "new" && !lead.resolved_contactable && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!!loading}
+                      onClick={() => apiCall(`/api/jarvis/outreach/leads/${lead.id}`, "POST")}
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Kontakt suchen
                     </Button>
                   )}
                   {lead.outreach_message && (

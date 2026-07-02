@@ -99,7 +99,8 @@ export async function assertCanMarkContacted(
 
 export async function processOutreachLead(
   supabase: SupabaseClient,
-  leadId: string
+  leadId: string,
+  options: { force?: boolean; enrichOnly?: boolean } = {}
 ): Promise<{ lead: B2BOutreachLead | null; error: string | null }> {
   const { data: row, error: loadError } = await supabase
     .from("b2b_outreach_leads")
@@ -111,7 +112,7 @@ export async function processOutreachLead(
     return { lead: null, error: loadError?.message ?? "Lead nicht gefunden" };
   }
 
-  if (row.status === "ready" && row.outreach_message) {
+  if (!options.force && row.status === "ready" && row.outreach_message) {
     return { lead: mapLead(row), error: null };
   }
 
@@ -136,23 +137,28 @@ export async function processOutreachLead(
     contact_role: row.contact_role,
   });
 
-  const outreach_message = partner.auto_outreach
-    ? await generateOutreachMessage({
-        company_name: row.company_name,
-        industry: row.industry,
-        contact_role: row.contact_role,
-        contact_name: row.contact_name,
-        analysis,
-        partner_score: partner.partner_score,
-        lead_category: partner.lead_category,
-      })
-    : null;
+  const outreach_message =
+    options.enrichOnly && row.outreach_message
+      ? row.outreach_message
+      : partner.auto_outreach
+        ? await generateOutreachMessage({
+            company_name: row.company_name,
+            industry: row.industry,
+            contact_role: row.contact_role,
+            contact_name: row.contact_name,
+            analysis,
+            partner_score: partner.partner_score,
+            lead_category: partner.lead_category,
+          })
+        : null;
 
-  const status = partner.deprioritized
-    ? "review_later"
-    : outreach_message
-      ? "ready"
-      : "skipped";
+  const status = options.enrichOnly
+    ? row.status
+    : partner.deprioritized
+      ? "review_later"
+      : outreach_message
+        ? "ready"
+        : "skipped";
 
   const contactEmail =
     row.contact_email?.trim() ||
@@ -238,6 +244,43 @@ export async function processPendingLeads(
 
   for (const item of pending ?? []) {
     const { lead, error } = await processOutreachLead(supabase, item.id);
+    if (error || !lead) {
+      result.errors.push(error ?? "Unbekannter Fehler");
+      result.skipped += 1;
+      continue;
+    }
+    result.processed += 1;
+    result.leads.push(lead);
+  }
+
+  return result;
+}
+
+export async function processLeadsNeedingEnrichment(
+  supabase: SupabaseClient,
+  limit?: number
+): Promise<ProcessResult> {
+  const result: ProcessResult = {
+    processed: 0,
+    skipped: 0,
+    errors: [],
+    leads: [],
+  };
+
+  const batchSize = limit ?? OUTREACH_BATCH_ANALYSIS_LIMIT;
+
+  const { data: pending } = await supabase
+    .from("b2b_outreach_leads")
+    .select("id")
+    .or("is_contactable.eq.false,lead_quality_score.is.null")
+    .order("created_at", { ascending: true })
+    .limit(batchSize);
+
+  for (const item of pending ?? []) {
+    const { lead, error } = await processOutreachLead(supabase, item.id, {
+      force: true,
+      enrichOnly: true,
+    });
     if (error || !lead) {
       result.errors.push(error ?? "Unbekannter Fehler");
       result.skipped += 1;
