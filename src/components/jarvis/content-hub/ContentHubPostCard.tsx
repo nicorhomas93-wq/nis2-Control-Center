@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Send } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -23,10 +23,14 @@ export function ContentHubPostCard({
   post,
   onStatusChange,
   onDelete,
+  onImportToPublishing,
+  importing,
 }: {
   post: ContentHubPost;
   onStatusChange?: (id: string, status: string) => void;
   onDelete?: (id: string) => void;
+  onImportToPublishing?: (id: string) => void;
+  importing?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -94,6 +98,18 @@ export function ContentHubPostCard({
               }
             >
               {post.status === "ready" ? "Als Entwurf" : "Als bereit markieren"}
+            </Button>
+          )}
+          {onImportToPublishing && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={importing}
+              onClick={() => onImportToPublishing(post.id)}
+            >
+              <Send className="h-4 w-4" />
+              → Publishing
             </Button>
           )}
           {onDelete && (

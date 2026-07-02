@@ -10,6 +10,7 @@ const VIEWS = [
   { key: "scheduled", label: "Geplant" },
   { key: "published", label: "Veröffentlicht" },
   { key: "create", label: "Erstellen" },
+  { key: "import", label: "Content Hub" },
 ] as const;
 
 export function LinkedInPublishingShell({ children }: { children: React.ReactNode }) {

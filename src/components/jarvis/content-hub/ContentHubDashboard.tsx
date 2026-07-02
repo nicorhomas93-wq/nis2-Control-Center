@@ -87,6 +87,25 @@ export function ContentHubDashboard({ posts, series }: ContentHubDashboardProps)
     await apiCall(`/api/jarvis/content-hub/posts/${id}`, "DELETE");
   }
 
+  async function importToPublishing(postId: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/jarvis/linkedin-publishing/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content_hub_post_id: postId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Import fehlgeschlagen");
+      router.push("/jarvis/linkedin-publishing?view=drafts");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -94,6 +113,15 @@ export function ContentHubDashboard({ posts, series }: ContentHubDashboardProps)
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <div className="flex flex-wrap gap-2">
+        <a
+          href="/jarvis/linkedin-publishing?view=import"
+          className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          → LinkedIn Publishing
+        </a>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -256,6 +284,8 @@ export function ContentHubDashboard({ posts, series }: ContentHubDashboardProps)
                 post={post}
                 onStatusChange={updatePostStatus}
                 onDelete={deletePost}
+                onImportToPublishing={importToPublishing}
+                importing={loading}
               />
             ))}
           </div>

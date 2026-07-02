@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { LinkedInConnectionCard } from "@/components/jarvis/linkedin-publishing/LinkedInConnectionCard";
+import { ContentHubImportPanel } from "@/components/jarvis/linkedin-publishing/ContentHubImportPanel";
 import { LinkedInPostEditor } from "@/components/jarvis/linkedin-publishing/LinkedInPostEditor";
 import {
   LINKEDIN_PUBLISHING_DISCLAIMER,
@@ -25,6 +26,7 @@ import {
 } from "@/lib/jarvis/linkedin-publishing/constants";
 import type { PublishingDashboardStats } from "@/lib/jarvis/linkedin-publishing/stats";
 import type {
+  ContentHubPost,
   LinkedInCampaign,
   LinkedInPublishingAccount,
   LinkedInPublishingPost,
@@ -33,6 +35,7 @@ import type {
 interface LinkedInPublishingDashboardProps {
   account: LinkedInPublishingAccount | null;
   posts: LinkedInPublishingPost[];
+  contentHubPosts: ContentHubPost[];
   campaigns: LinkedInCampaign[];
   stats: PublishingDashboardStats;
   oauthConfigured: boolean;
@@ -41,6 +44,7 @@ interface LinkedInPublishingDashboardProps {
 export function LinkedInPublishingDashboard({
   account,
   posts,
+  contentHubPosts,
   campaigns,
   stats,
   oauthConfigured,
@@ -53,6 +57,11 @@ export function LinkedInPublishingDashboard({
   const [editing, setEditing] = useState<LinkedInPublishingPost | null>(null);
 
   const connected = Boolean(account?.is_active && account?.profile_name);
+
+  const importedHubIds = useMemo(
+    () => new Set(posts.map((p) => p.content_hub_post_id).filter(Boolean) as string[]),
+    [posts]
+  );
 
   const filtered = useMemo(() => {
     if (view === "drafts") return posts.filter((p) => p.status === "draft");
@@ -147,6 +156,28 @@ export function LinkedInPublishingDashboard({
     await apiCall(`/api/jarvis/linkedin-publishing/posts/${postId}`, "DELETE");
   }
 
+  async function importFromHub(ids: string[]) {
+    const data = await apiCall("/api/jarvis/linkedin-publishing/import", "POST", {
+      content_hub_post_ids: ids,
+    });
+    if (data) router.push("/jarvis/linkedin-publishing?view=drafts");
+  }
+
+  if (view === "import") {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-slate-800">Aus Content Hub importieren</h3>
+        <ContentHubImportPanel
+          posts={contentHubPosts}
+          importedIds={importedHubIds}
+          loading={loading}
+          onImport={(ids) => importFromHub(ids)}
+          onImportAll={(ids) => importFromHub(ids)}
+        />
+      </div>
+    );
+  }
+
   if (view === "create" || editing) {
     return (
       <LinkedInPostEditor
@@ -196,7 +227,7 @@ export function LinkedInPublishingDashboard({
           Neuen Beitrag erstellen
         </Link>
         <Link
-          href="/jarvis/content-hub"
+          href="/jarvis/linkedin-publishing?view=import"
           className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           Aus Content Hub importieren

@@ -44,6 +44,7 @@ export default async function LinkedInPublishingPage() {
               <LinkedInPublishingDashboard
                 account={data.account}
                 posts={data.posts}
+                contentHubPosts={data.contentHubPosts}
                 campaigns={data.campaigns}
                 stats={data.stats}
                 oauthConfigured={data.oauthConfigured}
