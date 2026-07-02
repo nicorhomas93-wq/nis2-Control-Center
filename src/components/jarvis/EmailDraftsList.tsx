@@ -76,7 +76,15 @@ export function EmailDraftsList({
         return;
       }
       setSuccess(
-        `E-Mail wurde versendet${data.method ? ` (${data.method === "resend" ? "Resend" : "SMTP"})` : ""}.`
+        `E-Mail wurde versendet${
+          data.method === "resend"
+            ? " (Resend)"
+            : data.method === "graph"
+              ? " (Microsoft Graph)"
+              : data.method === "smtp"
+                ? " (SMTP)"
+                : ""
+        }.`
       );
       router.refresh();
     } catch {
@@ -98,8 +106,8 @@ export function EmailDraftsList({
     <div className="space-y-4">
       {!emailConfig.configured && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          E-Mail-Versand nicht eingerichtet. Entwürfe können kopiert oder per Mailprogramm
-          geöffnet werden. Für echten Versand RESEND_API_KEY oder SMTP konfigurieren.
+          E-Mail-Versand nicht eingerichtet auf diesem Server.
+          {emailConfig.hint ? ` ${emailConfig.hint}` : ""}
         </p>
       )}
 
@@ -148,13 +156,11 @@ export function EmailDraftsList({
                 size="sm"
                 onClick={() => sendDraft(draft.id)}
                 disabled={
-                  loadingId === draft.id ||
-                  draft.lead?.consent_status === "no_contact" ||
-                  !emailConfig.configured
+                  loadingId === draft.id || draft.lead?.consent_status === "no_contact"
                 }
                 title={
                   !emailConfig.configured
-                    ? "E-Mail-Versand nicht eingerichtet"
+                    ? "Versand wird versucht — falls nicht konfiguriert, erscheint eine Fehlermeldung"
                     : undefined
                 }
               >

@@ -1,42 +1,55 @@
+import {
+  hasGraphConfig,
+  hasResendConfig,
+  hasSmtpConfig,
+  type OutboundEmailMethod,
+} from "@/lib/email/outbound";
+
 export const JARVIS_EMAIL_NOT_CONFIGURED = "E-Mail-Versand nicht eingerichtet";
 
-export type JarvisEmailProvider = "resend" | "smtp";
+export type JarvisEmailProvider = OutboundEmailMethod;
 
 export interface JarvisEmailConfig {
   configured: boolean;
   provider: JarvisEmailProvider | null;
+  providers: JarvisEmailProvider[];
   label: string;
-}
-
-function parseSmtpPass(raw?: string): string {
-  return raw?.trim().replace(/^["']|["']$/g, "") ?? "";
+  hint?: string;
 }
 
 export function getJarvisEmailConfig(): JarvisEmailConfig {
-  const resendKey = process.env.RESEND_API_KEY?.trim();
-  if (resendKey) {
-    return {
-      configured: true,
-      provider: "resend",
-      label: "Resend API",
-    };
+  const providers: JarvisEmailProvider[] = [];
+  const labels: string[] = [];
+
+  if (hasResendConfig()) {
+    providers.push("resend");
+    labels.push("Resend API");
+  }
+  if (hasGraphConfig()) {
+    providers.push("graph");
+    labels.push("Microsoft Graph");
+  }
+  if (hasSmtpConfig()) {
+    providers.push("smtp");
+    const host = process.env.SMTP_HOST?.trim();
+    labels.push(host ? `SMTP (${host})` : "SMTP");
   }
 
-  const host = process.env.SMTP_HOST?.trim();
-  const user = process.env.SMTP_USER?.trim();
-  const pass = parseSmtpPass(process.env.SMTP_PASS);
-
-  if (host && user && pass) {
+  if (providers.length === 0) {
     return {
-      configured: true,
-      provider: "smtp",
-      label: `SMTP (${host})`,
+      configured: false,
+      provider: null,
+      providers: [],
+      label: JARVIS_EMAIL_NOT_CONFIGURED,
+      hint:
+        "In Vercel oder .env.local setzen: RESEND_API_KEY, oder SMTP_HOST/SMTP_USER/SMTP_PASS, oder AZURE_TENANT_ID/AZURE_CLIENT_ID/AZURE_CLIENT_SECRET.",
     };
   }
 
   return {
-    configured: false,
-    provider: null,
-    label: JARVIS_EMAIL_NOT_CONFIGURED,
+    configured: true,
+    provider: providers[0] ?? null,
+    providers,
+    label: labels.join(" → "),
   };
 }

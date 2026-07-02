@@ -6,6 +6,7 @@ import type {
   CustomerMessageDelivery,
 } from "@/lib/jarvis/customer-message/types";
 import { logJarvisEvent } from "@/lib/jarvis/jarvis-events";
+import type { OutboundEmailMethod } from "@/lib/email/outbound";
 import { JARVIS_EMAIL_NOT_CONFIGURED } from "@/lib/jarvis/email-config";
 import { sendLeadEmail } from "@/lib/jarvis/send-lead-email";
 import { JARVIS_DISCLAIMER } from "@/lib/jarvis/constants";
@@ -28,7 +29,7 @@ export interface SendCustomerMessageResult {
   status: "logged" | "sent" | "failed";
   delivery: CustomerMessageDelivery;
   externalUrl?: string;
-  method?: "resend" | "smtp";
+  method?: OutboundEmailMethod;
   error?: string;
 }
 
@@ -105,7 +106,7 @@ export async function sendCustomerMessage(
   let status: "logged" | "sent" | "failed" = "logged";
   let externalUrl: string | undefined;
   let error: string | undefined;
-  let method: "resend" | "smtp" | undefined;
+  let method: OutboundEmailMethod | undefined;
 
   if (delivery === "internal") {
     status = "logged";

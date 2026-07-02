@@ -60,6 +60,7 @@ export function SendCustomerMessageModal({
         setEmailConfig({
           configured: false,
           provider: null,
+          providers: [],
           label: "E-Mail-Versand nicht eingerichtet",
         })
       );
@@ -116,8 +117,16 @@ export function SendCustomerMessageModal({
       if (!res.ok) throw new Error(data.error ?? "Aktion fehlgeschlagen");
 
       if (delivery === "smtp" && data.status === "sent") {
+        const methodLabel =
+          data.method === "resend"
+            ? "Resend"
+            : data.method === "graph"
+              ? "Microsoft Graph"
+              : data.method === "smtp"
+                ? "SMTP"
+                : null;
         setSuccess(
-          `E-Mail wurde versendet${data.method ? ` (${data.method === "resend" ? "Resend" : "SMTP"})` : ""}.`
+          `E-Mail wurde versendet${methodLabel ? ` (${methodLabel})` : ""}.`
         );
       } else if (delivery === "internal") {
         setSuccess("Nachricht intern gespeichert.");
@@ -205,8 +214,10 @@ export function SendCustomerMessageModal({
 
           {channel === "email" && emailConfig && !mailConfigured && (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              E-Mail-Versand nicht eingerichtet. Nutzen Sie Kopieren oder Mailprogramm öffnen,
-              oder konfigurieren Sie RESEND_API_KEY oder SMTP in der Umgebung.
+              E-Mail-Versand nicht eingerichtet auf diesem Server.
+              {emailConfig.hint ? ` ${emailConfig.hint}` : ""}
+              {" "}Nutzen Sie Kopieren oder Mailprogramm öffnen, oder konfigurieren Sie die
+              Umgebungsvariablen in Vercel.
             </p>
           )}
 
@@ -307,8 +318,12 @@ export function SendCustomerMessageModal({
                 <Button
                   type="button"
                   onClick={() => submit("smtp")}
-                  disabled={!!loading || !body.trim() || !mailConfigured}
-                  title={!mailConfigured ? "E-Mail-Versand nicht eingerichtet" : undefined}
+                  disabled={!!loading || !body.trim()}
+                  title={
+                    !mailConfigured
+                      ? "Versand wird versucht — falls nicht konfiguriert, erscheint eine Fehlermeldung"
+                      : undefined
+                  }
                 >
                   {loading === "smtp" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
