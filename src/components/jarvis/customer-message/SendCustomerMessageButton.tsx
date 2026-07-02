@@ -34,7 +34,7 @@ export function SendCustomerMessageButton({
         onClick={() => setOpen(true)}
       >
         <MessageSquare className="h-4 w-4" />
-        Nachricht senden
+        Nachricht vorbereiten
       </Button>
       <SendCustomerMessageModal
         open={open}

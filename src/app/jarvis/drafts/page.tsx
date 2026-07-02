@@ -1,6 +1,7 @@
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { JarvisShell } from "@/components/jarvis/JarvisShell";
 import { EmailDraftsList } from "@/components/jarvis/EmailDraftsList";
+import { getJarvisEmailConfig } from "@/lib/jarvis/email-config";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { createClient } from "@/lib/supabase/server";
 import { isMissingTableError } from "@/lib/supabase/db-error";
@@ -20,6 +21,8 @@ export default async function JarvisDraftsPage() {
     .eq("status", "draft")
     .order("created_at", { ascending: false });
 
+  const emailConfig = getJarvisEmailConfig();
+
   return (
     <DashboardShell>
       {error && isMissingTableError(error) && <SupabaseSetupBanner />}
@@ -27,10 +30,11 @@ export default async function JarvisDraftsPage() {
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-slate-900">E-Mail-Entwürfe</h2>
           <p className="text-sm text-slate-500">
-            Entwürfe werden protokolliert. Versand nur nach manueller Freigabe.
+            Entwürfe sind intern gespeichert. Versand, Kopieren oder Mailprogramm sind getrennte
+            Aktionen.
           </p>
         </div>
-        <EmailDraftsList drafts={data ?? []} />
+        <EmailDraftsList drafts={data ?? []} emailConfig={emailConfig} />
       </JarvisShell>
     </DashboardShell>
   );

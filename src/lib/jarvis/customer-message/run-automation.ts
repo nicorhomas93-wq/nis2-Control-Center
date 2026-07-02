@@ -97,6 +97,7 @@ export async function runAutomationForCustomer(
         entityType: input.entityType,
         entityId: input.entityId,
         channel: "internal",
+        delivery: "internal",
         subject: message.subject,
         body: message.body,
         sentByUserId: input.sentByUserId ?? null,

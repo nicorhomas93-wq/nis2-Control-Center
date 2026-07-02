@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, MessageSquare, X } from "lucide-react";
+import { Check, Copy, ExternalLink, Loader2, Mail, MessageSquare, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Textarea } from "@/components/ui/Textarea";
+import { buildMailtoUrl } from "@/lib/jarvis/customer-message/channels";
 import type {
   CustomerMessageChannel,
+  CustomerMessageDelivery,
   CustomerMessageTarget,
 } from "@/lib/jarvis/customer-message/types";
+import type { JarvisEmailConfig } from "@/lib/jarvis/email-config";
+import { JARVIS_DISCLAIMER } from "@/lib/jarvis/constants";
 import { cn } from "@/lib/utils";
 
 const CHANNEL_LABELS: Record<CustomerMessageChannel, string> = {
@@ -34,9 +38,11 @@ export function SendCustomerMessageModal({
   const [channel, setChannel] = useState<CustomerMessageChannel>("email");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<CustomerMessageDelivery | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [emailConfig, setEmailConfig] = useState<JarvisEmailConfig | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -45,6 +51,18 @@ export function SendCustomerMessageModal({
     setBody(target.defaultBody?.trim() ?? "");
     setError(null);
     setSuccess(null);
+    setCopied(false);
+
+    fetch("/api/jarvis/email-config")
+      .then((res) => res.json())
+      .then((data) => setEmailConfig(data))
+      .catch(() =>
+        setEmailConfig({
+          configured: false,
+          provider: null,
+          label: "E-Mail-Versand nicht eingerichtet",
+        })
+      );
   }, [open, target]);
 
   useEffect(() => {
@@ -59,10 +77,25 @@ export function SendCustomerMessageModal({
 
   const canEmail = Boolean(target.email) && !target.consentBlocked;
   const canWhatsApp = Boolean(target.phone) && !target.consentBlocked;
+  const mailConfigured = emailConfig?.configured ?? false;
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
+  function fullEmailBody(): string {
+    const text = body.trim();
+    return text ? `${text}\n\n---\n${JARVIS_DISCLAIMER}` : "";
+  }
+
+  async function copyMessage() {
+    const text = channel === "email" ? fullEmailBody() : body.trim();
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function submit(delivery: CustomerMessageDelivery) {
+    if (!body.trim()) return;
+
+    setLoading(delivery);
     setError(null);
     setSuccess(null);
 
@@ -73,34 +106,39 @@ export function SendCustomerMessageModal({
         body: JSON.stringify({
           entityType: target.entityType,
           entityId: target.entityId,
-          channel,
+          channel: delivery === "internal" ? "internal" : channel,
+          delivery,
           subject: channel === "email" ? subject : null,
           body,
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Versand fehlgeschlagen");
+      if (!res.ok) throw new Error(data.error ?? "Aktion fehlgeschlagen");
 
-      if (data.externalUrl) {
-        window.open(data.externalUrl, "_blank", "noopener,noreferrer");
-      }
-
-      if (channel === "internal") {
-        setSuccess("Nachricht im internen Log gespeichert.");
-      } else if (data.status === "sent") {
-        setSuccess("Nachricht wurde gesendet.");
-      } else if (data.externalUrl) {
-        setSuccess("Im Log gespeichert — externer Kanal wurde geöffnet.");
-      } else {
-        setSuccess("Nachricht protokolliert.");
+      if (delivery === "smtp" && data.status === "sent") {
+        setSuccess(
+          `E-Mail wurde versendet${data.method ? ` (${data.method === "resend" ? "Resend" : "SMTP"})` : ""}.`
+        );
+      } else if (delivery === "internal") {
+        setSuccess("Nachricht intern gespeichert.");
+      } else if (delivery === "mailto") {
+        if (data.externalUrl) {
+          window.location.href = data.externalUrl;
+        }
+        setSuccess("Nachricht gespeichert — Mailprogramm geöffnet.");
+      } else if (delivery === "whatsapp") {
+        if (data.externalUrl) {
+          window.open(data.externalUrl, "_blank", "noopener,noreferrer");
+        }
+        setSuccess("Nachricht gespeichert — WhatsApp geöffnet.");
       }
 
       onSent?.();
-      setTimeout(() => onClose(), 1200);
+      setTimeout(() => onClose(), 1400);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler");
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }
 
@@ -116,7 +154,7 @@ export function SendCustomerMessageModal({
       >
         <div className="flex items-start justify-between border-b border-slate-100 px-4 py-4 md:px-6">
           <div className="min-w-0 pr-2">
-            <h2 className="text-lg font-bold text-slate-900">Nachricht senden</h2>
+            <h2 className="text-lg font-bold text-slate-900">Nachricht vorbereiten</h2>
             <p className="mt-1 truncate text-sm text-slate-600">
               {target.companyName}
               {target.contactName ? ` · ${target.contactName}` : ""}
@@ -132,7 +170,7 @@ export function SendCustomerMessageModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto px-4 py-4 md:max-h-[70vh] md:px-6">
+        <div className="space-y-4 overflow-y-auto px-4 py-4 md:max-h-[70vh] md:px-6">
           <div className="flex flex-wrap gap-2">
             {(["email", "whatsapp", "internal"] as const).map((ch) => {
               const disabled =
@@ -162,6 +200,19 @@ export function SendCustomerMessageModal({
           {target.consentBlocked && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Externer Kontakt gesperrt — nur internes Log möglich.
+            </p>
+          )}
+
+          {channel === "email" && emailConfig && !mailConfigured && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              E-Mail-Versand nicht eingerichtet. Nutzen Sie Kopieren oder Mailprogramm öffnen,
+              oder konfigurieren Sie RESEND_API_KEY oder SMTP in der Umgebung.
+            </p>
+          )}
+
+          {channel === "email" && emailConfig?.configured && (
+            <p className="text-xs text-slate-500">
+              Versand aktiv: {emailConfig.label}
             </p>
           )}
 
@@ -196,23 +247,110 @@ export function SendCustomerMessageModal({
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {success && <p className="text-sm text-green-700">{success}</p>}
+          {error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+          {success && (
+            <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+              {success}
+            </p>
+          )}
 
           <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={!!loading}>
               Abbrechen
             </Button>
-            <Button type="submit" disabled={loading || !body.trim()}>
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <MessageSquare className="h-4 w-4" />
-              )}
-              {channel === "internal" ? "Speichern" : "Senden"}
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={copyMessage}
+              disabled={!!loading || !body.trim()}
+            >
+              {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+              Kopieren
             </Button>
+
+            {(channel === "email" || channel === "whatsapp") && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => submit("internal")}
+                disabled={!!loading || !body.trim()}
+              >
+                {loading === "internal" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Intern speichern
+              </Button>
+            )}
+
+            {channel === "email" && canEmail && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => submit("mailto")}
+                  disabled={!!loading || !body.trim()}
+                >
+                  {loading === "mailto" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4" />
+                  )}
+                  Mailprogramm öffnen
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => submit("smtp")}
+                  disabled={!!loading || !body.trim() || !mailConfigured}
+                  title={!mailConfigured ? "E-Mail-Versand nicht eingerichtet" : undefined}
+                >
+                  {loading === "smtp" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Mail className="h-4 w-4" />
+                  )}
+                  E-Mail senden
+                </Button>
+              </>
+            )}
+
+            {channel === "whatsapp" && canWhatsApp && (
+              <Button
+                type="button"
+                onClick={() => submit("whatsapp")}
+                disabled={!!loading || !body.trim()}
+              >
+                {loading === "whatsapp" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MessageSquare className="h-4 w-4" />
+                )}
+                WhatsApp öffnen
+              </Button>
+            )}
+
+            {channel === "internal" && (
+              <Button
+                type="button"
+                onClick={() => submit("internal")}
+                disabled={!!loading || !body.trim()}
+              >
+                {loading === "internal" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Speichern
+              </Button>
+            )}
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

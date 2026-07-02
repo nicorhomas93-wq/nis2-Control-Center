@@ -2,6 +2,9 @@ export type CustomerEntityType = "jarvis_lead" | "b2b_outreach_lead";
 
 export type CustomerMessageChannel = "email" | "whatsapp" | "internal";
 
+/** Wie die Nachricht zugestellt werden soll (getrennt von Kanal-Auswahl). */
+export type CustomerMessageDelivery = "smtp" | "mailto" | "whatsapp" | "internal";
+
 export type CustomerMessageStatus = "logged" | "sent" | "failed";
 
 export type CustomerMessageSource = "manual" | "automatic";

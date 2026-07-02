@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendLeadEmail } from "@/lib/jarvis/send-lead-email";
+import { getJarvisEmailConfig, JARVIS_EMAIL_NOT_CONFIGURED } from "@/lib/jarvis/email-config";
 import { logJarvisEvent } from "@/lib/jarvis/jarvis-events";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
 import { JARVIS_DISCLAIMER } from "@/lib/jarvis/constants";
@@ -54,6 +55,11 @@ export async function POST(
     );
   }
 
+  const emailConfig = getJarvisEmailConfig();
+  if (!emailConfig.configured) {
+    return NextResponse.json({ error: JARVIS_EMAIL_NOT_CONFIGURED }, { status: 503 });
+  }
+
   const bodyWithDisclaimer = `${interaction.content ?? ""}\n\n---\n${JARVIS_DISCLAIMER}`;
 
   const mail = await sendLeadEmail({
@@ -97,15 +103,17 @@ export async function POST(
     event_type: "email_sent",
     entity_type: "lead_interaction",
     entity_id: id,
-    summary: `E-Mail manuell freigegeben und versendet an ${lead.email}`,
+    summary: `E-Mail versendet an ${lead.email}`,
     details: {
       subject: interaction.subject,
       approved_by: user.email,
       lead_id: interaction.lead_id,
+      method: mail.method,
+      provider: emailConfig.label,
     },
   });
 
-  return NextResponse.json({ sent: true });
+  return NextResponse.json({ sent: true, method: mail.method });
 }
 
 export async function PATCH(

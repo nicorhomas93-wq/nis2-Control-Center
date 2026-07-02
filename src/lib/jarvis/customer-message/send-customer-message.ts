@@ -3,8 +3,10 @@ import { buildMailtoUrl, buildWhatsAppUrl } from "@/lib/jarvis/customer-message/
 import type {
   CustomerEntityType,
   CustomerMessageChannel,
+  CustomerMessageDelivery,
 } from "@/lib/jarvis/customer-message/types";
 import { logJarvisEvent } from "@/lib/jarvis/jarvis-events";
+import { JARVIS_EMAIL_NOT_CONFIGURED } from "@/lib/jarvis/email-config";
 import { sendLeadEmail } from "@/lib/jarvis/send-lead-email";
 import { JARVIS_DISCLAIMER } from "@/lib/jarvis/constants";
 
@@ -12,6 +14,7 @@ export interface SendCustomerMessageInput {
   entityType: CustomerEntityType;
   entityId: string;
   channel: CustomerMessageChannel;
+  delivery: CustomerMessageDelivery;
   subject?: string | null;
   body: string;
   sentByUserId?: string | null;
@@ -23,7 +26,9 @@ export interface SendCustomerMessageInput {
 export interface SendCustomerMessageResult {
   messageId: string;
   status: "logged" | "sent" | "failed";
+  delivery: CustomerMessageDelivery;
   externalUrl?: string;
+  method?: "resend" | "smtp";
   error?: string;
 }
 
@@ -68,6 +73,16 @@ async function resolveRecipient(
   };
 }
 
+function resolveDelivery(
+  channel: CustomerMessageChannel,
+  delivery: CustomerMessageDelivery
+): CustomerMessageDelivery {
+  if (delivery) return delivery;
+  if (channel === "internal") return "internal";
+  if (channel === "whatsapp") return "whatsapp";
+  return "smtp";
+}
+
 export async function sendCustomerMessage(
   supabase: SupabaseClient,
   input: SendCustomerMessageInput
@@ -77,20 +92,41 @@ export async function sendCustomerMessage(
     throw new Error("Nachricht darf nicht leer sein");
   }
 
+  const delivery = resolveDelivery(input.channel, input.delivery);
   const recipient = await resolveRecipient(supabase, input.entityType, input.entityId);
   if (!recipient) {
     throw new Error("Kunde nicht gefunden");
   }
 
-  if (recipient.consentBlocked && input.channel !== "internal") {
+  if (recipient.consentBlocked && delivery !== "internal") {
     throw new Error("Kontakt untersagt (no_contact)");
   }
 
   let status: "logged" | "sent" | "failed" = "logged";
   let externalUrl: string | undefined;
   let error: string | undefined;
+  let method: "resend" | "smtp" | undefined;
 
-  if (input.channel === "email") {
+  if (delivery === "internal") {
+    status = "logged";
+  } else if (delivery === "mailto") {
+    if (!recipient.email) {
+      throw new Error("Keine E-Mail-Adresse hinterlegt");
+    }
+    const subject = input.subject?.trim() || `TKND NIS2 — ${recipient.companyName}`;
+    const mailBody = `${body}\n\n---\n${JARVIS_DISCLAIMER}`;
+    externalUrl = buildMailtoUrl(recipient.email, subject, mailBody);
+    status = "logged";
+  } else if (delivery === "whatsapp") {
+    if (!recipient.phone) {
+      throw new Error("Keine Telefonnummer hinterlegt");
+    }
+    externalUrl = buildWhatsAppUrl(recipient.phone, body) ?? undefined;
+    if (!externalUrl) {
+      throw new Error("Telefonnummer ungültig für WhatsApp");
+    }
+    status = "logged";
+  } else if (delivery === "smtp") {
     if (!recipient.email) {
       throw new Error("Keine E-Mail-Adresse hinterlegt");
     }
@@ -105,20 +141,11 @@ export async function sendCustomerMessage(
 
     if (mail.sent) {
       status = "sent";
+      method = mail.method;
     } else {
-      status = "logged";
-      externalUrl = buildMailtoUrl(recipient.email, subject, mailBody);
-      error = mail.error;
+      status = "failed";
+      error = mail.error ?? JARVIS_EMAIL_NOT_CONFIGURED;
     }
-  } else if (input.channel === "whatsapp") {
-    if (!recipient.phone) {
-      throw new Error("Keine Telefonnummer hinterlegt");
-    }
-    externalUrl = buildWhatsAppUrl(recipient.phone, body) ?? undefined;
-    if (!externalUrl) {
-      throw new Error("Telefonnummer ungültig für WhatsApp");
-    }
-    status = "logged";
   }
 
   const { data: row, error: insertError } = await supabase
@@ -132,8 +159,9 @@ export async function sendCustomerMessage(
       status,
       source: input.source ?? "manual",
       trigger_type: input.triggerType ?? null,
-      recipient_email: input.channel === "email" ? recipient.email : null,
-      recipient_phone: input.channel === "whatsapp" ? recipient.phone : null,
+      recipient_email:
+        delivery === "smtp" || delivery === "mailto" ? recipient.email : null,
+      recipient_phone: delivery === "whatsapp" ? recipient.phone : null,
       sent_by: input.sentByUserId ?? null,
     })
     .select("id")
@@ -143,7 +171,11 @@ export async function sendCustomerMessage(
     throw new Error(insertError?.message ?? "Speichern fehlgeschlagen");
   }
 
-  if (input.entityType === "jarvis_lead" && input.channel === "email" && status === "sent") {
+  if (
+    input.entityType === "jarvis_lead" &&
+    delivery === "smtp" &&
+    status === "sent"
+  ) {
     await supabase.from("lead_interactions").insert({
       lead_id: input.entityId,
       type: "email",
@@ -154,29 +186,45 @@ export async function sendCustomerMessage(
     });
   }
 
+  const eventType =
+    status === "sent"
+      ? "customer_message_sent"
+      : status === "failed"
+        ? "email_failed"
+        : "customer_message_logged";
+
   await logJarvisEvent(supabase, {
-    event_type:
-      input.source === "automatic"
-        ? "customer_message_automatic"
-        : input.channel === "internal"
-          ? "customer_message_logged"
-          : "customer_message_sent",
+    event_type: eventType,
     entity_type: input.entityType,
     entity_id: input.entityId,
-    summary: `Nachricht (${input.source === "automatic" ? "auto" : input.channel}) an ${recipient.companyName}`,
+    summary:
+      status === "sent"
+        ? `E-Mail versendet an ${recipient.companyName}`
+        : status === "failed"
+          ? `E-Mail-Versand fehlgeschlagen: ${recipient.companyName}`
+          : delivery === "mailto"
+            ? `Nachricht gespeichert — Mailprogramm für ${recipient.companyName}`
+            : delivery === "whatsapp"
+              ? `Nachricht gespeichert — WhatsApp für ${recipient.companyName}`
+              : `Nachricht intern gespeichert für ${recipient.companyName}`,
     details: {
       message_id: row.id,
       channel: input.channel,
+      delivery,
       status,
+      method,
       trigger_type: input.triggerType,
       sent_by: input.sentByEmail,
+      error,
     },
   });
 
   return {
     messageId: row.id,
     status,
+    delivery,
     externalUrl,
+    method,
     error,
   };
 }

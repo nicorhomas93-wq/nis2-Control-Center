@@ -1,9 +1,13 @@
+import { PILOT_NOTIFICATION_EMAIL } from "@/lib/app-config";
 import {
-  PILOT_NOTIFICATION_EMAIL,
-} from "@/lib/app-config";
+  getJarvisEmailConfig,
+  JARVIS_EMAIL_NOT_CONFIGURED,
+  type JarvisEmailProvider,
+} from "@/lib/jarvis/email-config";
 
 export type SendLeadEmailResult = {
   sent: boolean;
+  method?: JarvisEmailProvider;
   error?: string;
 };
 
@@ -17,8 +21,17 @@ export async function sendLeadEmail(options: {
   body: string;
   replyTo?: string;
 }): Promise<SendLeadEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (apiKey) {
+  const config = getJarvisEmailConfig();
+  if (!config.configured || !config.provider) {
+    return { sent: false, error: JARVIS_EMAIL_NOT_CONFIGURED };
+  }
+
+  if (config.provider === "resend") {
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    if (!apiKey) {
+      return { sent: false, error: JARVIS_EMAIL_NOT_CONFIGURED };
+    }
+
     try {
       const from =
         process.env.PILOT_EMAIL_FROM?.trim() ??
@@ -40,7 +53,7 @@ export async function sendLeadEmail(options: {
       if (!res.ok) {
         return { sent: false, error: `Resend: ${await res.text()}` };
       }
-      return { sent: true };
+      return { sent: true, method: "resend" };
     } catch (error) {
       return {
         sent: false,
@@ -53,7 +66,7 @@ export async function sendLeadEmail(options: {
   const user = process.env.SMTP_USER?.trim();
   const pass = parseSmtpPass(process.env.SMTP_PASS);
   if (!host || !user || !pass) {
-    return { sent: false, error: "SMTP nicht konfiguriert" };
+    return { sent: false, error: JARVIS_EMAIL_NOT_CONFIGURED };
   }
 
   const nodemailer = await import("nodemailer");
@@ -80,7 +93,7 @@ export async function sendLeadEmail(options: {
       subject: options.subject,
       text: options.body,
     });
-    return { sent: true };
+    return { sent: true, method: "smtp" };
   } catch (error) {
     return {
       sent: false,

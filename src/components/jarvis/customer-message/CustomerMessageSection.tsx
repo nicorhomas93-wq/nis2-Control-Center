@@ -130,6 +130,14 @@ export function CustomerMessageSection({ target, compact }: CustomerMessageSecti
                     </span>
                     <span className="text-slate-400">·</span>
                     <span>{msg.channel}</span>
+                    <span className="text-slate-400">·</span>
+                    <span>
+                      {msg.status === "sent"
+                        ? "versendet"
+                        : msg.status === "failed"
+                          ? "fehlgeschlagen"
+                          : "gespeichert"}
+                    </span>
                     {msg.trigger_type && (
                       <>
                         <span className="text-slate-400">·</span>

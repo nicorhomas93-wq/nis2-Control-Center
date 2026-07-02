@@ -6,6 +6,7 @@ import {
   Copy,
   Check,
   Download,
+  ExternalLink,
   MapPin,
   Play,
   Plus,
@@ -38,6 +39,7 @@ import type { OutreachQuotaInfo } from "@/lib/jarvis/outreach/processor";
 import type { B2BOutreachLead, B2BOutreachStatus } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { CustomerMessageSection } from "@/components/jarvis/customer-message/CustomerMessageSection";
+import { buildMailtoUrl } from "@/lib/jarvis/customer-message/channels";
 import { customerMessageTargetFromB2BLead } from "@/lib/jarvis/customer-message/targets";
 
 interface B2BOutreachDashboardProps {
@@ -140,7 +142,16 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
     await apiCall(`/api/jarvis/outreach/leads/${id}`, "PATCH", { status });
   }
 
-  const sendProgress = Math.min(100, (quota.sentToday / quota.sendLimit) * 100);
+  function openMailto(lead: B2BOutreachLead) {
+    if (!lead.contact_email || !lead.outreach_message) return;
+    window.location.href = buildMailtoUrl(
+      lead.contact_email,
+      `TKND NIS2 — ${lead.company_name}`,
+      lead.outreach_message
+    );
+  }
+
+  const contactProgress = Math.min(100, (quota.sentToday / quota.sendLimit) * 100);
 
   return (
     <div className="space-y-6">
@@ -148,7 +159,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
         <CardContent className="space-y-3 pt-4">
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-700">
             <span>
-              Heute gesendet:{" "}
+              Heute kontaktiert:{" "}
               <strong>
                 {quota.sentToday} / {quota.sendLimit}
               </strong>
@@ -162,8 +173,8 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
           </div>
           <div className="max-w-md space-y-1">
             <div className="flex justify-between text-xs text-slate-500">
-              <span>Versand-Fortschritt</span>
-              <span>{Math.round(sendProgress)}%</span>
+              <span>Kontakt-Fortschritt (manuell markiert)</span>
+              <span>{Math.round(contactProgress)}%</span>
             </div>
             <div
               className="h-2 overflow-hidden rounded-full bg-slate-200"
@@ -171,13 +182,13 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
               aria-valuenow={quota.sentToday}
               aria-valuemin={0}
               aria-valuemax={quota.sendLimit}
-              aria-label="Versand-Fortschritt heute"
+              aria-label="Kontakt-Fortschritt heute"
             >
               <div
                 className={`h-full rounded-full transition-all ${
                   quota.sendLimitReached ? "bg-amber-500" : "bg-sky-600"
                 }`}
-                style={{ width: `${sendProgress}%` }}
+                style={{ width: `${contactProgress}%` }}
               />
             </div>
           </div>
@@ -270,8 +281,8 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
 
       {quota.sendLimitReached && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Tageslimit erreicht — heute wurden bereits {quota.sendLimit} Nachrichten gesendet.
-          Analysen sind weiterhin möglich.
+          Tageslimit erreicht — heute wurden bereits {quota.sendLimit} Leads als kontaktiert
+          markiert (kein E-Mail-Versand). Analysen sind weiterhin möglich.
         </div>
       )}
 
@@ -638,14 +649,22 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                     </Button>
                   )}
                   {lead.outreach_message && (
-                    <Button size="sm" variant="outline" onClick={() => copyMessage(lead)}>
-                      {copiedId === lead.id ? (
-                        <Check className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => copyMessage(lead)}>
+                        {copiedId === lead.id ? (
+                          <Check className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                        Nachricht kopieren
+                      </Button>
+                      {lead.contact_email && (
+                        <Button size="sm" variant="outline" onClick={() => openMailto(lead)}>
+                          <ExternalLink className="h-4 w-4" />
+                          Mailprogramm öffnen
+                        </Button>
                       )}
-                      Nachricht kopieren
-                    </Button>
+                    </>
                   )}
                   {lead.status === "ready" && (
                     <Button
@@ -653,7 +672,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                       disabled={quota.sendLimitReached}
                       onClick={() => updateStatus(lead.id, "contacted")}
                     >
-                      Als kontaktiert
+                      Als kontaktiert markieren
                     </Button>
                   )}
                   {lead.status === "contacted" && (
@@ -693,8 +712,8 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
       )}
 
       <p className="text-xs text-slate-400">
-        Kein Auto-Versand. Versand-Limit: {OUTREACH_DAILY_SEND_LIMIT} Kontakte/Tag (env:
-        OUTREACH_DAILY_SEND_LIMIT). Analysen unbegrenzt. OpenAI optional für bessere Texte.
+        Kein E-Mail-Auto-Versand. Kontakt-Limit: {OUTREACH_DAILY_SEND_LIMIT} Markierungen/Tag
+        (manuell). Analysen unbegrenzt. OpenAI optional für bessere Texte.
       </p>
     </div>
   );

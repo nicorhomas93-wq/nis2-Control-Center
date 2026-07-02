@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Check, Copy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -13,6 +15,13 @@ import { formatDate } from "@/lib/utils";
 
 export function OutreachDraftsList({ drafts }: { drafts: OutreachDraft[] }) {
   const router = useRouter();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  async function copyDraft(body: string, id: string) {
+    await navigator.clipboard.writeText(body);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
 
   async function updateStatus(id: string, status: string) {
     await fetch(`/api/jarvis/traffic/outreach/${id}`, {
@@ -63,10 +72,22 @@ export function OutreachDraftsList({ drafts }: { drafts: OutreachDraft[] }) {
               {draft.body}
             </pre>
             <p className="text-xs text-slate-400">
-              Manuell kopieren und versenden — kein Auto-Versand. Erstellt:{" "}
+              Manuell kopieren und versenden — kein E-Mail-Auto-Versand. Erstellt:{" "}
               {formatDate(draft.created_at)}
             </p>
             <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => copyDraft(draft.body ?? "", draft.id)}
+              >
+                {copiedId === draft.id ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+                Kopieren
+              </Button>
               {draft.status === "draft" && (
                 <Button size="sm" onClick={() => updateStatus(draft.id, "approved")}>
                   Freigeben (manuell nutzen)
