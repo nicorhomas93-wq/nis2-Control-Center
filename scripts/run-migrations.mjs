@@ -63,6 +63,7 @@ const ORDER = [
   "add_vendor_applicability_na.sql",
   "add_vendor_categories_providers.sql",
   "add_compliance_evidence_module.sql",
+  "add_compliance_evidence_center.sql",
 ];
 
 const url = process.env.DATABASE_URL;

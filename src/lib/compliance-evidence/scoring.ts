@@ -81,11 +81,18 @@ export function buildEvidenceDashboardStats(
   let reviewsDue = 0;
   let expiredEntries = 0;
 
+  let voluntaryDocumented = 0;
+  let mandatoryRelevant = 0;
+
   for (const entry of entries) {
     const status = deriveEntryStatus(entry, entry.files, company);
     if (status === "vollstaendig" || status === "freiwillig_dokumentiert") {
       completeEntries += 1;
     }
+    if (status === "freiwillig_dokumentiert" || status === "freiwillig_empfohlen") {
+      voluntaryDocumented += 1;
+    }
+    if (isEntryMandatoryForCompany(entry, company)) mandatoryRelevant += 1;
     if (status === "nachweis_fehlt" || status === "unvollstaendig") {
       if (isEntryMandatoryForCompany(entry, company)) missingEvidence += 1;
     }
@@ -99,6 +106,8 @@ export function buildEvidenceDashboardStats(
     missingEvidence,
     reviewsDue,
     expiredEntries,
+    voluntaryDocumented,
+    mandatoryRelevant,
     scope,
     scopeLabel: scope === "mandatory"
       ? "NIS2-betroffen — Nachweise pflichtrelevant"
@@ -113,17 +122,12 @@ export function getAuditReadinessDeduction(
   company: Pick<Company, "nis2_status"> | null | undefined
 ): { deduction: number; reasons: string[] } {
   const scope = getNis2EvidenceScope(company);
-  if (scope === "voluntary") {
+  if (scope === "voluntary" || scope === "unknown") {
     return { deduction: 0, reasons: [] };
   }
 
   const reasons: string[] = [];
   let deduction = 0;
-
-  if (scope === "unknown") {
-    deduction += 5;
-    reasons.push("NIS2-Betroffenheit nicht geklärt");
-  }
 
   for (const entry of entries) {
     if (!isEntryMandatoryForCompany(entry, company)) continue;

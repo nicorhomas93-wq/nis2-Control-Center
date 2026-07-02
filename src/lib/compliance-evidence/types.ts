@@ -16,6 +16,7 @@ export type EvidenceEntryType =
   | "teilnahmebestaetigung"
   | "phishing_auswertung"
   | "mfa_nachweis"
+  | "zugriffskontroll_nachweis"
   | "backup_nachweis"
   | "incident_nachweis"
   | "lieferanten_nachweis"
@@ -30,9 +31,13 @@ export type EvidenceEntryStatus =
   | "review_faellig"
   | "abgelaufen"
   | "freiwillig_dokumentiert"
+  | "freiwillig_empfohlen"
+  | "wartet_auf_nachweis"
   | "nicht_zutreffend";
 
-export type EvidenceMandatoryRelevance = "yes" | "no" | "nis2_dependent";
+export type EvidenceMandatoryRelevance = "yes" | "no" | "nis2_dependent" | "not_applicable";
+
+export type ReviewInterval = "none" | "6m" | "12m" | "24m" | "custom";
 
 export type Nis2EvidenceScope = "mandatory" | "voluntary" | "unknown";
 
@@ -50,16 +55,23 @@ export interface ComplianceEvidenceEntry {
   description: string | null;
   conducted_at: string | null;
   responsible: string | null;
+  participants_target: string | null;
+  department: string | null;
+  participant_count: number | null;
   valid_until: string | null;
   next_review_at: string | null;
+  review_interval: ReviewInterval;
   status: EvidenceEntryStatus;
   mandatory_relevance: EvidenceMandatoryRelevance;
   external_links: EvidenceExternalLink[];
   linked_risk_ids: string[];
   linked_measure_ids: string[];
   linked_task_ids: string[];
+  linked_incident_ids: string[];
   linked_vendor_ids: string[];
   linked_audit_areas: string[];
+  template_key: string | null;
+  recommended_file_labels: string[];
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -92,6 +104,8 @@ export interface ComplianceEvidenceDashboardStats {
   missingEvidence: number;
   reviewsDue: number;
   expiredEntries: number;
+  voluntaryDocumented: number;
+  mandatoryRelevant: number;
   scope: Nis2EvidenceScope;
   scopeLabel: string;
 }
@@ -137,11 +151,17 @@ export function isEntryMandatoryForCompany(
   entry: Pick<ComplianceEvidenceEntry, "mandatory_relevance" | "status">,
   company: Pick<Company, "nis2_status"> | null | undefined
 ): boolean {
-  if (entry.status === "nicht_zutreffend" || entry.status === "freiwillig_dokumentiert") {
+  if (
+    entry.status === "nicht_zutreffend" ||
+    entry.status === "freiwillig_dokumentiert" ||
+    entry.status === "freiwillig_empfohlen"
+  ) {
     return false;
   }
+  if (entry.mandatory_relevance === "not_applicable") return false;
   if (entry.mandatory_relevance === "yes") return true;
   if (entry.mandatory_relevance === "no") return false;
+  if (isNis2StatusUnknown(company?.nis2_status)) return false;
   return isNis2Affected(company?.nis2_status);
 }
 
@@ -149,4 +169,7 @@ export const NIS2_UNKNOWN_SCOPE_MESSAGE =
   "Der NIS2-Betroffenheitsstatus ist noch nicht geklärt. Bitte führen Sie den Betroffenheitscheck durch.";
 
 export const NIS2_VOLUNTARY_SCOPE_MESSAGE =
-  "Ihr Unternehmen ist aktuell nicht als NIS2-betroffen eingestuft. Schulungen und Nachweise können freiwillig zur Sicherheits- und Organisationsdokumentation gepflegt werden.";
+  "Ihr Unternehmen ist aktuell nicht als NIS2-betroffen eingestuft. Schulungen und Nachweise können freiwillig gepflegt werden.";
+
+export const NIS2_MANDATORY_SCOPE_MESSAGE =
+  "Fehlende Pflichtnachweise können Audit-Bereitschaft und Datenqualität beeinflussen.";

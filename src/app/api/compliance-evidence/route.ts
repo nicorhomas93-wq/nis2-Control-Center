@@ -14,6 +14,9 @@ import type {
   EvidenceMandatoryRelevance,
 } from "@/lib/compliance-evidence/types";
 import { syncAndReturnComplianceSnapshot } from "@/lib/compliance/sync";
+import { logActivity } from "@/lib/activity/log";
+import type { ReviewInterval } from "@/lib/compliance-evidence/review-interval";
+import { computeNextReviewDate } from "@/lib/compliance-evidence/review-interval";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -70,16 +73,23 @@ export async function POST(request: Request) {
     description,
     conductedAt,
     responsible,
+    participantsTarget,
+    department,
+    participantCount,
     validUntil,
     nextReviewAt,
+    reviewInterval,
     mandatoryRelevance,
     externalLinks,
     linkedRiskIds,
     linkedMeasureIds,
     linkedTaskIds,
+    linkedIncidentIds,
     linkedVendorIds,
     linkedAuditAreas,
     status,
+    templateKey,
+    recommendedFileLabels,
   } = body;
 
   if (!companyId || !title) {
@@ -89,6 +99,12 @@ export async function POST(request: Request) {
   const company = await verifyCompanyOwnership(user.id, companyId);
   if (!company) return NextResponse.json({ error: "Unternehmen nicht gefunden" }, { status: 404 });
 
+  const effectiveReviewInterval = (reviewInterval as ReviewInterval) ?? "none";
+  const effectiveConductedAt = conductedAt || null;
+  const computedNextReview =
+    nextReviewAt ??
+    computeNextReviewDate(effectiveReviewInterval, effectiveConductedAt, nextReviewAt);
+
   const { data: entry, error } = await supabase
     .from("compliance_evidence_entries")
     .insert({
@@ -97,17 +113,24 @@ export async function POST(request: Request) {
       category: (category as EvidenceCategory) ?? "sonstige",
       entry_type: (entryType as EvidenceEntryType) ?? "sonstiges",
       description: description?.trim() || null,
-      conducted_at: conductedAt || null,
+      conducted_at: effectiveConductedAt,
       responsible: responsible?.trim() || null,
+      participants_target: participantsTarget?.trim() || null,
+      department: department?.trim() || null,
+      participant_count: participantCount ?? null,
       valid_until: validUntil || null,
-      next_review_at: nextReviewAt || null,
+      next_review_at: computedNextReview,
+      review_interval: effectiveReviewInterval,
       mandatory_relevance: (mandatoryRelevance as EvidenceMandatoryRelevance) ?? "nis2_dependent",
       external_links: externalLinks ?? [],
       linked_risk_ids: linkedRiskIds ?? [],
       linked_measure_ids: linkedMeasureIds ?? [],
       linked_task_ids: linkedTaskIds ?? [],
+      linked_incident_ids: linkedIncidentIds ?? [],
       linked_vendor_ids: linkedVendorIds ?? [],
       linked_audit_areas: linkedAuditAreas ?? [],
+      template_key: templateKey ?? null,
+      recommended_file_labels: recommendedFileLabels ?? [],
       status: status ?? "nachweis_fehlt",
       created_by: user.id,
     })
@@ -120,6 +143,15 @@ export async function POST(request: Request) {
       { status: isMissingTableError(error) ? 503 : 500 }
     );
   }
+
+  await logActivity(supabase, {
+    companyId,
+    userId: user.id,
+    action: "evidence_entry_created",
+    entityType: "compliance_evidence",
+    entityId: entry.id,
+    comment: `Eintrag „${entry.title}" angelegt`,
+  });
 
   const snapshot = await syncAndReturnComplianceSnapshot(supabase, companyId);
   return NextResponse.json({ entry: { ...entry, files: [] }, snapshot });

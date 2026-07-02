@@ -257,7 +257,7 @@ export function calculateDataQuality(input: {
     });
   }
 
-  if (evidenceScope === "mandatory" || evidenceScope === "unknown") {
+  if (evidenceScope === "mandatory") {
     const mandatoryGaps = countMandatoryGaps(complianceEntries, input.company);
     if (mandatoryGaps > 0) {
       checks.push({

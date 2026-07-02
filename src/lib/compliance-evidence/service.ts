@@ -9,11 +9,17 @@ function normalizeEntry(row: ComplianceEvidenceEntry): ComplianceEvidenceEntry {
   return {
     ...row,
     external_links: Array.isArray(row.external_links) ? row.external_links : [],
+    recommended_file_labels: Array.isArray(row.recommended_file_labels)
+      ? row.recommended_file_labels
+      : [],
     linked_risk_ids: row.linked_risk_ids ?? [],
     linked_measure_ids: row.linked_measure_ids ?? [],
     linked_task_ids: row.linked_task_ids ?? [],
+    linked_incident_ids: row.linked_incident_ids ?? [],
     linked_vendor_ids: row.linked_vendor_ids ?? [],
     linked_audit_areas: row.linked_audit_areas ?? [],
+    review_interval: row.review_interval ?? "none",
+    participant_count: row.participant_count ?? null,
   };
 }
 

@@ -10,6 +10,8 @@ import type {
   EvidenceMandatoryRelevance,
 } from "@/lib/compliance-evidence/types";
 import { syncAndReturnComplianceSnapshot } from "@/lib/compliance/sync";
+import { logActivity } from "@/lib/activity/log";
+import type { ReviewInterval } from "@/lib/compliance-evidence/review-interval";
 
 export async function PATCH(
   request: Request,
@@ -48,7 +50,18 @@ export async function PATCH(
   if (fields.linkedMeasureIds !== undefined) updates.linked_measure_ids = fields.linkedMeasureIds;
   if (fields.linkedTaskIds !== undefined) updates.linked_task_ids = fields.linkedTaskIds;
   if (fields.linkedVendorIds !== undefined) updates.linked_vendor_ids = fields.linkedVendorIds;
+  if (fields.linkedIncidentIds !== undefined) updates.linked_incident_ids = fields.linkedIncidentIds;
   if (fields.linkedAuditAreas !== undefined) updates.linked_audit_areas = fields.linkedAuditAreas;
+  if (fields.participantsTarget !== undefined) {
+    updates.participants_target = fields.participantsTarget?.trim() || null;
+  }
+  if (fields.department !== undefined) updates.department = fields.department?.trim() || null;
+  if (fields.participantCount !== undefined) {
+    updates.participant_count = fields.participantCount ?? null;
+  }
+  if (fields.reviewInterval !== undefined) {
+    updates.review_interval = fields.reviewInterval as ReviewInterval;
+  }
   if (fields.status !== undefined) updates.status = fields.status as EvidenceEntryStatus;
 
   const { data: entry, error } = await supabase
@@ -84,6 +97,15 @@ export async function PATCH(
       .update({ status: computedStatus })
       .eq("id", id);
   }
+
+  await logActivity(supabase, {
+    companyId,
+    userId: user.id,
+    action: "evidence_entry_updated",
+    entityType: "compliance_evidence",
+    entityId: id,
+    comment: `Eintrag „${entry.title}" aktualisiert`,
+  });
 
   const snapshot = await syncAndReturnComplianceSnapshot(supabase, companyId);
   return NextResponse.json({ entry: { ...entry, status: computedStatus }, snapshot });

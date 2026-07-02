@@ -7,6 +7,8 @@ import { getWorkspaceCompany } from "@/lib/company";
 import { loadComplianceEvidenceEntries } from "@/lib/compliance-evidence/service";
 import { buildEvidenceDashboardStats } from "@/lib/compliance-evidence/scoring";
 import { getNis2EvidenceScope, getNis2EvidenceScopeLabel } from "@/lib/compliance-evidence/types";
+import { loadEvidenceLinkOptions } from "@/lib/compliance-evidence/link-options";
+import type { EvidenceLinkOptions } from "@/components/compliance-evidence/EvidenceLinkFields";
 import { redirect } from "next/navigation";
 
 export default async function SchulungenPage() {
@@ -22,10 +24,21 @@ export default async function SchulungenPage() {
   let stats = buildEvidenceDashboardStats([], company);
   const scope = getNis2EvidenceScope(company);
   const scopeLabel = getNis2EvidenceScopeLabel(scope);
+  let linkOptions: EvidenceLinkOptions = {
+    risks: [],
+    measures: [],
+    tasks: [],
+    incidents: [],
+    vendors: [],
+    auditAreas: [],
+  };
 
   if (company) {
     try {
-      entries = await loadComplianceEvidenceEntries(supabase, company.id);
+      [entries, linkOptions] = await Promise.all([
+        loadComplianceEvidenceEntries(supabase, company.id),
+        loadEvidenceLinkOptions(supabase, company.id),
+      ]);
       stats = buildEvidenceDashboardStats(entries, company);
     } catch {
       entries = [];
@@ -39,8 +52,8 @@ export default async function SchulungenPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Schulungen & Nachweise</h1>
         <p className="mt-1 text-slate-500">
-          Zentrale Ablage für Schulungsunterlagen, Teilnahmebescheinigungen, Phishing-Auswertungen
-          und weitere Audit-Belege.
+          Nachweis- und Schulungscenter: Schulungen, Phishing-Auswertungen, MFA-Unterlagen,
+          Teilnehmerlisten, Backup-Tests, Lieferantennachweise und Audit-Belege zentral verwalten.
         </p>
       </div>
       {company ? (
@@ -52,6 +65,7 @@ export default async function SchulungenPage() {
           initialStats={stats}
           initialScope={scope}
           initialScopeLabel={scopeLabel}
+          linkOptions={linkOptions}
         />
       ) : (
         <p className="text-sm text-slate-600">Bitte zuerst das Unternehmensprofil vervollständigen.</p>

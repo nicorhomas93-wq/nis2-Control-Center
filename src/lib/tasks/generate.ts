@@ -191,6 +191,8 @@ export async function autoTaskFromComplianceEvidenceGaps(
 
   await autoTaskClarifyNis2Status(supabase, company, createdBy);
 
+  if (scope === "unknown") return;
+
   for (const entry of entries) {
     if (!isEntryMandatoryForCompany(entry, company)) continue;
     const status = deriveEntryStatus(entry, entry.files, company);
