@@ -11,7 +11,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("linkedin_publishing_accounts")
     .select(
-      "id, user_id, linkedin_member_id, profile_name, profile_picture_url, profile_headline, is_active, connected_at, token_expires_at, created_at, updated_at"
+      "id, user_id, linkedin_member_id, profile_name, profile_picture_url, profile_headline, connection_mode, is_active, connected_at, token_expires_at, created_at, updated_at"
     )
     .eq("user_id", access.userId)
     .maybeSingle();

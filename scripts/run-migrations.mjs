@@ -70,6 +70,7 @@ const ORDER = [
   "add_jarvis_campaign_response_automation.sql",
   "add_jarvis_content_hub.sql",
   "add_jarvis_linkedin_publishing.sql",
+  "add_jarvis_linkedin_manual_mode.sql",
 ];
 
 const url = process.env.DATABASE_URL;

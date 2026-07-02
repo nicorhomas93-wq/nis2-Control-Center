@@ -3,9 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
 import {
-  publishLinkedInImagePost,
-  publishLinkedInTextPost,
-} from "@/lib/jarvis/linkedin-publishing/linkedin-api";
+  formatLinkedInPostText,
+  LINKEDIN_FEED_URL,
+} from "@/lib/jarvis/linkedin-publishing/post-format";
 
 export async function POST(
   _request: Request,
@@ -33,9 +33,9 @@ export async function POST(
   const post = postRes.data;
   const account = accountRes.data;
 
-  if (!account?.is_active || !account.access_token || !account.linkedin_member_id) {
+  if (!account?.is_active || !account.profile_name) {
     return NextResponse.json(
-      { error: "LinkedIn ist nicht verbunden. Bitte zuerst Account verbinden." },
+      { error: "Profil nicht eingerichtet. Bitte zuerst LinkedIn-Profil verknüpfen." },
       { status: 400 }
     );
   }
@@ -44,7 +44,30 @@ export async function POST(
     return NextResponse.json({ error: "Beitrag wurde bereits veröffentlicht." }, { status: 400 });
   }
 
+  const isManual = account.connection_mode === "manual";
+
+  if (isManual) {
+    const text = formatLinkedInPostText(post);
+    return NextResponse.json({
+      manual: true,
+      text,
+      linkedinUrl: LINKEDIN_FEED_URL,
+      message:
+        "Text wird kopiert. LinkedIn öffnet sich — dort einfügen und selbst auf „Veröffentlichen“ klicken.",
+    });
+  }
+
+  if (!account.access_token || !account.linkedin_member_id) {
+    return NextResponse.json(
+      { error: "API-Verbindung fehlt. Nutzen Sie „Persönliches Profil“ oder OAuth." },
+      { status: 400 }
+    );
+  }
+
   try {
+    const { publishLinkedInImagePost, publishLinkedInTextPost } = await import(
+      "@/lib/jarvis/linkedin-publishing/linkedin-api"
+    );
     const result = post.image_url
       ? await publishLinkedInImagePost({
           accessToken: account.access_token,

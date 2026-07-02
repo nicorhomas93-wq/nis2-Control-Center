@@ -550,6 +550,7 @@ export interface LinkedInPublishingAccount {
   profile_name: string | null;
   profile_picture_url: string | null;
   profile_headline: string | null;
+  connection_mode: string;
   is_active: boolean;
   connected_at: string;
   token_expires_at: string | null;

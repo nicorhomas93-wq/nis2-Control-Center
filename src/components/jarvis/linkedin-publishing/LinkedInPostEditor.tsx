@@ -235,8 +235,13 @@ export function LinkedInPostEditor({
           </div>
           {!connected && (
             <p className="text-xs text-amber-700">
-              Veröffentlichen erst nach LinkedIn-Verbindung möglich. Entwürfe können Sie trotzdem
-              erstellen und planen.
+              Zuerst oben dein Profil verknüpfen — kein Unternehmensaccount nötig.
+            </p>
+          )}
+          {connected && account?.connection_mode === "manual" && (
+            <p className="text-xs text-slate-500">
+              Manueller Modus: Beitrag wird kopiert, LinkedIn öffnet sich — du klickst dort selbst auf
+              Veröffentlichen.
             </p>
           )}
         </CardContent>

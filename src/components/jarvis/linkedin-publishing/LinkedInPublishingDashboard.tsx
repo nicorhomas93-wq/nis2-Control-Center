@@ -98,10 +98,48 @@ export function LinkedInPublishingDashboard({
     }
   }
 
+  async function manualConnect(payload: { profile_name: string; profile_headline?: string }) {
+    await apiCall("/api/jarvis/linkedin-publishing/account/manual", "POST", payload);
+  }
+
   async function publishPost(postId: string) {
-    if (!confirm("Beitrag jetzt auf LinkedIn veröffentlichen?")) return;
-    await apiCall(`/api/jarvis/linkedin-publishing/posts/${postId}/publish`, "POST");
-    setEditing(null);
+    const isManual = account?.connection_mode === "manual";
+    const msg = isManual
+      ? "Text wird kopiert und LinkedIn geöffnet. Dort einfügen und selbst auf Veröffentlichen klicken."
+      : "Beitrag jetzt über LinkedIn API veröffentlichen?";
+    if (!confirm(msg)) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/jarvis/linkedin-publishing/posts/${postId}/publish`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Veröffentlichung fehlgeschlagen");
+
+      if (data.manual) {
+        await navigator.clipboard.writeText(data.text);
+        window.open(data.linkedinUrl, "_blank", "noopener,noreferrer");
+        if (
+          confirm(
+            "Text ist in der Zwischenablage. Hast du den Beitrag auf LinkedIn veröffentlicht?"
+          )
+        ) {
+          await fetch(`/api/jarvis/linkedin-publishing/posts/${postId}/mark-published`, {
+            method: "POST",
+          });
+        }
+        router.refresh();
+      } else {
+        router.refresh();
+      }
+      setEditing(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function deletePost(postId: string) {
@@ -146,6 +184,7 @@ export function LinkedInPublishingDashboard({
         oauthConfigured={oauthConfigured}
         loading={loading}
         onDisconnect={disconnect}
+        onManualConnect={manualConnect}
       />
 
       <div className="flex flex-wrap gap-2">
@@ -225,7 +264,7 @@ export function LinkedInPublishingDashboard({
                         disabled={loading || !connected}
                         onClick={() => publishPost(post.id)}
                       >
-                        Veröffentlichen
+                        {account?.connection_mode === "manual" ? "Auf LinkedIn öffnen" : "Veröffentlichen"}
                       </Button>
                     )}
                     <Button type="button" variant="ghost" size="sm" onClick={() => deletePost(post.id)}>

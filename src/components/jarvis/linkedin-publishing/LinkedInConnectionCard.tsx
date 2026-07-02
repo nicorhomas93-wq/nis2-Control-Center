@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
-import { CheckCircle2, Link2, Unlink } from "lucide-react";
+import { CheckCircle2, ExternalLink, Link2, Unlink, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { LINKEDIN_LOGIN_URL } from "@/lib/jarvis/linkedin-publishing/post-format";
 import type { LinkedInPublishingAccount } from "@/lib/types";
 
 interface LinkedInConnectionCardProps {
@@ -12,6 +14,7 @@ interface LinkedInConnectionCardProps {
   oauthConfigured: boolean;
   loading: boolean;
   onDisconnect: () => void;
+  onManualConnect: (payload: { profile_name: string; profile_headline?: string }) => Promise<void>;
 }
 
 export function LinkedInConnectionCard({
@@ -20,12 +23,19 @@ export function LinkedInConnectionCard({
   oauthConfigured,
   loading,
   onDisconnect,
+  onManualConnect,
 }: LinkedInConnectionCardProps) {
+  const [profileName, setProfileName] = useState(account?.profile_name ?? "Nico Thomas");
+  const [headline, setHeadline] = useState(account?.profile_headline ?? "");
+  const [showManualForm, setShowManualForm] = useState(!connected);
+
+  const isManual = account?.connection_mode === "manual";
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Link2 className="h-4 w-4" /> LinkedIn Publishing
+          <Link2 className="h-4 w-4" /> LinkedIn Profil
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -42,8 +52,8 @@ export function LinkedInConnectionCard({
                   unoptimized
                 />
               ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                  LI
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 text-brand-700 font-semibold">
+                  {account.profile_name?.charAt(0) ?? "N"}
                 </div>
               )}
               <div>
@@ -53,10 +63,8 @@ export function LinkedInConnectionCard({
                 </p>
                 <p className="text-sm text-slate-700">{account.profile_name}</p>
                 <p className="text-xs text-slate-500">
-                  Status: {account.is_active ? "Aktiv" : "Inaktiv"}
-                  {account.connected_at
-                    ? ` · verbunden seit ${new Date(account.connected_at).toLocaleDateString("de-DE")}`
-                    : ""}
+                  {isManual ? "Persönliches Profil (manuell)" : "API-Verbindung"} ·{" "}
+                  {account.is_active ? "Aktiv" : "Inaktiv"}
                 </p>
               </div>
             </div>
@@ -66,29 +74,81 @@ export function LinkedInConnectionCard({
             </Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-slate-600">
-              Verbinden Sie Ihren LinkedIn-Account, um Beiträge vorzubereiten und per Klick zu
-              veröffentlichen.
-            </p>
-            {oauthConfigured ? (
-              <Button
-                type="button"
-                disabled={loading}
-                onClick={() => {
-                  window.location.href = "/api/jarvis/linkedin-publishing/oauth/start";
-                }}
-              >
-                LinkedIn verbinden
-              </Button>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm text-brand-900">
+              <strong>Kein Unternehmensaccount nötig.</strong> Ein normales persönliches LinkedIn-Profil
+              reicht völlig aus. Jarvis bereitet Beiträge vor — du postest selbst mit einem Klick auf
+              LinkedIn.
+            </div>
+
+            {showManualForm ? (
+              <div className="rounded-lg border border-slate-200 p-4 space-y-3">
+                <p className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                  <UserRound className="h-4 w-4" />
+                  Persönliches Profil einrichten
+                </p>
+                <label className="block text-sm">
+                  <span className="mb-1 block text-slate-600">Dein Name (wie auf LinkedIn)</span>
+                  <input
+                    className="w-full rounded border border-slate-200 px-3 py-2 text-sm"
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    placeholder="z.B. Nico Thomas"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="mb-1 block text-slate-600">Headline (optional)</span>
+                  <input
+                    className="w-full rounded border border-slate-200 px-3 py-2 text-sm"
+                    value={headline}
+                    onChange={(e) => setHeadline(e.target.value)}
+                    placeholder="z.B. IT-Security & NIS2"
+                  />
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    disabled={loading || !profileName.trim()}
+                    onClick={() =>
+                      onManualConnect({
+                        profile_name: profileName.trim(),
+                        profile_headline: headline.trim() || undefined,
+                      })
+                    }
+                  >
+                    Profil verknüpfen
+                  </Button>
+                  <a
+                    href={LINKEDIN_LOGIN_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Bei LinkedIn anmelden
+                  </a>
+                </div>
+              </div>
             ) : (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                OAuth noch nicht konfiguriert. In <code>.env.local</code> setzen:
-                <br />
-                LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, NEXT_PUBLIC_APP_URL
-                <br />
-                Redirect-URI in der LinkedIn-App:{" "}
-                <code>/api/jarvis/linkedin-publishing/oauth/callback</code>
+              <Button type="button" variant="outline" onClick={() => setShowManualForm(true)}>
+                Profil einrichten
+              </Button>
+            )}
+
+            {oauthConfigured && (
+              <div className="border-t border-slate-100 pt-4">
+                <p className="mb-2 text-xs text-slate-500">Optional: Direkt über LinkedIn API verbinden</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={loading}
+                  onClick={() => {
+                    window.location.href = "/api/jarvis/linkedin-publishing/oauth/start";
+                  }}
+                >
+                  Mit LinkedIn API verbinden
+                </Button>
               </div>
             )}
           </div>
