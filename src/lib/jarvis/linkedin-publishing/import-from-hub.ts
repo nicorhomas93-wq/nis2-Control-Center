@@ -40,7 +40,7 @@ export function contentHubToPublishingRow(
   post: ContentHubPost,
   userId: string
 ): Record<string, unknown> {
-  const status = post.scheduled_date ? "scheduled" : "draft";
+  const status = "draft";
   return {
     user_id: userId,
     content_hub_post_id: post.id,

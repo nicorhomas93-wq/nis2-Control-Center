@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 const VIEWS = [
   { key: "overview", label: "Übersicht" },
   { key: "drafts", label: "Entwürfe" },
+  { key: "pending", label: "Zur Freigabe" },
+  { key: "approved", label: "Freigegeben" },
   { key: "scheduled", label: "Geplant" },
   { key: "published", label: "Veröffentlicht" },
   { key: "create", label: "Erstellen" },

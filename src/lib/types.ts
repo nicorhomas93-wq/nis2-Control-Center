@@ -426,6 +426,9 @@ export interface LinkedInCampaign {
   pipeline_value: number | null;
   template_key: string | null;
   goal: string | null;
+  approval_status?: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
   created_at: string;
   updated_at: string;
   lead_count?: number;
@@ -508,6 +511,17 @@ export interface LinkedInCampaignDemo {
   updated_at: string;
 }
 
+export interface JarvisContentAuditLog {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  actor: string;
+  campaign_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface ContentHubSeries {
   id: string;
   name: string;
@@ -574,6 +588,11 @@ export interface LinkedInPublishingPost {
   scheduled_at: string | null;
   published_at: string | null;
   linkedin_post_urn: string | null;
+  campaign_id: string | null;
+  created_by: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  submitted_at: string | null;
   reach_views: number;
   response_count: number;
   publish_error: string | null;

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
 import type { LinkedInPostType } from "@/lib/jarvis/linkedin-publishing/constants";
+import { logContentAudit } from "@/lib/jarvis/linkedin-publishing/approval";
 
 export async function POST(request: Request) {
   const access = await requireJarvisApiAccess();
@@ -16,9 +17,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Titel und Text sind erforderlich" }, { status: 400 });
   }
 
-  const status = body.status === "scheduled" ? "scheduled" : "draft";
-  const scheduledAt =
-    status === "scheduled" && body.scheduled_at ? String(body.scheduled_at) : null;
+  const scheduledAt = body.scheduled_at ? String(body.scheduled_at) : null;
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -26,6 +25,7 @@ export async function POST(request: Request) {
     .insert({
       user_id: access.userId,
       content_hub_post_id: body.content_hub_post_id ?? null,
+      campaign_id: body.campaign_id ?? null,
       title,
       post_type: (body.post_type as LinkedInPostType) ?? "short_post",
       body_text: bodyText,
@@ -34,8 +34,9 @@ export async function POST(request: Request) {
       target_audience: body.target_audience?.trim() || null,
       call_to_action: body.call_to_action?.trim() || null,
       hashtags: body.hashtags?.trim() || null,
-      status,
+      status: "draft",
       scheduled_at: scheduledAt,
+      created_by: "jarvis",
     })
     .select()
     .single();
@@ -43,6 +44,15 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
   }
+
+  await logContentAudit({
+    entity_type: "post",
+    entity_id: data.id,
+    action: "created",
+    actor: "jarvis",
+    campaign_id: data.campaign_id,
+    metadata: { title: data.title },
+  });
 
   return NextResponse.json({ post: data });
 }

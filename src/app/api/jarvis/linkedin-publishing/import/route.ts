@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
+import { logContentAudit } from "@/lib/jarvis/linkedin-publishing/approval";
 import { contentHubToPublishingRow } from "@/lib/jarvis/linkedin-publishing/import-from-hub";
 import type { ContentHubPost } from "@/lib/types";
 
@@ -57,6 +58,17 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
+  }
+
+  for (const row of data ?? []) {
+    await logContentAudit({
+      entity_type: "post",
+      entity_id: row.id,
+      action: "created",
+      actor: "jarvis",
+      campaign_id: row.campaign_id,
+      metadata: { title: row.title, source: "content_hub" },
+    });
   }
 
   return NextResponse.json({

@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { ContentAuditLogPanel } from "@/components/jarvis/linkedin-publishing/ContentAuditLogPanel";
 import { LinkedInConnectionCard } from "@/components/jarvis/linkedin-publishing/LinkedInConnectionCard";
 import { ContentHubImportPanel } from "@/components/jarvis/linkedin-publishing/ContentHubImportPanel";
 import { LinkedInPostEditor } from "@/components/jarvis/linkedin-publishing/LinkedInPostEditor";
@@ -27,6 +28,7 @@ import {
 import type { PublishingDashboardStats } from "@/lib/jarvis/linkedin-publishing/stats";
 import type {
   ContentHubPost,
+  JarvisContentAuditLog,
   LinkedInCampaign,
   LinkedInPublishingAccount,
   LinkedInPublishingPost,
@@ -37,6 +39,7 @@ interface LinkedInPublishingDashboardProps {
   posts: LinkedInPublishingPost[];
   contentHubPosts: ContentHubPost[];
   campaigns: LinkedInCampaign[];
+  auditLog: JarvisContentAuditLog[];
   stats: PublishingDashboardStats;
   oauthConfigured: boolean;
 }
@@ -46,6 +49,7 @@ export function LinkedInPublishingDashboard({
   posts,
   contentHubPosts,
   campaigns,
+  auditLog,
   stats,
   oauthConfigured,
 }: LinkedInPublishingDashboardProps) {
@@ -65,6 +69,8 @@ export function LinkedInPublishingDashboard({
 
   const filtered = useMemo(() => {
     if (view === "drafts") return posts.filter((p) => p.status === "draft");
+    if (view === "pending") return posts.filter((p) => p.status === "pending_approval");
+    if (view === "approved") return posts.filter((p) => p.status === "approved");
     if (view === "scheduled") return posts.filter((p) => p.status === "scheduled");
     if (view === "published") return posts.filter((p) => p.status === "published");
     return posts;
@@ -105,6 +111,20 @@ export function LinkedInPublishingDashboard({
       await apiCall("/api/jarvis/linkedin-publishing/posts", "POST", payload);
       router.push("/jarvis/linkedin-publishing?view=drafts");
     }
+  }
+
+  async function submitForApproval(postId: string) {
+    await apiCall(`/api/jarvis/linkedin-publishing/posts/${postId}/submit`, "POST");
+  }
+
+  async function approvePost(postId: string) {
+    if (!confirm("Beitrag freigeben? Danach kann er veröffentlicht oder geplant werden.")) return;
+    await apiCall(`/api/jarvis/linkedin-publishing/posts/${postId}/approve`, "POST");
+  }
+
+  async function approveCampaign(campaignId: string) {
+    if (!confirm("Gesamte Kampagne freigeben? Danach dürfen zugeordnete Beiträge veröffentlicht werden.")) return;
+    await apiCall(`/api/jarvis/kampagnen/${campaignId}/approve`, "POST");
   }
 
   async function manualConnect(payload: { profile_name: string; profile_headline?: string }) {
@@ -240,8 +260,10 @@ export function LinkedInPublishingDashboard({
         </Link>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
         <StatCard icon={FileEdit} label="Entwürfe" value={stats.drafts} />
+        <StatCard icon={MessageSquare} label="Zur Freigabe" value={stats.pendingApproval} />
+        <StatCard icon={Send} label="Freigegeben" value={stats.approved} />
         <StatCard icon={CalendarClock} label="Geplant" value={stats.scheduled} />
         <StatCard icon={Send} label="Veröffentlicht" value={stats.published} />
         <StatCard icon={BarChart3} label="Reichweite" value={stats.reach} />
@@ -288,7 +310,17 @@ export function LinkedInPublishingDashboard({
                     <Button type="button" variant="outline" size="sm" onClick={() => setEditing(post)}>
                       Bearbeiten
                     </Button>
-                    {post.status !== "published" && (
+                    {post.status === "draft" && (
+                      <Button type="button" size="sm" disabled={loading} onClick={() => submitForApproval(post.id)}>
+                        Zur Freigabe
+                      </Button>
+                    )}
+                    {post.status === "pending_approval" && (
+                      <Button type="button" size="sm" disabled={loading} onClick={() => approvePost(post.id)}>
+                        Freigeben
+                      </Button>
+                    )}
+                    {(post.status === "approved" || post.status === "scheduled") && (
                       <Button
                         type="button"
                         size="sm"
@@ -302,6 +334,14 @@ export function LinkedInPublishingDashboard({
                       Löschen
                     </Button>
                   </div>
+                  {post.approved_by && (
+                    <p className="text-xs text-green-700">
+                      Freigegeben von {post.approved_by}
+                      {post.approved_at
+                        ? ` · ${new Date(post.approved_at).toLocaleString("de-DE")}`
+                        : ""}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -316,16 +356,27 @@ export function LinkedInPublishingDashboard({
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {campaigns.slice(0, 5).map((c) => (
-              <div key={c.id} className="flex justify-between gap-2">
+              <div key={c.id} className="flex flex-wrap items-center justify-between gap-2">
                 <Link href={`/jarvis/kampagnen/${c.id}`} className="text-brand-700 hover:underline">
                   {c.name}
                 </Link>
-                <span className="text-slate-500">{c.status}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 text-xs">{c.status}</span>
+                  {c.approval_status !== "approved" ? (
+                    <Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => approveCampaign(c.id)}>
+                      Kampagne freigeben
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-green-700">Freigegeben</span>
+                  )}
+                </div>
               </div>
             ))}
           </CardContent>
         </Card>
       )}
+
+      <ContentAuditLogPanel entries={auditLog} />
     </div>
   );
 }

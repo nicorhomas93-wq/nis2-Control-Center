@@ -46,6 +46,7 @@ export default async function LinkedInPublishingPage() {
                 posts={data.posts}
                 contentHubPosts={data.contentHubPosts}
                 campaigns={data.campaigns}
+                auditLog={data.auditLog}
                 stats={data.stats}
                 oauthConfigured={data.oauthConfigured}
               />

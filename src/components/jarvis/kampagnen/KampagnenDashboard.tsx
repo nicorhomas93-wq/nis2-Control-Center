@@ -92,6 +92,11 @@ export function KampagnenDashboard({
     }
   }
 
+  async function approveCampaign(campaignId: string) {
+    if (!confirm("Gesamte Kampagne freigeben?")) return;
+    await apiCall(`/api/jarvis/kampagnen/${campaignId}/approve`, "POST");
+  }
+
   async function startTemplate(templateKey: string) {
     await apiCall("/api/jarvis/kampagnen/start", "POST", { template_key: templateKey });
   }
@@ -348,7 +353,13 @@ export function KampagnenDashboard({
 
           <div className="grid gap-4 md:grid-cols-2">
             {activeCampaigns.slice(0, 4).map((c) => (
-              <CampaignCard key={c.id} campaign={c} leadCount={leads.filter((l) => l.campaign_id === c.id).length} />
+              <CampaignCard
+                key={c.id}
+                campaign={c}
+                leadCount={leads.filter((l) => l.campaign_id === c.id).length}
+                onApprove={approveCampaign}
+                loading={loading}
+              />
             ))}
           </div>
         </>
@@ -360,7 +371,13 @@ export function KampagnenDashboard({
             <p className="text-sm text-slate-500">Keine aktiven Kampagnen — Vorlage starten oder anlegen.</p>
           ) : (
             activeCampaigns.map((c) => (
-              <CampaignCard key={c.id} campaign={c} leadCount={leads.filter((l) => l.campaign_id === c.id).length} />
+              <CampaignCard
+                key={c.id}
+                campaign={c}
+                leadCount={leads.filter((l) => l.campaign_id === c.id).length}
+                onApprove={approveCampaign}
+                loading={loading}
+              />
             ))
           )}
         </div>
@@ -471,10 +488,15 @@ export function KampagnenDashboard({
 function CampaignCard({
   campaign,
   leadCount,
+  onApprove,
+  loading,
 }: {
   campaign: LinkedInCampaign;
   leadCount: number;
+  onApprove?: (id: string) => void;
+  loading?: boolean;
 }) {
+  const approved = campaign.approval_status === "approved";
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-2">
@@ -486,10 +508,17 @@ function CampaignCard({
           </CardTitle>
           <p className="mt-1 text-xs text-slate-500">{campaign.target_group}</p>
         </div>
-        <Badge className="bg-violet-100 text-violet-800">
-          {CAMPAIGN_STATUS_LABELS[campaign.status as keyof typeof CAMPAIGN_STATUS_LABELS] ??
-            campaign.status}
-        </Badge>
+        <div className="flex flex-col items-end gap-1">
+          <Badge className="bg-violet-100 text-violet-800">
+            {CAMPAIGN_STATUS_LABELS[campaign.status as keyof typeof CAMPAIGN_STATUS_LABELS] ??
+              campaign.status}
+          </Badge>
+          {approved ? (
+            <Badge className="bg-green-100 text-green-800">Freigegeben</Badge>
+          ) : (
+            <Badge className="bg-amber-100 text-amber-800">Nicht freigegeben</Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-2 text-sm text-slate-600">
         {campaign.goal && <p>Ziel: {campaign.goal}</p>}
@@ -497,6 +526,11 @@ function CampaignCard({
           <Megaphone className="h-4 w-4" />
           {leadCount} Leads · {campaign.responsible}
         </p>
+        {!approved && onApprove && (
+          <Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => onApprove(campaign.id)}>
+            Gesamte Kampagne freigeben
+          </Button>
+        )}
         <Link
           href={`/jarvis/kampagnen/${campaign.id}`}
           className="text-sm text-violet-700 hover:underline"

@@ -1,5 +1,5 @@
 export const LINKEDIN_PUBLISHING_DISCLAIMER =
-  "LinkedIn Publishing bereitet Beiträge vor und veröffentlicht nur auf expliziten Klick — keine automatischen Nachrichten, keine Kontaktanfragen, kein Auto-Posting.";
+  "Freigabe durch Nico erforderlich — ohne Freigabe keine Veröffentlichung und keine aktive Planung.";
 
 export type LinkedInPostType =
   | "expert_article"
@@ -12,7 +12,15 @@ export type LinkedInPostType =
   | "vendor"
   | "training_evidence";
 
-export type LinkedInPublishStatus = "draft" | "scheduled" | "published" | "failed";
+export type LinkedInPublishStatus =
+  | "draft"
+  | "pending_approval"
+  | "approved"
+  | "scheduled"
+  | "published"
+  | "failed";
+
+export const APPROVED_PUBLISH_STATUSES = ["approved", "scheduled"] as const;
 
 export const LINKEDIN_POST_TYPE_LABELS: Record<LinkedInPostType, string> = {
   expert_article: "Fachbeitrag",
@@ -28,6 +36,8 @@ export const LINKEDIN_POST_TYPE_LABELS: Record<LinkedInPostType, string> = {
 
 export const LINKEDIN_PUBLISH_STATUS_LABELS: Record<LinkedInPublishStatus, string> = {
   draft: "Entwurf",
+  pending_approval: "Zur Freigabe",
+  approved: "Freigegeben",
   scheduled: "Geplant",
   published: "Veröffentlicht",
   failed: "Fehlgeschlagen",

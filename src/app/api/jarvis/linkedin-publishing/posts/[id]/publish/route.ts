@@ -3,9 +3,20 @@ import { createClient } from "@/lib/supabase/server";
 import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
 import {
+  assertCampaignApproved,
+  canPublishPost,
+  logContentAudit,
+} from "@/lib/jarvis/linkedin-publishing/approval";
+import {
   formatLinkedInPostText,
   LINKEDIN_FEED_URL,
 } from "@/lib/jarvis/linkedin-publishing/post-format";
+
+async function getActorName(userId: string): Promise<string> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("profiles").select("email").eq("id", userId).maybeSingle();
+  return data?.email ?? "Nico";
+}
 
 export async function POST(
   _request: Request,
@@ -16,6 +27,7 @@ export async function POST(
 
   const { id } = await params;
   const supabase = await createClient();
+  const actor = await getActorName(access.userId);
 
   const [postRes, accountRes] = await Promise.all([
     supabase.from("linkedin_publishing_posts").select("*").eq("id", id).single(),
@@ -32,6 +44,21 @@ export async function POST(
 
   const post = postRes.data;
   const account = accountRes.data;
+
+  if (!canPublishPost(post.status)) {
+    return NextResponse.json(
+      {
+        error:
+          "Beitrag ist nicht freigegeben. Bitte zuerst prüfen und „Freigeben“ klicken.",
+      },
+      { status: 403 }
+    );
+  }
+
+  const campaignCheck = await assertCampaignApproved(post.campaign_id);
+  if (!campaignCheck.ok) {
+    return NextResponse.json({ error: campaignCheck.error }, { status: 403 });
+  }
 
   if (!account?.is_active || !account.profile_name) {
     return NextResponse.json(
@@ -100,6 +127,15 @@ export async function POST(
     if (error) {
       return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
     }
+
+    await logContentAudit({
+      entity_type: "post",
+      entity_id: id,
+      action: "published",
+      actor,
+      campaign_id: post.campaign_id,
+      metadata: { title: post.title, urn: result.urn, mode: "api" },
+    });
 
     return NextResponse.json({ post: data, urn: result.urn });
   } catch (err) {

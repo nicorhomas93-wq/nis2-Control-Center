@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
-import {
-  assertCampaignApproved,
-  canPublishPost,
-  logContentAudit,
-} from "@/lib/jarvis/linkedin-publishing/approval";
+import { logContentAudit } from "@/lib/jarvis/linkedin-publishing/approval";
 
 export async function POST(
   _request: Request,
@@ -18,26 +14,18 @@ export async function POST(
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: post } = await supabase
-    .from("linkedin_publishing_posts")
+  const { data: campaign, error: fetchError } = await supabase
+    .from("linkedin_campaigns")
     .select("*")
     .eq("id", id)
     .single();
 
-  if (!post) {
-    return NextResponse.json({ error: "Beitrag nicht gefunden" }, { status: 404 });
+  if (fetchError || !campaign) {
+    return NextResponse.json({ error: "Kampagne nicht gefunden" }, { status: 404 });
   }
 
-  if (!canPublishPost(post.status)) {
-    return NextResponse.json(
-      { error: "Beitrag ist nicht freigegeben." },
-      { status: 403 }
-    );
-  }
-
-  const campaignCheck = await assertCampaignApproved(post.campaign_id);
-  if (!campaignCheck.ok) {
-    return NextResponse.json({ error: campaignCheck.error }, { status: 403 });
+  if (campaign.approval_status === "approved") {
+    return NextResponse.json({ error: "Kampagne ist bereits freigegeben." }, { status: 400 });
   }
 
   const { data: profile } = await supabase
@@ -48,11 +36,11 @@ export async function POST(
   const actor = profile?.email ?? "Nico";
 
   const { data, error } = await supabase
-    .from("linkedin_publishing_posts")
+    .from("linkedin_campaigns")
     .update({
-      status: "published",
-      published_at: new Date().toISOString(),
-      publish_error: null,
+      approval_status: "approved",
+      approved_by: actor,
+      approved_at: new Date().toISOString(),
     })
     .eq("id", id)
     .select()
@@ -63,13 +51,13 @@ export async function POST(
   }
 
   await logContentAudit({
-    entity_type: "post",
+    entity_type: "campaign",
     entity_id: id,
-    action: "published",
+    action: "campaign_approved",
     actor,
-    campaign_id: post.campaign_id,
-    metadata: { title: post.title, mode: "manual" },
+    campaign_id: id,
+    metadata: { name: campaign.name },
   });
 
-  return NextResponse.json({ post: data });
+  return NextResponse.json({ campaign: data });
 }

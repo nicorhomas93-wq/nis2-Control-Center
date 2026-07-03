@@ -65,7 +65,7 @@ export function LinkedInPostEditor({
     }
   }
 
-  function buildPayload(status: "draft" | "scheduled") {
+  function buildPayload() {
     return {
       title,
       post_type: postType,
@@ -75,8 +75,7 @@ export function LinkedInPostEditor({
       target_audience: targetAudience || null,
       call_to_action: callToAction || null,
       hashtags: hashtags || null,
-      status,
-      scheduled_at: status === "scheduled" && scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
     };
   }
 
@@ -203,20 +202,12 @@ export function LinkedInPostEditor({
               type="button"
               variant="outline"
               disabled={loading || !title || !bodyText}
-              onClick={() => onSave(buildPayload("draft"))}
+              onClick={() => onSave(buildPayload())}
             >
               <Save className="h-4 w-4" />
               Als Entwurf speichern
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={loading || !title || !bodyText || !scheduledAt}
-              onClick={() => onSave(buildPayload("scheduled"))}
-            >
-              Planen
-            </Button>
-            {initial && onPublish && (
+            {initial && onPublish && (initial.status === "approved" || initial.status === "scheduled") && (
               <Button
                 type="button"
                 disabled={loading || !connected}
@@ -233,6 +224,9 @@ export function LinkedInPostEditor({
               </Button>
             )}
           </div>
+          <p className="text-xs text-slate-500">
+            Wunschtermin wird gespeichert — aktive Planung erst nach deiner Freigabe.
+          </p>
           {!connected && (
             <p className="text-xs text-amber-700">
               Zuerst oben dein Profil verknüpfen — kein Unternehmensaccount nötig.
