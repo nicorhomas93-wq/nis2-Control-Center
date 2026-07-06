@@ -7,6 +7,7 @@ import { canAccessJarvis } from "@/lib/jarvis/access";
 import { createClient } from "@/lib/supabase/server";
 import type { JarvisLeadResearchRun, JarvisLeadResearchSignal } from "@/lib/types";
 import { isMissingTableError } from "@/lib/supabase/db-error";
+import { MIN_LEAD_SCORE } from "@/lib/jarvis/lead-research/lead-qualification";
 import { getLatestLeadResearchRun } from "@/lib/jarvis/lead-research/run-research";
 
 export default async function LeadResearchPage() {
@@ -30,7 +31,7 @@ export default async function LeadResearchPage() {
     supabase
       .from("jarvis_lead_research_signals")
       .select("*")
-      .gte("research_score", 50)
+      .gte("research_score", MIN_LEAD_SCORE)
       .order("research_score", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(200),

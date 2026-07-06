@@ -15,6 +15,7 @@ import {
   RESEARCH_SIGNAL_TYPE_LABELS,
   LEAD_TYPE_LABELS,
   LEAD_PRIORITY_LABELS,
+  MIN_LEAD_SCORE,
   TENDER_SOURCES,
   TENDER_SOURCES_AUTOMATED,
   JOB_SOURCES,
@@ -163,7 +164,7 @@ export function LeadResearchPanel({
               </p>
             </div>
             <div className="sm:col-span-2">
-              <p className="font-medium text-slate-800">Score-System</p>
+              <p className="font-medium text-slate-800">Score-System (ab {MIN_LEAD_SCORE} übernehmen)</p>
               <ul className="mt-1 list-disc pl-4 text-xs text-slate-600">
                 {Object.entries(RESEARCH_SCORE_LABELS).map(([score, label]) => (
                   <li key={score}>

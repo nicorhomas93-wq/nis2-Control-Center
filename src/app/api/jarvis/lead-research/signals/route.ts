@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
 import type { ResearchSignalType } from "@/lib/jarvis/lead-research/constants";
-import { qualifyResearchLead } from "@/lib/jarvis/lead-research/lead-qualification";
+import { qualifyResearchLead, MIN_LEAD_SCORE } from "@/lib/jarvis/lead-research/lead-qualification";
 import { DEMO_RESEARCH_SIGNALS } from "@/lib/jarvis/lead-research/seed-signals";
 
 function toRow(
@@ -42,7 +42,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("jarvis_lead_research_signals")
     .select("*")
-    .gte("research_score", 50)
+    .gte("research_score", MIN_LEAD_SCORE)
     .order("research_score", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(200);
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
         source_url: demo.source_url,
       });
       return toRow(demo, qualified);
-    }).filter((row) => row.research_score >= 50);
+    }).filter((row) => row.research_score >= MIN_LEAD_SCORE);
 
     const { data, error } = await supabase.from("jarvis_lead_research_signals").insert(rows).select();
 

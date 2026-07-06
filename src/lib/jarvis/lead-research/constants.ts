@@ -1,13 +1,10 @@
-export const LEAD_RESEARCH_SYSTEM_PROMPT = `Du bist Jarvis, ein deutscher B2B-Lead-Research-Agent für das TKND NIS2 Control Center.
+export const LEAD_RESEARCH_SYSTEM_PROMPT = `Jarvis Lead Research für TKND: Echte geschäftliche Bedarfssignale erkennen — nicht NIS2-News.
 
-WICHTIG: Du suchst KEINE allgemeinen Nachrichtenartikel, Blogbeiträge, Ratgeberseiten, Kanzleiartikel oder Marketingseiten über NIS2.
+NIS2-Erwähnung allein ist KEIN Lead (max. 20 Punkte). Medien, Ratgeber und allgemeine Artikel = Score 0.
 
-Du suchst ausschließlich konkrete Bedarfssignale von Organisationen mit akutem oder sehr wahrscheinlichem Bedarf an NIS2-Dokumentation, Risikomanagement, Maßnahmenmanagement, Audit-Nachweisen oder Lieferantenbewertung.
+Leads nur bei: Stellen (ISB, Security, ISMS, DORA), Ausschreibungen, Unternehmensprojekten oder Partnern (Systemhaus/MSP/Berater).
 
-Erlaubte Signale: Stellenanzeigen (ISB, Security Manager, ISMS), Ausschreibungen (NIS2, ISMS, ISO27001), konkrete Unternehmensmeldungen, Partnerpotenzial (MSP/Berater).
-
-Qualität vor Menge. Lieber 5 sehr gute Leads als 100 schlechte Treffer.
-Kein Auto-Versand. Keine Kontaktanfragen ohne Freigabe durch Nico.`;
+Systemhäuser mit NIS2-Rollen = Partner, nicht Endkunde. Gute Leads ab Score 60. Qualität vor Menge.`;
 
 export type ResearchSignalType = "tender" | "job" | "announcement" | "size_inference";
 
@@ -55,8 +52,8 @@ export const SCRAPER_RSS_PLATFORMS = [
 ] as const;
 
 export const TENDER_KEYWORDS = [
-  "NIS2",
   "NIS2 Umsetzung",
+  "NIS2",
   "ISMS Aufbau",
   "ISO 27001 Einführung",
   "Informationssicherheitsmanagement",
@@ -66,8 +63,10 @@ export const TENDER_KEYWORDS = [
   "Security Awareness",
   "Incident Response Konzept",
   "Notfallmanagement",
+  "BCM",
   "Audit-Vorbereitung Informationssicherheit",
   "Cybersecurity",
+  "DORA",
 ] as const;
 
 export const JOB_KEYWORDS = [
@@ -81,6 +80,11 @@ export const JOB_KEYWORDS = [
   "CISO",
   "IT-Risikomanager",
   "Business Continuity Manager",
+  "OT Security",
+  "DORA",
+  "IT Asset Management",
+  "IT-Governance",
+  "Security Officer",
   "NIS2",
   "ISO 27001",
 ] as const;
@@ -98,27 +102,26 @@ export const ANNOUNCEMENT_KEYWORDS = [
 ] as const;
 
 export const INDUSTRY_PRIORITY_A = [
-  "it-systemhaus",
-  "systemhaus",
-  "msp",
-  "managed service",
   "rechenzentrum",
-  "cloud",
-  "software",
-  "it-dienstleister",
+  "energie",
+  "stadtwerk",
+  "klinik",
+  "krankenhaus",
+  "logistik",
+  "automobil",
+  "produktion",
 ] as const;
 
 export const INDUSTRY_PRIORITY_B = [
   "maschinenbau",
-  "automobil",
   "zulieferer",
-  "logistik",
-  "energie",
   "lebensmittel",
-  "stadtwerk",
-  "klinik",
-  "krankenhaus",
-  "produktion",
+  "chemie",
+  "wasser",
+  "versorgung",
+  "transport",
+  "finanz",
+  "versicherung",
 ] as const;
 
 export const INDUSTRY_PRIORITY_C = [
@@ -132,38 +135,42 @@ export const INDUSTRY_PRIORITY_C = [
 ] as const;
 
 export const RESEARCH_SCORE_LABELS: Record<number, string> = {
-  100: "NIS2-Ausschreibung oder explizite NIS2-Suche",
-  90: "ISMS-/ISO27001-Ausschreibung oder ISB gesucht",
-  80: "Security-/Compliance-Stelle mit NIS2/ISO-Bezug",
-  70: "Unternehmen baut Informationssicherheit aus",
-  60: "NIS2-Branche + offene Security-Stelle",
-  50: "Partner mit NIS2-/ISMS-Angebot",
+  100: "Konkrete NIS2-Ausschreibung",
+  95: "Stelle mit direkter NIS2-Compliance-Verantwortung",
+  90: "ISMS-/ISO27001-Ausschreibung oder ISB/NIS2+DORA gesucht",
+  80: "Security-/Compliance-Stelle mit NIS2/ISO/ISMS-Bezug",
+  70: "Security-Ausbau oder Partner-Systemhaus mit NIS2-Rolle",
+  60: "NIS2-Branche + Security-Stelle oder Partner mit Angebot",
+  50: "Partnerpotenzial ohne klaren Anknüpfungspunkt (nicht übernehmen)",
+  20: "Nur NIS2-Erwähnung ohne Bedarfssignal",
+  0: "Nachrichtenportal / kein Lead",
 };
 
 export const LEAD_PRIORITY_LABELS: Record<string, string> = {
   A: "Akuter Bedarf wahrscheinlich",
   B: "Hoher Bedarf wahrscheinlich",
   C: "Partnerpotenzial",
-  D: "Beobachten / nicht übernehmen",
+  D: "Beobachten",
+  keine: "Kein Lead",
 };
 
-export { LEAD_TYPE_LABELS } from "@/lib/jarvis/lead-research/lead-qualification";
+export { LEAD_TYPE_LABELS, MIN_LEAD_SCORE } from "@/lib/jarvis/lead-research/lead-qualification";
 
 export const RESEARCH_OUTPUT_FIELDS = [
+  "Leadstatus",
   "Lead-Typ",
   "Firma / Organisation",
-  "Website",
+  "Quelle",
+  "Quelle-Typ",
+  "Titel des Treffers",
   "Ort",
   "Branche",
-  "Mitarbeitergröße",
   "Bedarfssignal",
-  "Signal-Art",
-  "Quelle",
-  "Datum / Aktualität",
-  "Relevanz für TKND",
+  "Warum relevant für TKND",
   "Passende TKND-Module",
-  "Leadscore",
+  "Score",
   "Priorität",
   "Empfohlene nächste Aktion",
   "Empfohlene Ansprache",
+  "Ausschlussgrund",
 ] as const;

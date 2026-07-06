@@ -5,36 +5,52 @@ function normalize(text: string): string {
   return text.toLowerCase().replace(/\s+/g, " ");
 }
 
-/** Strenger Filter: nur konkrete Bedarfssignale, keine allgemeinen News-Treffer. */
+const ROLE_OR_PROJECT_PATTERNS = [
+  /informationssicherheit/,
+  /iso\s*27001/,
+  /\bisms\b/,
+  /cyber\s*security/,
+  /cybersecurity/,
+  /bsi\s*(it-)?grundschutz/,
+  /informationssicherheitsbeauftragter/,
+  /\bisb\b/,
+  /it\s*security\s*manager/,
+  /security\s*manager/,
+  /compliance\s*manager/,
+  /\bciso\b/,
+  /isms\s*manager/,
+  /incident\s*response/,
+  /security\s*awareness/,
+  /notfallmanagement/,
+  /lieferantensicherheit/,
+  /nis2[\s-]*(umsetzung|compliance)/,
+  /isms[\s-]*aufbau/,
+  /ot[\s-]*security/,
+  /\bdora\b/,
+  /business\s*continuity/,
+  /it[\s-]*asset/,
+  /it[\s-]*governance/,
+  /ausschreibung/,
+  /vergabe/,
+  /stellenangebot/,
+];
+
+/** Strenger Filter: NIS2 allein reicht nicht — Rollen- oder Projektbezug erforderlich. */
 export function matchesAutomatedResearchText(
   text: string,
   signalType: ResearchSignalType = "tender"
 ): boolean {
   const n = normalize(text);
 
-  const strongPatterns = [
-    /\bnis2\b/,
-    /informationssicherheit/,
-    /iso\s*27001/,
-    /\bisms\b/,
-    /cyber\s*security/,
-    /cybersecurity/,
-    /bsi\s*(it-)?grundschutz/,
-    /informationssicherheitsbeauftragter/,
-    /\bisb\b/,
-    /it\s*security\s*manager/,
-    /security\s*manager/,
-    /compliance\s*manager/,
-    /\bciso\b/,
-    /isms\s*manager/,
-    /incident\s*response/,
-    /security\s*awareness/,
-    /notfallmanagement/,
-    /lieferantensicherheit/,
-  ];
+  const hasRoleOrProject = ROLE_OR_PROJECT_PATTERNS.some((pattern) => pattern.test(n));
+  const hasNis2WithContext =
+    /\bnis2\b/.test(n) &&
+    /(compliance|umsetzung|dora|manager|consultant|architect|lead|officer|governance|asset)/.test(
+      n
+    );
 
-  if (!strongPatterns.some((pattern) => pattern.test(n))) {
-    if (/risikomanagement/.test(n) && /informationssicherheit|cyber|nis2|iso\s*27001/.test(n)) {
+  if (!hasRoleOrProject && !hasNis2WithContext) {
+    if (/risikomanagement/.test(n) && /informationssicherheit|cyber|iso\s*27001/.test(n)) {
       // ok
     } else {
       return false;
