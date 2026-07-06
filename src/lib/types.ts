@@ -612,6 +612,27 @@ export type B2BOutreachStatus =
 export type Nis2Likelihood = "yes" | "no" | "uncertain";
 export type ItMaturity = "low" | "medium" | "high" | "unknown";
 
+export interface JarvisLeadResearchSignal {
+  id: string;
+  company_name: string;
+  signal_type: string;
+  source_platform: string | null;
+  source_url: string | null;
+  title: string | null;
+  description: string | null;
+  region: string | null;
+  industry: string | null;
+  industry_priority: string | null;
+  research_score: number;
+  score_reason: string | null;
+  keywords_matched: string[] | null;
+  status: string;
+  b2b_outreach_lead_id: string | null;
+  discovered_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface B2BOutreachLead {
   id: string;
   company_name: string;

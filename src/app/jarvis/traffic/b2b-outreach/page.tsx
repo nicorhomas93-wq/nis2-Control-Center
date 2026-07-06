@@ -63,7 +63,10 @@ export default async function B2BOutreachPage() {
             <h2 className="text-lg font-semibold text-slate-900">Jarvis Lead Finder</h2>
             <p className="text-sm text-slate-500">
               Hochwertige, kontaktierbare B2B-Partner — IT-Dienstleister, MSP, Cybersecurity und
-              Compliance-Berater. Qualität vor Quantität (intern, kein Auto-Versand).
+              Compliance-Berater. Qualität vor Quantität (intern, kein Auto-Versand).{" "}
+              <a href="/jarvis/lead-research" className="text-brand-700 hover:underline">
+                → Lead Research
+              </a>
             </p>
           </div>
           {!error && (
