@@ -26,7 +26,11 @@ export const RESEARCH_SIGNAL_STATUS_LABELS: Record<string, string> = {
   dismissed: "Verworfen",
 };
 
+/** Automatisch via Open-Data-API (aggregiert u. a. bund.de, Länder, Kommunen). */
+export const TENDER_SOURCES_AUTOMATED = ["oeffentlichevergabe.de", "bund.de"] as const;
+
 export const TENDER_SOURCES = [
+  "oeffentlichevergabe.de",
   "bund.de",
   "evergabe.de",
   "Vergabe24",
@@ -34,9 +38,21 @@ export const TENDER_SOURCES = [
   "Subreport",
 ] as const;
 
+/** Automatisch via BA Jobsuche + Stepstone HTML-Scraper. */
+export const JOB_SOURCES_AUTOMATED = ["arbeitsagentur.de", "Stepstone"] as const;
+
 export const JOB_SOURCES = ["Stepstone", "Indeed", "LinkedIn Jobs", "Xing Jobs"] as const;
 
 export const ANNOUNCEMENT_SOURCES = ["LinkedIn", "Unternehmenswebseite", "Pressemitteilung"] as const;
+
+export const ANNOUNCEMENT_SOURCES_AUTOMATED = ["Google News"] as const;
+
+export const SCRAPER_RSS_PLATFORMS = [
+  "evergabe.de",
+  "Vergabe24",
+  "DTAD",
+  "Subreport",
+] as const;
 
 export const TENDER_KEYWORDS = [
   "NIS2",

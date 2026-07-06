@@ -5,8 +5,9 @@ import { LeadResearchPanel } from "@/components/jarvis/lead-research/LeadResearc
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { canAccessJarvis } from "@/lib/jarvis/access";
 import { createClient } from "@/lib/supabase/server";
-import type { JarvisLeadResearchSignal } from "@/lib/types";
+import type { JarvisLeadResearchRun, JarvisLeadResearchSignal } from "@/lib/types";
 import { isMissingTableError } from "@/lib/supabase/db-error";
+import { getLatestLeadResearchRun } from "@/lib/jarvis/lead-research/run-research";
 
 export default async function LeadResearchPage() {
   const supabase = await createClient();
@@ -25,12 +26,15 @@ export default async function LeadResearchPage() {
     redirect("/dashboard");
   }
 
-  const { data, error } = await supabase
-    .from("jarvis_lead_research_signals")
-    .select("*")
-    .order("research_score", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const [{ data, error }, lastRun] = await Promise.all([
+    supabase
+      .from("jarvis_lead_research_signals")
+      .select("*")
+      .order("research_score", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(200),
+    getLatestLeadResearchRun(supabase),
+  ]);
 
   return (
     <DashboardShell>
@@ -44,7 +48,10 @@ export default async function LeadResearchPage() {
           </p>
         </div>
         {!error && (
-          <LeadResearchPanel signals={(data ?? []) as JarvisLeadResearchSignal[]} />
+          <LeadResearchPanel
+            signals={(data ?? []) as JarvisLeadResearchSignal[]}
+            lastRun={(lastRun as JarvisLeadResearchRun | null) ?? null}
+          />
         )}
         {error && !isMissingTableError(error) && (
           <p className="text-sm text-red-600">{error.message}</p>

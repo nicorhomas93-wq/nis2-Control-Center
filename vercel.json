@@ -11,6 +11,10 @@
     {
       "path": "/api/tasks/reminders/run",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/jarvis/lead-research/run",
+      "schedule": "30 6 * * *"
     }
   ]
 }

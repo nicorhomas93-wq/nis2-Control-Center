@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Radar, Search, UserPlus } from "lucide-react";
+import { Plus, Play, Radar, Search, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -14,15 +14,27 @@ import {
   RESEARCH_SIGNAL_STATUS_LABELS,
   RESEARCH_SIGNAL_TYPE_LABELS,
   TENDER_SOURCES,
+  TENDER_SOURCES_AUTOMATED,
   JOB_SOURCES,
+  JOB_SOURCES_AUTOMATED,
+  ANNOUNCEMENT_SOURCES,
+  ANNOUNCEMENT_SOURCES_AUTOMATED,
+  SCRAPER_RSS_PLATFORMS,
   type ResearchSignalType,
 } from "@/lib/jarvis/lead-research/constants";
-import type { JarvisLeadResearchSignal } from "@/lib/types";
+import type { JarvisLeadResearchRun, JarvisLeadResearchSignal } from "@/lib/types";
 
-export function LeadResearchPanel({ signals }: { signals: JarvisLeadResearchSignal[] }) {
+export function LeadResearchPanel({
+  signals,
+  lastRun,
+}: {
+  signals: JarvisLeadResearchSignal[];
+  lastRun: JarvisLeadResearchRun | null;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [runSummary, setRunSummary] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<"all" | "new" | "converted">("all");
   const [form, setForm] = useState({
@@ -63,6 +75,22 @@ export function LeadResearchPanel({ signals }: { signals: JarvisLeadResearchSign
     }
   }
 
+  async function runAutomaticResearch() {
+    const data = await apiCall("/api/jarvis/lead-research/run", "POST");
+    if (!data) return;
+    setRunSummary(
+      `${data.inserted ?? 0} neu · ${data.tendersMatched ?? 0} Ausschreibungen · ${data.jobsMatched ?? 0} Jobs · ${data.announcementsMatched ?? 0} Meldungen · ${data.skippedDuplicates ?? 0} Duplikate`
+    );
+  }
+
+  function formatRunTime(value: string | null | undefined) {
+    if (!value) return "—";
+    return new Date(value).toLocaleString("de-DE", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
@@ -70,6 +98,34 @@ export function LeadResearchPanel({ signals }: { signals: JarvisLeadResearchSign
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+      {runSummary && <p className="text-sm text-brand-800">{runSummary}</p>}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Automatische Recherche</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p className="text-slate-600">
+            Täglich um 06:30 Uhr (Vercel Cron): Ausschreibungen über{" "}
+            <strong>{TENDER_SOURCES_AUTOMATED.join(", ")}</strong>, Stellen über{" "}
+            <strong>{JOB_SOURCES_AUTOMATED.join(", ")}</strong>, Meldungen über{" "}
+            <strong>{ANNOUNCEMENT_SOURCES_AUTOMATED.join(", ")}</strong>. Zusätzlich{" "}
+            {SCRAPER_RSS_PLATFORMS.join(", ")} (bund.de-RSS, TED-API, Subreport-Embed).
+          </p>
+          {lastRun && (
+            <p className="text-xs text-slate-500">
+              Letzter Lauf: {formatRunTime(lastRun.finished_at ?? lastRun.started_at)} ·{" "}
+              {lastRun.status} · {lastRun.inserted} neu · {lastRun.tenders_matched} Ausschreibungen
+              · {lastRun.jobs_matched} Jobs · {lastRun.announcements_matched ?? 0} Meldungen
+              {lastRun.errors?.length ? ` · ${lastRun.errors.length} Hinweise` : ""}
+            </p>
+          )}
+          <Button type="button" disabled={loading} onClick={runAutomaticResearch}>
+            <Play className="h-4 w-4" />
+            Jetzt automatisch suchen
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -80,10 +136,28 @@ export function LeadResearchPanel({ signals }: { signals: JarvisLeadResearchSign
             <div>
               <p className="font-medium text-slate-800">Ausschreibungen</p>
               <p className="text-xs text-slate-500">{TENDER_SOURCES.join(" · ")}</p>
+              <p className="text-xs text-brand-700">
+                Auto: {TENDER_SOURCES_AUTOMATED.join(" · ")}
+              </p>
             </div>
             <div>
               <p className="font-medium text-slate-800">Stellenanzeigen</p>
               <p className="text-xs text-slate-500">{JOB_SOURCES.join(" · ")}</p>
+              <p className="text-xs text-brand-700">Auto: {JOB_SOURCES_AUTOMATED.join(" · ")}</p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="font-medium text-slate-800">Unternehmensmeldungen</p>
+              <p className="text-xs text-slate-500">{ANNOUNCEMENT_SOURCES.join(" · ")}</p>
+              <p className="text-xs text-brand-700">
+                Auto: {ANNOUNCEMENT_SOURCES_AUTOMATED.join(" · ")}
+              </p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="font-medium text-slate-800">Weitere Portale (auto)</p>
+              <p className="text-xs text-slate-500">{SCRAPER_RSS_PLATFORMS.join(" · ")}</p>
+              <p className="text-xs text-brand-700">
+                evergabe/Vergabe24 via bund.de-RSS · DTAD via TED-API · Subreport HTML-Embed
+              </p>
             </div>
             <div className="sm:col-span-2">
               <p className="font-medium text-slate-800">Score-System</p>
