@@ -1,4 +1,5 @@
 import { hasConcreteDemandSignal } from "@/lib/jarvis/lead-research/quality-filter";
+import { isGenericNewsContent } from "@/lib/jarvis/lead-research/media-block";
 import type { ResearchSignalType } from "@/lib/jarvis/lead-research/constants";
 
 function normalize(text: string): string {
@@ -30,9 +31,8 @@ const ROLE_OR_PROJECT_PATTERNS = [
   /business\s*continuity/,
   /it[\s-]*asset/,
   /it[\s-]*governance/,
-  /ausschreibung/,
-  /vergabe/,
-  /stellenangebot/,
+  /vergabestelle/,
+  /auftraggeber/,
 ];
 
 /** Strenger Filter: NIS2 allein reicht nicht — Rollen- oder Projektbezug erforderlich. */
@@ -40,12 +40,14 @@ export function matchesAutomatedResearchText(
   text: string,
   signalType: ResearchSignalType = "tender"
 ): boolean {
+  if (isGenericNewsContent(text)) return false;
+
   const n = normalize(text);
 
   const hasRoleOrProject = ROLE_OR_PROJECT_PATTERNS.some((pattern) => pattern.test(n));
   const hasNis2WithContext =
     /\bnis2\b/.test(n) &&
-    /(compliance|umsetzung|dora|manager|consultant|architect|lead|officer|governance|asset)/.test(
+    /(compliance|umsetzung|dora|manager|consultant|architect|lead|officer|governance|asset|vergabe|ausschreibung)/.test(
       n
     );
 

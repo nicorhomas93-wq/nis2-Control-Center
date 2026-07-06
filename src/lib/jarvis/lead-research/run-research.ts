@@ -5,6 +5,7 @@ import { fetchOeffentlicheVergabeSignals } from "@/lib/jarvis/lead-research/fetc
 import { fetchScrapedSignals } from "@/lib/jarvis/lead-research/scrapers";
 import type { ResearchCandidate } from "@/lib/jarvis/lead-research/fetchers/types";
 import { qualifyResearchLead } from "@/lib/jarvis/lead-research/lead-qualification";
+import { purgeBlockedResearchSignals } from "@/lib/jarvis/lead-research/purge-blocked";
 
 export interface LeadResearchRunResult {
   runId: string | null;
@@ -17,6 +18,7 @@ export interface LeadResearchRunResult {
   inserted: number;
   skippedDuplicates: number;
   skippedRejected: number;
+  purgedBlocked: number;
   errors: string[];
 }
 
@@ -148,6 +150,7 @@ export async function runLeadResearch(options?: {
       inserted: 0,
       skippedDuplicates: 0,
       skippedRejected: 0,
+      purgedBlocked: 0,
       errors: ["Admin-Client nicht verfügbar (SUPABASE_SERVICE_ROLE_KEY)"],
     };
   }
@@ -170,12 +173,20 @@ export async function runLeadResearch(options?: {
       inserted: 0,
       skippedDuplicates: 0,
       skippedRejected: 0,
+      purgedBlocked: 0,
       errors: [runError.message],
     };
   }
 
   const runId = runRow.id as string;
   const errors: string[] = [];
+  let purgedBlocked = 0;
+
+  try {
+    purgedBlocked = await purgeBlockedResearchSignals(client);
+  } catch (err) {
+    errors.push(err instanceof Error ? err.message : "Bereinigung blockierter Quellen fehlgeschlagen");
+  }
 
   const [apiTenders, apiJobs, scraped] = await Promise.all([
     fetchOeffentlicheVergabeSignals(options?.pubDay),
@@ -247,6 +258,7 @@ export async function runLeadResearch(options?: {
     inserted,
     skippedDuplicates,
     skippedRejected,
+    purgedBlocked,
     errors,
   };
 }

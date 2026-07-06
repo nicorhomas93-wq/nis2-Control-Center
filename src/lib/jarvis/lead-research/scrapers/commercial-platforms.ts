@@ -10,6 +10,7 @@ import {
 } from "@/lib/jarvis/lead-research/scrapers/rss-feeds";
 import { fetchSubreportHtmlSignals } from "@/lib/jarvis/lead-research/scrapers/subreport-html";
 import { matchesAutomatedResearchText } from "@/lib/jarvis/lead-research/fetchers/keyword-match";
+import { isBlockedResearchCandidate } from "@/lib/jarvis/lead-research/candidate-block";
 
 interface PlatformConfig {
   platform: string;
@@ -70,7 +71,7 @@ async function fetchPlatformRss(config: PlatformConfig): Promise<FetcherResult> 
         if (seen.has(externalId)) continue;
         seen.add(externalId);
 
-        matched.push({
+        const candidate: ResearchCandidate = {
           company_name: extractCompanyFromText(item.title, item.description),
           signal_type: "tender",
           source_platform: config.platform,
@@ -80,7 +81,11 @@ async function fetchPlatformRss(config: PlatformConfig): Promise<FetcherResult> 
           description: item.description.slice(0, 2000),
           region: null,
           industry: "öffentlich",
-        });
+        };
+
+        if (isBlockedResearchCandidate(candidate)) continue;
+
+        matched.push(candidate);
       }
     } catch (err) {
       errors.push(

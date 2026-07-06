@@ -1,6 +1,5 @@
 import type { FetcherResult } from "@/lib/jarvis/lead-research/fetchers/types";
 import { fetchCommercialPlatformSignals } from "@/lib/jarvis/lead-research/scrapers/commercial-platforms";
-import { fetchGoogleNewsSignals } from "@/lib/jarvis/lead-research/scrapers/google-news";
 import { fetchServiceBundSignals } from "@/lib/jarvis/lead-research/scrapers/service-bund";
 import { fetchStepstoneSignals } from "@/lib/jarvis/lead-research/scrapers/stepstone";
 
@@ -31,16 +30,15 @@ function mergeResults(results: FetcherResult[]): FetcherResult {
 }
 
 export async function fetchScrapedSignals(): Promise<ScrapedSignalsBundle> {
-  const [serviceBund, commercial, stepstone, googleNews] = await Promise.all([
+  const [serviceBund, commercial, stepstone] = await Promise.all([
     fetchServiceBundSignals(),
     fetchCommercialPlatformSignals(),
     fetchStepstoneSignals(),
-    fetchGoogleNewsSignals(),
   ]);
 
   return {
     tenders: mergeResults([serviceBund, commercial]),
     jobs: stepstone,
-    announcements: googleNews,
+    announcements: { scanned: 0, matched: [], errors: [] },
   };
 }

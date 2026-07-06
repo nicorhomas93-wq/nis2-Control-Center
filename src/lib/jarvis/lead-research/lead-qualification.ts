@@ -13,6 +13,12 @@ import {
   rejectLeadQuality,
   type QualityCheckInput,
 } from "@/lib/jarvis/lead-research/quality-filter";
+import {
+  hasTenderProcurementMarkers,
+  isBlockedMediaSource,
+  isGenericNewsContent,
+  isTrustedTenderSource,
+} from "@/lib/jarvis/lead-research/media-block";
 
 export type LeadType =
   | "endkunde"
@@ -204,15 +210,33 @@ function hasSecurityJobRole(n: string): boolean {
   );
 }
 
-function hasNis2Tender(n: string): boolean {
-  return /\bnis2\b/.test(n) && /(umsetzung|ausschreibung|vergabe|einführung|compliance)/.test(n);
+function hasNis2Tender(
+  n: string,
+  sourceUrl?: string | null,
+  sourcePlatform?: string | null
+): boolean {
+  if (!/\bnis2\b/.test(n)) return false;
+  if (!/(umsetzung|ausschreibung|vergabe|einführung|compliance)/.test(n)) return false;
+  if (isGenericNewsContent(n)) return false;
+
+  const trusted = isTrustedTenderSource(sourceUrl, sourcePlatform);
+  const procurement = hasTenderProcurementMarkers(n);
+  if (!trusted && !procurement) return false;
+
+  return true;
 }
 
-function hasIsmsIsoTender(n: string): boolean {
-  return (
-    (/iso\s*27001/.test(n) || /\bisms\b/.test(n) || /informationssicherheitsmanagement/.test(n)) &&
-    /(aufbau|einführung|ausschreibung|vergabe|implementierung)/.test(n)
-  );
+function hasIsmsIsoTender(
+  n: string,
+  sourceUrl?: string | null,
+  sourcePlatform?: string | null
+): boolean {
+  const hasTopic =
+    /iso\s*27001/.test(n) || /\bisms\b/.test(n) || /informationssicherheitsmanagement/.test(n);
+  const hasAction = /(aufbau|einführung|ausschreibung|vergabe|implementierung)/.test(n);
+  if (!hasTopic || !hasAction) return false;
+  if (isGenericNewsContent(n)) return false;
+  return isTrustedTenderSource(sourceUrl, sourcePlatform) || hasTenderProcurementMarkers(n);
 }
 
 function scoreLead(input: ResearchSignalInput, combined: string, isPartner: boolean): {
@@ -226,6 +250,14 @@ function scoreLead(input: ResearchSignalInput, combined: string, isPartner: bool
   const hasIsms = /\bisms\b/.test(n) || /informationssicherheitsmanagement/.test(n);
   const hasDora = /\bdora\b/.test(n);
   const industry_priority = classifyIndustryPriority(input.industry);
+
+  if (isBlockedMediaSource(input)) {
+    return {
+      research_score: 0,
+      score_reason: "Nachrichtenportal / allgemeiner Artikel — kein Lead",
+      lead_priority: "keine",
+    };
+  }
 
   if (isPartner) {
     if (input.signal_type === "job" && hasNis2) {
@@ -249,7 +281,7 @@ function scoreLead(input: ResearchSignalInput, combined: string, isPartner: bool
     };
   }
 
-  if (input.signal_type === "tender" && hasNis2Tender(n)) {
+  if (input.signal_type === "tender" && hasNis2Tender(n, input.source_url, input.source_platform)) {
     return {
       research_score: 100,
       score_reason: "Konkrete NIS2-Ausschreibung",
@@ -273,7 +305,7 @@ function scoreLead(input: ResearchSignalInput, combined: string, isPartner: bool
     };
   }
 
-  if (input.signal_type === "tender" && hasIsmsIsoTender(n)) {
+  if (input.signal_type === "tender" && hasIsmsIsoTender(n, input.source_url, input.source_platform)) {
     return {
       research_score: 90,
       score_reason: "ISMS-/ISO27001-Ausschreibung",
@@ -360,6 +392,24 @@ export function qualifyResearchLead(input: ResearchSignalInput): LeadQualificati
   const combined = [input.title, input.description, input.company_name, input.industry]
     .filter(Boolean)
     .join(" ");
+
+  if (isBlockedMediaSource(input)) {
+    return {
+      accepted: false,
+      reject_reason: "Nachrichtenportal / allgemeiner Artikel — kein Lead",
+      research_score: 0,
+      score_reason: "Nachrichtenportal / allgemeiner Artikel — kein Lead",
+      lead_type: "kein_lead",
+      lead_priority: "keine",
+      industry_priority: classifyIndustryPriority(input.industry),
+      demand_signal: buildDemandSignal(input, []),
+      signal_art: inferSignalArt(input.signal_type),
+      tknd_modules: [],
+      recommended_action: "Nicht übernehmen",
+      relevance_note: "Nachrichtenportal / allgemeiner Artikel",
+      keywords_matched: [],
+    };
+  }
 
   const rejectReason = rejectLeadQuality(input);
   const isPartner =

@@ -82,7 +82,7 @@ export function LeadResearchPanel({
     const data = await apiCall("/api/jarvis/lead-research/run", "POST");
     if (!data) return;
     setRunSummary(
-      `${data.inserted ?? 0} neu · ${data.tendersMatched ?? 0} Ausschreibungen · ${data.jobsMatched ?? 0} Jobs · ${data.announcementsMatched ?? 0} Meldungen · ${data.skippedDuplicates ?? 0} Duplikate · ${data.skippedRejected ?? 0} abgelehnt (Qualität)`
+      `${data.inserted ?? 0} neu · ${data.tendersMatched ?? 0} Ausschreibungen · ${data.jobsMatched ?? 0} Jobs · ${data.skippedDuplicates ?? 0} Duplikate · ${data.skippedRejected ?? 0} abgelehnt · ${data.purgedBlocked ?? 0} Medien-Treffer bereinigt`
     );
   }
 

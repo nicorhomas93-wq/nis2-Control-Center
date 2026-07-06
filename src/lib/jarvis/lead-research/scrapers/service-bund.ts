@@ -1,6 +1,7 @@
 import { TENDER_KEYWORDS } from "@/lib/jarvis/lead-research/constants";
 import { matchesAutomatedResearchText } from "@/lib/jarvis/lead-research/fetchers/keyword-match";
 import type { FetcherResult, ResearchCandidate } from "@/lib/jarvis/lead-research/fetchers/types";
+import { isBlockedResearchCandidate } from "@/lib/jarvis/lead-research/candidate-block";
 import { fetchText } from "@/lib/jarvis/lead-research/scrapers/http";
 import { parseRss } from "@/lib/jarvis/lead-research/scrapers/rss";
 
@@ -43,7 +44,7 @@ function toCandidate(item: ReturnType<typeof parseRss>[number]): ResearchCandida
   const company = extractBuyer(item.description) ?? "Öffentlicher Auftraggeber";
   const externalId = item.guid || item.link;
 
-  return {
+  const candidate: ResearchCandidate = {
     company_name: company,
     signal_type: "tender",
     source_platform: SOURCE_PLATFORM,
@@ -54,6 +55,10 @@ function toCandidate(item: ReturnType<typeof parseRss>[number]): ResearchCandida
     region: extractRegion(item.description),
     industry: "öffentlich",
   };
+
+  if (isBlockedResearchCandidate(candidate)) return null;
+
+  return candidate;
 }
 
 async function fetchKeywordFeed(keyword: string): Promise<{

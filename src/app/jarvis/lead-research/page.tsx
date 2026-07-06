@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { JarvisLeadResearchRun, JarvisLeadResearchSignal } from "@/lib/types";
 import { isMissingTableError } from "@/lib/supabase/db-error";
 import { MIN_LEAD_SCORE } from "@/lib/jarvis/lead-research/lead-qualification";
+import { isBlockedMediaSource } from "@/lib/jarvis/lead-research/media-block";
 import { getLatestLeadResearchRun } from "@/lib/jarvis/lead-research/run-research";
 
 export default async function LeadResearchPage() {
@@ -51,7 +52,9 @@ export default async function LeadResearchPage() {
         </div>
         {!error && (
           <LeadResearchPanel
-            signals={(data ?? []) as JarvisLeadResearchSignal[]}
+            signals={((data ?? []) as JarvisLeadResearchSignal[]).filter(
+              (row) => !isBlockedMediaSource(row)
+            )}
             lastRun={(lastRun as JarvisLeadResearchRun | null) ?? null}
           />
         )}

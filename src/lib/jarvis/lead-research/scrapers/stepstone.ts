@@ -1,5 +1,6 @@
 import { JOB_KEYWORDS } from "@/lib/jarvis/lead-research/constants";
 import { matchesAutomatedResearchText } from "@/lib/jarvis/lead-research/fetchers/keyword-match";
+import { isBlockedResearchCandidate } from "@/lib/jarvis/lead-research/candidate-block";
 import type { FetcherResult, ResearchCandidate } from "@/lib/jarvis/lead-research/fetchers/types";
 import { fetchText } from "@/lib/jarvis/lead-research/scrapers/http";
 
@@ -80,7 +81,7 @@ async function fetchKeywordJobs(keyword: string): Promise<{
     const combined = `${job.title} ${job.company}`;
     if (!matchesAutomatedResearchText(combined, "job")) continue;
 
-    matched.push({
+    const candidate: ResearchCandidate = {
       company_name: job.company,
       signal_type: "job",
       source_platform: SOURCE_PLATFORM,
@@ -90,7 +91,11 @@ async function fetchKeywordJobs(keyword: string): Promise<{
       description: `${job.company} · ${job.location}`,
       region: job.location,
       industry: null,
-    });
+    };
+
+    if (isBlockedResearchCandidate(candidate)) continue;
+
+    matched.push(candidate);
   }
 
   return { scanned: jobs.length, matched };

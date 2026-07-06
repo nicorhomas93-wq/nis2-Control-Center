@@ -1,67 +1,17 @@
 import type { ResearchSignalType } from "@/lib/jarvis/lead-research/constants";
-
-const EXCLUDED_DOMAINS = [
-  "heise.de",
-  "computerwoche.de",
-  "cloudcomputing-insider.de",
-  "it-business.de",
-  "anwalt.de",
-  "haufe.de",
-  "cancom.com",
-  "bitkom.org",
-  "golem.de",
-  "t3n.de",
-  "channelpartner.de",
-  "security-insider.de",
-  "datenschutz-notizen.de",
-  "datenschutz-praxis.de",
-  "news.google.com",
-  "google.com",
-  "wikipedia.org",
-  "boerse-express.com",
-  "borncity.com",
-  "ad-hoc-news.de",
-  "finanzen.net",
-  "wallstreet-online.de",
-  "handelsblatt.com",
-  "faz.net",
-  "spiegel.de",
-  "zeit.de",
-  "tagesschau.de",
-  "manager-magazin.de",
-  "wiwo.de",
-  "focus.de",
-  "chip.de",
-  "netzwelt.de",
-];
-
-const EXCLUDED_GENERIC_PATTERNS = [
-  /was bedeutet nis2/i,
-  /nis2 wird wichtig/i,
-  /unternehmen müssen handeln/i,
-  /warum nis2/i,
-  /nis2.*jetzt relevant/i,
-  /nis2.*erklärt/i,
-  /nis2.*ratgeber/i,
-  /nis2.*leitfaden/i,
-  /nis2.*webinar/i,
-  /nis2.*whitepaper/i,
-  /\bnis2\b.*\b(artikel|blog|news|pressemitteilung)\b/i,
-  /\b(artikel|blog|ratgeber|kanzlei|gastbeitrag|magazin)\b.*\bnis2\b/i,
-  /workshop.*nis2/i,
-  /seminar.*nis2/i,
-  /\d{1,3}[.\s]?\d{3}\s*(deutsche\s+)?unternehmen/i,
-  /müssen (bis|ab|bis zum).*(handeln|vorgeben|umsetzen)/i,
-  /risikoanalysen vorlegen/i,
-  /was nis2 für unternehmen bedeutet/i,
-];
+import {
+  hasJobRoleMarkers,
+  hasTenderProcurementMarkers,
+  isBlockedMediaSource,
+  isGenericNewsContent,
+  isTrustedJobSource,
+  isTrustedTenderSource,
+} from "@/lib/jarvis/lead-research/media-block";
 
 const CONCRETE_DEMAND_PATTERNS = [
   /\bwir (suchen|stellen ein|bieten|führen ein|bauen auf|bereiten uns vor|erweitern|professionalisieren)\b/i,
   /\bstellenanzeige\b/i,
   /\bstellenangebot\b/i,
-  /\bausschreibung\b/i,
-  /\bvergabe\b/i,
   /informationssicherheitsbeauftragter/i,
   /\bisb\b/i,
   /it[\s-]*security[\s-]*manager/i,
@@ -124,66 +74,63 @@ const KNOWN_PARTNER_ORGANIZATIONS = [
   "ernst & young",
 ];
 
-const MEDIA_COMPANY_NAMES = [
-  "heise",
-  "computerwoche",
-  "haufe",
-  "bitkom",
-  "cancom",
-  "cloudcomputing",
-  "it-business",
-  "golem",
-  "channel partner",
-  "börse express",
-  "boerse express",
-  "borncity",
-  "ad hoc news",
-  "finanzen.net",
-  "handelsblatt",
-  "manager magazin",
-];
-
 function normalize(text: string): string {
   return text.toLowerCase().replace(/\s+/g, " ");
 }
 
-function extractHostname(url: string | null | undefined): string {
-  if (!url) return "";
-  try {
-    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
-  } catch {
-    return "";
-  }
-}
-
+/** @deprecated Nutze isBlockedMediaSource */
 export function isExcludedMediaSource(url: string | null | undefined, companyName: string): boolean {
-  const host = extractHostname(url);
-  if (EXCLUDED_DOMAINS.some((d) => host.includes(d))) return true;
-
-  const company = normalize(companyName);
-  return MEDIA_COMPANY_NAMES.some((m) => company.includes(m));
+  return isBlockedMediaSource({ company_name: companyName, source_url: url });
 }
 
-export function isGenericNewsContent(text: string): boolean {
-  const n = normalize(text);
-  return EXCLUDED_GENERIC_PATTERNS.some((p) => p.test(n));
-}
+export { isGenericNewsContent } from "@/lib/jarvis/lead-research/media-block";
 
 export function hasConcreteDemandSignal(
   text: string,
-  signalType: ResearchSignalType
+  signalType: ResearchSignalType,
+  sourceUrl?: string | null,
+  sourcePlatform?: string | null
 ): boolean {
-  if (signalType === "job" || signalType === "tender") return true;
-
   const n = normalize(text);
+
+  if (signalType === "tender") {
+    if (isGenericNewsContent(text)) return false;
+    if (isTrustedTenderSource(sourceUrl, sourcePlatform) && hasTenderProcurementMarkers(text)) {
+      return true;
+    }
+    return hasTenderProcurementMarkers(text) && CONCRETE_DEMAND_PATTERNS.some((p) => p.test(n));
+  }
+
+  if (signalType === "job") {
+    if (isGenericNewsContent(text)) return false;
+    if (isTrustedJobSource(sourceUrl, sourcePlatform) && hasJobRoleMarkers(text)) return true;
+    return hasJobRoleMarkers(text);
+  }
+
   return CONCRETE_DEMAND_PATTERNS.some((p) => p.test(n));
 }
 
 /** NIS2-Erwähnung ohne Rollen-, Projekt- oder Ausschreibungsbezug ist kein Lead. */
-export function isNis2MentionOnly(text: string, signalType: ResearchSignalType): boolean {
+export function isNis2MentionOnly(
+  text: string,
+  signalType: ResearchSignalType,
+  sourceUrl?: string | null,
+  sourcePlatform?: string | null
+): boolean {
   const n = normalize(text);
   if (!/\bnis2\b/.test(n)) return false;
-  if (signalType === "job" || signalType === "tender") return false;
+
+  if (signalType === "tender") {
+    if (isTrustedTenderSource(sourceUrl, sourcePlatform) && hasTenderProcurementMarkers(text)) {
+      return false;
+    }
+    return true;
+  }
+
+  if (signalType === "job") {
+    if (isTrustedJobSource(sourceUrl, sourcePlatform) && hasJobRoleMarkers(text)) return false;
+    return !hasJobRoleMarkers(text);
+  }
 
   const beyondNis2 = CONCRETE_DEMAND_PATTERNS.filter((p) => !/nis2/.test(p.source)).some((p) =>
     p.test(n)
@@ -228,28 +175,21 @@ export interface QualityCheckInput {
   description?: string | null;
   source_url?: string | null;
   source_platform?: string | null;
+  signal_art?: string | null;
 }
 
 export function rejectLeadQuality(input: QualityCheckInput): string | null {
+  if (isBlockedMediaSource(input)) {
+    return "Nachrichtenportal / allgemeiner Artikel — kein Lead";
+  }
+
   const combined = [input.title, input.description, input.company_name].filter(Boolean).join(" ");
 
-  if (input.source_platform === "Google News") {
-    return "Nachrichtenportal / allgemeiner Artikel";
-  }
-
-  if (isExcludedMediaSource(input.source_url, input.company_name)) {
-    return "Nachrichtenportal / Medienquelle ausgeschlossen";
-  }
-
-  if (isGenericNewsContent(combined)) {
-    return "Allgemeiner NIS2-Artikel ohne konkrete Organisation";
-  }
-
-  if (isNis2MentionOnly(combined, input.signal_type)) {
+  if (isNis2MentionOnly(combined, input.signal_type, input.source_url, input.source_platform)) {
     return "Nur NIS2-Erwähnung ohne konkretes Bedarfssignal";
   }
 
-  if (!hasConcreteDemandSignal(combined, input.signal_type)) {
+  if (!hasConcreteDemandSignal(combined, input.signal_type, input.source_url, input.source_platform)) {
     return "Kein konkretes Bedarfssignal erkennbar";
   }
 

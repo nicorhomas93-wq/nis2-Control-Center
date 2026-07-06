@@ -4,6 +4,7 @@ import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
 import type { ResearchSignalType } from "@/lib/jarvis/lead-research/constants";
 import { qualifyResearchLead, MIN_LEAD_SCORE } from "@/lib/jarvis/lead-research/lead-qualification";
+import { isBlockedMediaSource } from "@/lib/jarvis/lead-research/media-block";
 import { DEMO_RESEARCH_SIGNALS } from "@/lib/jarvis/lead-research/seed-signals";
 
 function toRow(
@@ -51,7 +52,9 @@ export async function GET() {
     return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
   }
 
-  return NextResponse.json({ signals: data ?? [] });
+  return NextResponse.json({
+    signals: (data ?? []).filter((row) => !isBlockedMediaSource(row)),
+  });
 }
 
 export async function POST(request: Request) {
