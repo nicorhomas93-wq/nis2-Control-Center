@@ -57,7 +57,7 @@ async function fetchHtmlFeed(url: string): Promise<{
 
   for (const tender of tenders) {
     const combined = `${tender.title} ${tender.buyer}`;
-    if (!matchesAutomatedResearchText(combined)) continue;
+    if (!matchesAutomatedResearchText(combined, "tender")) continue;
 
     matched.push({
       company_name: tender.buyer.split(",")[0]?.trim() || tender.buyer,

@@ -3,8 +3,36 @@ import { createClient } from "@/lib/supabase/server";
 import { requireJarvisApiAccess } from "@/lib/jarvis/require-api-access";
 import { getDbErrorMessage } from "@/lib/supabase/db-error";
 import type { ResearchSignalType } from "@/lib/jarvis/lead-research/constants";
-import { scoreResearchSignal } from "@/lib/jarvis/lead-research/signal-scoring";
+import { qualifyResearchLead } from "@/lib/jarvis/lead-research/lead-qualification";
 import { DEMO_RESEARCH_SIGNALS } from "@/lib/jarvis/lead-research/seed-signals";
+
+function toRow(
+  demo: (typeof DEMO_RESEARCH_SIGNALS)[number],
+  qualified: ReturnType<typeof qualifyResearchLead>
+) {
+  return {
+    company_name: demo.company_name,
+    signal_type: demo.signal_type,
+    source_platform: demo.source_platform,
+    source_url: demo.source_url ?? null,
+    title: demo.title,
+    description: demo.description,
+    region: demo.region,
+    industry: demo.industry,
+    industry_priority: qualified.industry_priority,
+    research_score: qualified.research_score,
+    score_reason: qualified.score_reason,
+    keywords_matched: qualified.keywords_matched,
+    lead_type: qualified.lead_type,
+    lead_priority: qualified.lead_priority,
+    demand_signal: qualified.demand_signal,
+    signal_art: qualified.signal_art,
+    tknd_modules: qualified.tknd_modules,
+    recommended_action: qualified.recommended_action,
+    relevance_note: qualified.relevance_note,
+    status: "new",
+  };
+}
 
 export async function GET() {
   const access = await requireJarvisApiAccess();
@@ -14,6 +42,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("jarvis_lead_research_signals")
     .select("*")
+    .gte("research_score", 50)
     .order("research_score", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(200);
@@ -34,33 +63,19 @@ export async function POST(request: Request) {
   if (body.mode === "seed_demo") {
     const supabase = await createClient();
     const rows = DEMO_RESEARCH_SIGNALS.map((demo) => {
-      const scored = scoreResearchSignal({
+      const qualified = qualifyResearchLead({
         company_name: demo.company_name,
         signal_type: demo.signal_type,
         title: demo.title,
         description: demo.description,
         industry: demo.industry,
-      });
-      return {
-        company_name: demo.company_name,
-        signal_type: demo.signal_type,
         source_platform: demo.source_platform,
-        title: demo.title,
-        description: demo.description,
-        region: demo.region,
-        industry: demo.industry,
-        industry_priority: scored.industry_priority,
-        research_score: scored.research_score,
-        score_reason: scored.score_reason,
-        keywords_matched: scored.keywords_matched,
-        status: "new",
-      };
-    });
+        source_url: demo.source_url,
+      });
+      return toRow(demo, qualified);
+    }).filter((row) => row.research_score >= 50);
 
-    const { data, error } = await supabase
-      .from("jarvis_lead_research_signals")
-      .insert(rows)
-      .select();
+    const { data, error } = await supabase.from("jarvis_lead_research_signals").insert(rows).select();
 
     if (error) {
       return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
@@ -76,14 +91,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Firma und Signal-Typ sind erforderlich" }, { status: 400 });
   }
 
-  const scored = scoreResearchSignal({
+  const qualified = qualifyResearchLead({
     company_name,
     signal_type,
     title: body.title,
     description: body.description,
     industry: body.industry,
     employee_count: body.employee_count,
+    source_url: body.source_url,
+    source_platform: body.source_platform,
   });
+
+  if (!qualified.accepted) {
+    return NextResponse.json(
+      { error: qualified.reject_reason ?? "Lead erfüllt Qualitätskriterien nicht" },
+      { status: 422 }
+    );
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -97,10 +121,17 @@ export async function POST(request: Request) {
       description: body.description?.trim() || null,
       region: body.region?.trim() || null,
       industry: body.industry?.trim() || null,
-      industry_priority: scored.industry_priority,
-      research_score: scored.research_score,
-      score_reason: scored.score_reason,
-      keywords_matched: scored.keywords_matched,
+      industry_priority: qualified.industry_priority,
+      research_score: qualified.research_score,
+      score_reason: qualified.score_reason,
+      keywords_matched: qualified.keywords_matched,
+      lead_type: qualified.lead_type,
+      lead_priority: qualified.lead_priority,
+      demand_signal: qualified.demand_signal,
+      signal_art: qualified.signal_art,
+      tknd_modules: qualified.tknd_modules,
+      recommended_action: qualified.recommended_action,
+      relevance_note: qualified.relevance_note,
       status: "new",
     })
     .select()

@@ -73,7 +73,7 @@ export async function fetchOeffentlicheVergabeSignals(
       const description = purpose.description ?? "";
       const combined = `${title} ${description}`;
 
-      if (!matchesAutomatedResearchText(combined)) continue;
+      if (!matchesAutomatedResearchText(combined, "tender")) continue;
 
       const noticeIdentifier = purpose.noticeIdentifier;
       const noticeVersion = purpose.noticeVersion;

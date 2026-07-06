@@ -1,11 +1,12 @@
-export const LEAD_RESEARCH_SYSTEM_PROMPT = `Du bist Jarvis, ein deutscher B2B Lead-Research-Agent für NIS2-Compliance.
+export const LEAD_RESEARCH_SYSTEM_PROMPT = `Du bist Jarvis, ein deutscher B2B-Lead-Research-Agent für das TKND NIS2 Control Center.
 
-Ziel:
-Finde ausschließlich Unternehmen, die aktuell einen konkreten oder zeitnahen Bedarf an NIS2-Umsetzung, Informationssicherheit, ISMS oder Cybersecurity-Dokumentation haben.
+WICHTIG: Du suchst KEINE allgemeinen Nachrichtenartikel, Blogbeiträge, Ratgeberseiten, Kanzleiartikel oder Marketingseiten über NIS2.
 
-Suche täglich nach Ausschreibungen, Stellenanzeigen und Unternehmensmeldungen.
-Priorisiere IT-Systemhäuser, MSPs und NIS2-relevante Branchen.
+Du suchst ausschließlich konkrete Bedarfssignale von Organisationen mit akutem oder sehr wahrscheinlichem Bedarf an NIS2-Dokumentation, Risikomanagement, Maßnahmenmanagement, Audit-Nachweisen oder Lieferantenbewertung.
 
+Erlaubte Signale: Stellenanzeigen (ISB, Security Manager, ISMS), Ausschreibungen (NIS2, ISMS, ISO27001), konkrete Unternehmensmeldungen, Partnerpotenzial (MSP/Berater).
+
+Qualität vor Menge. Lieber 5 sehr gute Leads als 100 schlechte Treffer.
 Kein Auto-Versand. Keine Kontaktanfragen ohne Freigabe durch Nico.`;
 
 export type ResearchSignalType = "tender" | "job" | "announcement" | "size_inference";
@@ -26,7 +27,6 @@ export const RESEARCH_SIGNAL_STATUS_LABELS: Record<string, string> = {
   dismissed: "Verworfen",
 };
 
-/** Automatisch via Open-Data-API (aggregiert u. a. bund.de, Länder, Kommunen). */
 export const TENDER_SOURCES_AUTOMATED = ["oeffentlichevergabe.de", "bund.de"] as const;
 
 export const TENDER_SOURCES = [
@@ -38,14 +38,14 @@ export const TENDER_SOURCES = [
   "Subreport",
 ] as const;
 
-/** Automatisch via BA Jobsuche + Stepstone HTML-Scraper. */
 export const JOB_SOURCES_AUTOMATED = ["arbeitsagentur.de", "Stepstone"] as const;
 
 export const JOB_SOURCES = ["Stepstone", "Indeed", "LinkedIn Jobs", "Xing Jobs"] as const;
 
-export const ANNOUNCEMENT_SOURCES = ["LinkedIn", "Unternehmenswebseite", "Pressemitteilung"] as const;
+export const ANNOUNCEMENT_SOURCES = ["LinkedIn", "Unternehmenswebseite", "Karriereseite"] as const;
 
-export const ANNOUNCEMENT_SOURCES_AUTOMATED = ["Google News"] as const;
+/** Google News deaktiviert — liefert zu viele Ratgeber/News ohne Organisations-Bedarf */
+export const ANNOUNCEMENT_SOURCES_AUTOMATED = [] as const;
 
 export const SCRAPER_RSS_PLATFORMS = [
   "evergabe.de",
@@ -56,13 +56,17 @@ export const SCRAPER_RSS_PLATFORMS = [
 
 export const TENDER_KEYWORDS = [
   "NIS2",
-  "Informationssicherheit",
-  "ISMS",
-  "ISO 27001",
-  "ISO27001",
-  "BSI Grundschutz",
-  "Risikomanagement",
-  "Informationssicherheitsbeauftragter",
+  "NIS2 Umsetzung",
+  "ISMS Aufbau",
+  "ISO 27001 Einführung",
+  "Informationssicherheitsmanagement",
+  "BSI IT-Grundschutz",
+  "Risikoanalyse Informationssicherheit",
+  "Lieferantensicherheitsbewertung",
+  "Security Awareness",
+  "Incident Response Konzept",
+  "Notfallmanagement",
+  "Audit-Vorbereitung Informationssicherheit",
   "Cybersecurity",
 ] as const;
 
@@ -72,18 +76,25 @@ export const JOB_KEYWORDS = [
   "IT Security Manager",
   "Cyber Security Manager",
   "Compliance Manager",
-  "ISO 27001",
+  "ISO 27001 Manager",
+  "ISMS Manager",
+  "CISO",
+  "IT-Risikomanager",
+  "Business Continuity Manager",
   "NIS2",
+  "ISO 27001",
 ] as const;
 
 export const ANNOUNCEMENT_KEYWORDS = [
-  "NIS2",
-  "Cybersecurity",
-  "ISO27001",
-  "Informationssicherheit",
+  "wir führen ein",
+  "wir bauen auf",
+  "wir bereiten uns vor",
+  "wir suchen Unterstützung",
+  "wir stellen ein",
+  "wir suchen",
+  "ISO 27001",
   "ISMS",
-  "Audit",
-  "Compliance",
+  "NIS2",
 ] as const;
 
 export const INDUSTRY_PRIORITY_A = [
@@ -104,6 +115,10 @@ export const INDUSTRY_PRIORITY_B = [
   "logistik",
   "energie",
   "lebensmittel",
+  "stadtwerk",
+  "klinik",
+  "krankenhaus",
+  "produktion",
 ] as const;
 
 export const INDUSTRY_PRIORITY_C = [
@@ -112,26 +127,43 @@ export const INDUSTRY_PRIORITY_C = [
   "chemie",
   "wasser",
   "entsorgung",
+  "beratung",
+  "consulting",
 ] as const;
 
 export const RESEARCH_SCORE_LABELS: Record<number, string> = {
-  100: "NIS2 explizit genannt",
-  80: "ISO 27001 Einführung gesucht",
-  70: "ISB / Security Manager Stelle offen",
-  60: "Cybersecurity-Projekt ausgeschrieben",
-  50: "Unternehmen fällt nach Größe wahrscheinlich unter NIS2",
+  100: "NIS2-Ausschreibung oder explizite NIS2-Suche",
+  90: "ISMS-/ISO27001-Ausschreibung oder ISB gesucht",
+  80: "Security-/Compliance-Stelle mit NIS2/ISO-Bezug",
+  70: "Unternehmen baut Informationssicherheit aus",
+  60: "NIS2-Branche + offene Security-Stelle",
+  50: "Partner mit NIS2-/ISMS-Angebot",
 };
 
-/** Standard-Ausgabeformat pro Fund */
+export const LEAD_PRIORITY_LABELS: Record<string, string> = {
+  A: "Akuter Bedarf wahrscheinlich",
+  B: "Hoher Bedarf wahrscheinlich",
+  C: "Partnerpotenzial",
+  D: "Beobachten / nicht übernehmen",
+};
+
+export { LEAD_TYPE_LABELS } from "@/lib/jarvis/lead-research/lead-qualification";
+
 export const RESEARCH_OUTPUT_FIELDS = [
-  "Firma",
-  "Signal-Typ",
+  "Lead-Typ",
+  "Firma / Organisation",
+  "Website",
+  "Ort",
+  "Branche",
+  "Mitarbeitergröße",
+  "Bedarfssignal",
+  "Signal-Art",
   "Quelle",
-  "Score",
-  "Begründung",
-  "URL",
-  "Region / Branche",
-  "Branchen-Priorität",
-  "Kontakt-Hinweis",
-  "Empfohlene Aktion",
+  "Datum / Aktualität",
+  "Relevanz für TKND",
+  "Passende TKND-Module",
+  "Leadscore",
+  "Priorität",
+  "Empfohlene nächste Aktion",
+  "Empfohlene Ansprache",
 ] as const;

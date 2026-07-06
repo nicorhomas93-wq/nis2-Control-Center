@@ -4,7 +4,7 @@ import { fetchJobsucheSignals } from "@/lib/jarvis/lead-research/fetchers/jobsuc
 import { fetchOeffentlicheVergabeSignals } from "@/lib/jarvis/lead-research/fetchers/oeffentliche-vergabe";
 import { fetchScrapedSignals } from "@/lib/jarvis/lead-research/scrapers";
 import type { ResearchCandidate } from "@/lib/jarvis/lead-research/fetchers/types";
-import { scoreResearchSignal } from "@/lib/jarvis/lead-research/signal-scoring";
+import { qualifyResearchLead } from "@/lib/jarvis/lead-research/lead-qualification";
 
 export interface LeadResearchRunResult {
   runId: string | null;
@@ -16,6 +16,7 @@ export interface LeadResearchRunResult {
   announcementsMatched: number;
   inserted: number;
   skippedDuplicates: number;
+  skippedRejected: number;
   errors: string[];
 }
 
@@ -48,8 +49,8 @@ async function loadExistingExternalIds(
 async function insertCandidates(
   client: SupabaseClient,
   candidates: ResearchCandidate[]
-): Promise<{ inserted: number; skippedDuplicates: number }> {
-  if (candidates.length === 0) return { inserted: 0, skippedDuplicates: 0 };
+): Promise<{ inserted: number; skippedDuplicates: number; skippedRejected: number }> {
+  if (candidates.length === 0) return { inserted: 0, skippedDuplicates: 0, skippedRejected: 0 };
 
   const byPlatform = new Map<string, ResearchCandidate[]>();
   for (const candidate of candidates) {
@@ -59,6 +60,7 @@ async function insertCandidates(
   }
 
   let skippedDuplicates = 0;
+  let skippedRejected = 0;
   const rows: Record<string, unknown>[] = [];
 
   for (const [platform, platformCandidates] of byPlatform) {
@@ -74,13 +76,20 @@ async function insertCandidates(
         continue;
       }
 
-      const scored = scoreResearchSignal({
+      const qualified = qualifyResearchLead({
         company_name: candidate.company_name,
         signal_type: candidate.signal_type,
         title: candidate.title,
         description: candidate.description,
         industry: candidate.industry,
+        source_url: candidate.source_url,
+        source_platform: candidate.source_platform,
       });
+
+      if (!qualified.accepted) {
+        skippedRejected++;
+        continue;
+      }
 
       rows.push({
         company_name: candidate.company_name,
@@ -92,17 +101,24 @@ async function insertCandidates(
         description: candidate.description,
         region: candidate.region,
         industry: candidate.industry,
-        industry_priority: scored.industry_priority,
-        research_score: scored.research_score,
-        score_reason: scored.score_reason,
-        keywords_matched: scored.keywords_matched,
+        industry_priority: qualified.industry_priority,
+        research_score: qualified.research_score,
+        score_reason: qualified.score_reason,
+        keywords_matched: qualified.keywords_matched,
+        lead_type: qualified.lead_type,
+        lead_priority: qualified.lead_priority,
+        demand_signal: qualified.demand_signal,
+        signal_art: qualified.signal_art,
+        tknd_modules: qualified.tknd_modules,
+        recommended_action: qualified.recommended_action,
+        relevance_note: qualified.relevance_note,
         status: "new",
       });
     }
   }
 
   if (rows.length === 0) {
-    return { inserted: 0, skippedDuplicates };
+    return { inserted: 0, skippedDuplicates, skippedRejected };
   }
 
   const { error } = await client.from("jarvis_lead_research_signals").insert(rows);
@@ -110,7 +126,7 @@ async function insertCandidates(
     throw new Error(error.message);
   }
 
-  return { inserted: rows.length, skippedDuplicates };
+  return { inserted: rows.length, skippedDuplicates, skippedRejected };
 }
 
 export async function runLeadResearch(options?: {
@@ -131,6 +147,7 @@ export async function runLeadResearch(options?: {
       announcementsMatched: 0,
       inserted: 0,
       skippedDuplicates: 0,
+      skippedRejected: 0,
       errors: ["Admin-Client nicht verfügbar (SUPABASE_SERVICE_ROLE_KEY)"],
     };
   }
@@ -152,6 +169,7 @@ export async function runLeadResearch(options?: {
       announcementsMatched: 0,
       inserted: 0,
       skippedDuplicates: 0,
+      skippedRejected: 0,
       errors: [runError.message],
     };
   }
@@ -183,6 +201,7 @@ export async function runLeadResearch(options?: {
 
   let inserted = 0;
   let skippedDuplicates = 0;
+  let skippedRejected = 0;
 
   try {
     const persist = await insertCandidates(client, [
@@ -192,6 +211,7 @@ export async function runLeadResearch(options?: {
     ]);
     inserted = persist.inserted;
     skippedDuplicates = persist.skippedDuplicates;
+    skippedRejected = persist.skippedRejected;
   } catch (err) {
     errors.push(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
   }
@@ -211,6 +231,7 @@ export async function runLeadResearch(options?: {
       announcements_matched: announcementResult.matched.length,
       inserted,
       skipped_duplicates: skippedDuplicates,
+      skipped_rejected: skippedRejected,
       errors,
     })
     .eq("id", runId);
@@ -225,6 +246,7 @@ export async function runLeadResearch(options?: {
     announcementsMatched: announcementResult.matched.length,
     inserted,
     skippedDuplicates,
+    skippedRejected,
     errors,
   };
 }

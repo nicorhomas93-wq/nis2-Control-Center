@@ -13,6 +13,8 @@ import {
   RESEARCH_SCORE_LABELS,
   RESEARCH_SIGNAL_STATUS_LABELS,
   RESEARCH_SIGNAL_TYPE_LABELS,
+  LEAD_TYPE_LABELS,
+  LEAD_PRIORITY_LABELS,
   TENDER_SOURCES,
   TENDER_SOURCES_AUTOMATED,
   JOB_SOURCES,
@@ -79,7 +81,7 @@ export function LeadResearchPanel({
     const data = await apiCall("/api/jarvis/lead-research/run", "POST");
     if (!data) return;
     setRunSummary(
-      `${data.inserted ?? 0} neu · ${data.tendersMatched ?? 0} Ausschreibungen · ${data.jobsMatched ?? 0} Jobs · ${data.announcementsMatched ?? 0} Meldungen · ${data.skippedDuplicates ?? 0} Duplikate`
+      `${data.inserted ?? 0} neu · ${data.tendersMatched ?? 0} Ausschreibungen · ${data.jobsMatched ?? 0} Jobs · ${data.announcementsMatched ?? 0} Meldungen · ${data.skippedDuplicates ?? 0} Duplikate · ${data.skippedRejected ?? 0} abgelehnt (Qualität)`
     );
   }
 
@@ -108,15 +110,16 @@ export function LeadResearchPanel({
           <p className="text-slate-600">
             Täglich um 06:30 Uhr (Vercel Cron): Ausschreibungen über{" "}
             <strong>{TENDER_SOURCES_AUTOMATED.join(", ")}</strong>, Stellen über{" "}
-            <strong>{JOB_SOURCES_AUTOMATED.join(", ")}</strong>, Meldungen über{" "}
-            <strong>{ANNOUNCEMENT_SOURCES_AUTOMATED.join(", ")}</strong>. Zusätzlich{" "}
-            {SCRAPER_RSS_PLATFORMS.join(", ")} (bund.de-RSS, TED-API, Subreport-Embed).
+            <strong>{JOB_SOURCES_AUTOMATED.join(", ")}</strong>. Zusätzlich{" "}
+            {SCRAPER_RSS_PLATFORMS.join(", ")} (bund.de-RSS, TED-API, Subreport-Embed). Presse und
+            Ratgeber werden automatisch ausgeschlossen.
           </p>
           {lastRun && (
             <p className="text-xs text-slate-500">
               Letzter Lauf: {formatRunTime(lastRun.finished_at ?? lastRun.started_at)} ·{" "}
               {lastRun.status} · {lastRun.inserted} neu · {lastRun.tenders_matched} Ausschreibungen
-              · {lastRun.jobs_matched} Jobs · {lastRun.announcements_matched ?? 0} Meldungen
+              · {lastRun.jobs_matched} Jobs · {lastRun.announcements_matched ?? 0} Meldungen ·{" "}
+              {lastRun.skipped_rejected ?? 0} abgelehnt
               {lastRun.errors?.length ? ` · ${lastRun.errors.length} Hinweise` : ""}
             </p>
           )}
@@ -340,14 +343,35 @@ export function LeadResearchPanel({
                 <p className="text-xs text-slate-500">
                   {RESEARCH_SIGNAL_TYPE_LABELS[signal.signal_type as ResearchSignalType] ??
                     signal.signal_type}
+                  {signal.lead_type
+                    ? ` · ${LEAD_TYPE_LABELS[signal.lead_type as keyof typeof LEAD_TYPE_LABELS] ?? signal.lead_type}`
+                    : ""}
+                  {signal.lead_priority
+                    ? ` · Priorität ${signal.lead_priority}${LEAD_PRIORITY_LABELS[signal.lead_priority] ? ` (${LEAD_PRIORITY_LABELS[signal.lead_priority]})` : ""}`
+                    : signal.industry_priority
+                      ? ` · Branche ${signal.industry_priority}`
+                      : ""}
                   {signal.source_platform ? ` · ${signal.source_platform}` : ""}
-                  {signal.industry_priority ? ` · Priorität ${signal.industry_priority}` : ""}
                 </p>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
+                {signal.demand_signal && (
+                  <p className="text-xs font-medium text-slate-700">{signal.demand_signal}</p>
+                )}
                 {signal.title && <p className="font-medium text-slate-800">{signal.title}</p>}
                 {signal.description && (
                   <p className="text-slate-600 line-clamp-4">{signal.description}</p>
+                )}
+                {signal.tknd_modules && signal.tknd_modules.length > 0 && (
+                  <p className="text-xs text-slate-500">
+                    TKND: {signal.tknd_modules.join(" · ")}
+                  </p>
+                )}
+                {signal.recommended_action && (
+                  <p className="text-xs text-brand-800">→ {signal.recommended_action}</p>
+                )}
+                {signal.relevance_note && (
+                  <p className="text-xs text-slate-500">{signal.relevance_note}</p>
                 )}
                 {signal.score_reason && (
                   <p className="text-xs text-brand-700">{signal.score_reason}</p>

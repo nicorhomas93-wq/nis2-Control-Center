@@ -626,6 +626,7 @@ export interface JarvisLeadResearchRun {
   announcements_matched: number;
   inserted: number;
   skipped_duplicates: number;
+  skipped_rejected: number;
   errors: string[] | null;
 }
 
@@ -641,6 +642,14 @@ export interface JarvisLeadResearchSignal {
   region: string | null;
   industry: string | null;
   industry_priority: string | null;
+  lead_type: string | null;
+  lead_priority: string | null;
+  demand_signal: string | null;
+  signal_art: string | null;
+  tknd_modules: string[] | null;
+  recommended_action: string | null;
+  relevance_note: string | null;
+  website_url: string | null;
   research_score: number;
   score_reason: string | null;
   keywords_matched: string[] | null;

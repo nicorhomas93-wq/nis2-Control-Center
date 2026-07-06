@@ -4,6 +4,7 @@ export const DEMO_RESEARCH_SIGNALS: Array<{
   company_name: string;
   signal_type: ResearchSignalType;
   source_platform: string;
+  source_url?: string;
   title: string;
   description: string;
   industry: string;
@@ -13,6 +14,7 @@ export const DEMO_RESEARCH_SIGNALS: Array<{
     company_name: "Mittelstand Maschinenbau Süd GmbH",
     signal_type: "tender",
     source_platform: "bund.de",
+    source_url: "https://www.service.bund.de/IMPORTE/Ausschreibungen/",
     title: "Einführung ISMS nach ISO 27001 inkl. NIS2-Vorbereitung",
     description:
       "Ausschreibung zur Einführung eines Informationssicherheits-Managementsystems, Risikomanagement und Dokumentation für NIS2-Compliance.",
@@ -23,6 +25,7 @@ export const DEMO_RESEARCH_SIGNALS: Array<{
     company_name: "Logistik Nord Service AG",
     signal_type: "job",
     source_platform: "Stepstone",
+    source_url: "https://www.stepstone.de/stellenangebote--Informationssicherheitsbeauftragter",
     title: "Informationssicherheitsbeauftragter (ISB) (m/w/d)",
     description:
       "Aufbau ISMS, Schnittstelle zu Audit und Lieferantenbewertung, Erfahrung mit NIS2 wünschenswert.",
@@ -33,9 +36,10 @@ export const DEMO_RESEARCH_SIGNALS: Array<{
     company_name: "CloudSecure MSP GmbH",
     signal_type: "announcement",
     source_platform: "LinkedIn",
-    title: "Wir unterstützen Kunden bei NIS2-Nachweisen",
+    source_url: "https://www.linkedin.com/company/cloudsecure-msp",
+    title: "NIS2-Beratung und ISMS-Services für Mittelstandskunden",
     description:
-      "Pressemitteilung: Ausbau Cybersecurity-Beratung und zentrale Nachweisdokumentation für MSP-Mandanten.",
+      "Wir bieten unseren MSP-Mandanten NIS2-Umsetzung, ISO-27001-Beratung und zentrale Nachweisdokumentation als Managed Service.",
     industry: "MSP",
     region: "Dresden",
   },

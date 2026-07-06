@@ -69,7 +69,7 @@ export async function fetchDtadTedSignals(): Promise<FetcherResult> {
         const title = pickGermanText(notice.TI);
         const buyer = pickGermanText(notice["buyer-name"]);
         const combined = `${title} ${buyer}`;
-        if (!title || !matchesAutomatedResearchText(combined)) continue;
+        if (!title || !matchesAutomatedResearchText(combined, "tender")) continue;
 
         const id = notice.ND ?? notice["publication-number"] ?? title;
         const externalId = `ted-${id}`;

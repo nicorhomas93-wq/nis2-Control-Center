@@ -22,15 +22,24 @@ export async function convertResearchSignalToLead(signalId: string): Promise<{
     throw new Error("Signal wurde bereits als Lead übernommen");
   }
 
-  const hints = [signal.title, signal.description, signal.score_reason]
+  const hints = [
+    signal.title,
+    signal.description,
+    signal.demand_signal,
+    signal.score_reason,
+  ]
     .filter(Boolean)
     .join(" · ");
+
+  const isPartner =
+    signal.lead_type === "partner" ||
+    (signal.signal_type === "announcement" && signal.industry?.toLowerCase().includes("msp"));
 
   const quality = scoreLeadQuality({
     company_name: signal.company_name,
     industry: signal.industry,
     hints,
-    lead_category: signal.industry_priority === "A" ? "partner" : undefined,
+    lead_category: isPartner ? "partner" : undefined,
   });
 
   const nis2_likelihood =
@@ -46,6 +55,10 @@ export async function convertResearchSignalToLead(signalId: string): Promise<{
       observation: hints,
       analysis_bullets: [
         `Research-Score: ${signal.research_score}`,
+        signal.lead_priority ? `Priorität ${signal.lead_priority}` : "",
+        signal.demand_signal ?? "",
+        signal.recommended_action ? `Aktion: ${signal.recommended_action}` : "",
+        signal.tknd_modules?.length ? `TKND: ${signal.tknd_modules.join(", ")}` : "",
         signal.score_reason ?? "",
         signal.source_platform ? `Quelle: ${signal.source_platform}` : "",
       ].filter(Boolean),

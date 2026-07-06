@@ -64,7 +64,7 @@ async function fetchPlatformRss(config: PlatformConfig): Promise<FetcherResult> 
 
       for (const item of items) {
         const combined = `${item.title} ${item.description}`;
-        if (!matchesAutomatedResearchText(combined)) continue;
+        if (!matchesAutomatedResearchText(combined, "tender")) continue;
 
         const externalId = `${config.platform}:${item.guid || item.link}`;
         if (seen.has(externalId)) continue;

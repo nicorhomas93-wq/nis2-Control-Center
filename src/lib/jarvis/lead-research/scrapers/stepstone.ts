@@ -78,7 +78,7 @@ async function fetchKeywordJobs(keyword: string): Promise<{
 
   for (const job of jobs) {
     const combined = `${job.title} ${job.company}`;
-    if (!matchesAutomatedResearchText(combined)) continue;
+    if (!matchesAutomatedResearchText(combined, "job")) continue;
 
     matched.push({
       company_name: job.company,

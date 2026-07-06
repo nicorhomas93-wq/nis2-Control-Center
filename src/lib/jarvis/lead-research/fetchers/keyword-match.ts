@@ -1,15 +1,15 @@
-import {
-  ANNOUNCEMENT_KEYWORDS,
-  JOB_KEYWORDS,
-  TENDER_KEYWORDS,
-} from "@/lib/jarvis/lead-research/constants";
+import { hasConcreteDemandSignal } from "@/lib/jarvis/lead-research/quality-filter";
+import type { ResearchSignalType } from "@/lib/jarvis/lead-research/constants";
 
 function normalize(text: string): string {
   return text.toLowerCase().replace(/\s+/g, " ");
 }
 
-/** Strenger Filter für automatische Ingestion — weniger Rauschen als manuelle Volltextsuche. */
-export function matchesAutomatedResearchText(text: string): boolean {
+/** Strenger Filter: nur konkrete Bedarfssignale, keine allgemeinen News-Treffer. */
+export function matchesAutomatedResearchText(
+  text: string,
+  signalType: ResearchSignalType = "tender"
+): boolean {
   const n = normalize(text);
 
   const strongPatterns = [
@@ -19,36 +19,27 @@ export function matchesAutomatedResearchText(text: string): boolean {
     /\bisms\b/,
     /cyber\s*security/,
     /cybersecurity/,
-    /bsi\s*grundschutz/,
+    /bsi\s*(it-)?grundschutz/,
     /informationssicherheitsbeauftragter/,
     /\bisb\b/,
     /it\s*security\s*manager/,
     /security\s*manager/,
     /compliance\s*manager/,
+    /\bciso\b/,
+    /isms\s*manager/,
+    /incident\s*response/,
+    /security\s*awareness/,
+    /notfallmanagement/,
+    /lieferantensicherheit/,
   ];
 
-  if (strongPatterns.some((pattern) => pattern.test(n))) return true;
-
-  if (/risikomanagement/.test(n) && /informationssicherheit|cyber|nis2|iso\s*27001/.test(n)) {
-    return true;
-  }
-
-  return false;
-}
-
-export function pickMatchedKeywords(text: string): string[] {
-  const n = normalize(text);
-  const all = [...TENDER_KEYWORDS, ...JOB_KEYWORDS, ...ANNOUNCEMENT_KEYWORDS];
-  const seen = new Set<string>();
-
-  for (const keyword of all) {
-    const kw = keyword.toLowerCase();
-    if (kw === "isb") {
-      if (/\bisb\b/.test(n)) seen.add(keyword);
-      continue;
+  if (!strongPatterns.some((pattern) => pattern.test(n))) {
+    if (/risikomanagement/.test(n) && /informationssicherheit|cyber|nis2|iso\s*27001/.test(n)) {
+      // ok
+    } else {
+      return false;
     }
-    if (n.includes(kw)) seen.add(keyword);
   }
 
-  return [...seen];
+  return hasConcreteDemandSignal(text, signalType);
 }

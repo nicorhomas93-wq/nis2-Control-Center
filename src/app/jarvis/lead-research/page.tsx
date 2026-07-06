@@ -30,6 +30,7 @@ export default async function LeadResearchPage() {
     supabase
       .from("jarvis_lead_research_signals")
       .select("*")
+      .gte("research_score", 50)
       .order("research_score", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(200),

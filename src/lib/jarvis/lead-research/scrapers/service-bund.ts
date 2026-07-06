@@ -38,7 +38,7 @@ function extractRegion(description: string): string | null {
 
 function toCandidate(item: ReturnType<typeof parseRss>[number]): ResearchCandidate | null {
   const combined = `${item.title} ${item.description}`;
-  if (!matchesAutomatedResearchText(combined)) return null;
+  if (!matchesAutomatedResearchText(combined, "tender")) return null;
 
   const company = extractBuyer(item.description) ?? "Öffentlicher Auftraggeber";
   const externalId = item.guid || item.link;

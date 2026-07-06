@@ -78,7 +78,7 @@ export async function fetchJobsucheSignals(): Promise<FetcherResult> {
         if (!referenznummer || !company || !title) continue;
         const description = buildDescription(job);
         const combined = `${title} ${description}`;
-        if (!matchesAutomatedResearchText(combined)) continue;
+        if (!matchesAutomatedResearchText(combined, "job")) continue;
 
         if (seen.has(referenznummer)) continue;
         seen.add(referenznummer);
