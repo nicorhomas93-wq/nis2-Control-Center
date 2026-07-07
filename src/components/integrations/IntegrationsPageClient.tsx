@@ -5,11 +5,18 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { ConnectedSystemCard } from "@/components/integrations/ConnectedSystemCard";
 import { IntegrationWizard } from "@/components/integrations/IntegrationWizard";
 import { DuplicateConnectionDialog } from "@/components/integrations/DuplicateConnectionDialog";
 import type { CsvImportType } from "@/lib/integrations/types";
 import type { DuplicateConnectionErrorPayload, IntegrationTechnicalError } from "@/lib/integrations/connection-errors";
 import { sanitizeUserFacingError } from "@/lib/integrations/connection-errors";
+import {
+  getProviderStatusLabel,
+  statusBadgeClass as connectionStatusBadgeClass,
+  type ConnectionAction,
+  type ConnectionDisplayStatus,
+} from "@/lib/integrations/connection-display";
 
 const TABS = [
   "Übersicht",
@@ -43,10 +50,12 @@ const IMPORT_TYPE_LABELS: Record<CsvImportType, string> = {
   evidence: "Nachweise",
 };
 
-function statusBadge(status: string) {
+function statusBadge(status: string, displayStatus?: ConnectionDisplayStatus) {
+  if (displayStatus) return connectionStatusBadgeClass(displayStatus);
   if (status === "active" || status === "success") return "bg-emerald-100 text-emerald-800";
   if (status === "error" || status === "failed") return "bg-red-100 text-red-800";
   if (status === "partial") return "bg-amber-100 text-amber-800";
+  if (status === "prepared") return "bg-slate-100 text-slate-700";
   return "bg-slate-100 text-slate-700";
 }
 
@@ -263,17 +272,107 @@ export function IntegrationsPageClient({
     }, ...syncRuns]);
   }
 
-  async function triggerSync(connectionId: string) {
+  async function triggerSync(connectionId: string, syncType = "manual_trigger", label?: string) {
     const data = await callApi("/api/integrations/sync-runs", "POST", {
       tenantId,
       connectionId,
-      syncType: "manual_trigger",
+      syncType,
       direction: "bidirectional",
       status: "success",
-      details: { mode: "demo", initiatedBy: "ui" },
+      details: { mode: "demo", initiatedBy: "ui", label: label ?? syncType },
     });
     if (!data?.run) return;
     setSyncRuns([data.run, ...syncRuns]);
+    setConnections(
+      connections.map((c) =>
+        String(c.id) === connectionId
+          ? {
+              ...c,
+              status: "active",
+              last_sync_at: new Date().toISOString(),
+              last_error: null,
+            }
+          : c
+      )
+    );
+  }
+
+  function handleConnectionAction(action: ConnectionAction, connectionId: string) {
+    const connection = connections.find((c) => String(c.id) === connectionId);
+    const providerKey = String(
+      (connection as { integration_providers?: { key?: string } } | undefined)?.integration_providers
+        ?.key ?? ""
+    );
+
+    switch (action) {
+      case "test_connection":
+        void triggerSync(connectionId, "connection_test", "Verbindung prüfen");
+        break;
+      case "sync":
+      case "import_users":
+        void triggerSync(connectionId, action === "import_users" ? "import_users" : "manual_sync", action === "import_users" ? "Benutzer importieren" : "Synchronisieren");
+        break;
+      case "import_departments":
+        void triggerSync(connectionId, "import_departments", "Abteilungen importieren");
+        break;
+      case "check_sharepoint":
+        void triggerSync(connectionId, "check_sharepoint", "SharePoint prüfen");
+        break;
+      case "create_test_ticket":
+        void triggerSync(connectionId, "jira_test_ticket", "Test-Ticket erstellen");
+        break;
+      case "sync_measures":
+        void triggerSync(connectionId, "sync_measures", "Maßnahmen synchronisieren");
+        break;
+      case "create_test_incident":
+        void triggerSync(connectionId, "servicenow_test_incident", "Test-Incident erstellen");
+        break;
+      case "sync_incidents":
+        void triggerSync(connectionId, "sync_incidents", "Incidents synchronisieren");
+        break;
+      case "open_sap_checklist":
+      case "prepare_sap_setup":
+        setActiveTab("Integrationsassistent");
+        break;
+      case "import_file":
+        setActiveTab("Integrationsassistent");
+        break;
+      case "show_import_history":
+        setActiveTab("Synchronisationsläufe");
+        break;
+      case "open_mapping":
+        setMappingForm((prev) => ({ ...prev, connectionId }));
+        setActiveTab("Datenzuordnung / Mapping");
+        break;
+      case "open_settings":
+        editConnection(connectionId);
+        break;
+      case "open_sync_log":
+        setHighlightedConnectionId(connectionId);
+        setActiveTab("Synchronisationsläufe");
+        break;
+      case "open_error_log":
+        setHighlightedConnectionId(connectionId);
+        setActiveTab("Fehlerprotokoll");
+        break;
+      case "start_microsoft_signin":
+        if (providerKey === "microsoft365") {
+          setActiveTab("Integrationsassistent");
+        } else {
+          void triggerSync(connectionId, "microsoft_signin", "Microsoft-Anmeldung");
+        }
+        break;
+      case "manage_api_keys":
+      case "create_webhook":
+      case "open_docs":
+        setActiveTab("API & Webhooks");
+        break;
+      case "primary_next":
+        void triggerSync(connectionId);
+        break;
+      default:
+        void triggerSync(connectionId);
+    }
   }
 
   return (
@@ -305,7 +404,7 @@ export function IntegrationsPageClient({
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle>{String(provider.name)}</CardTitle>
                   <Badge className={statusBadge(String(provider.status))}>
-                    {String(provider.status)}
+                    {getProviderStatusLabel(String(provider.status))}
                   </Badge>
                 </div>
               </CardHeader>
@@ -328,73 +427,47 @@ export function IntegrationsPageClient({
       )}
 
       {activeTab === "Verbundene Systeme" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Verbundene Systeme</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {connections.length === 0 ? (
-              <p className="text-sm text-slate-500">Noch keine Verbindung vorhanden.</p>
-            ) : (
-              connections.map((c) => (
-                <div
-                  key={String(c.id)}
-                  className={`rounded-lg border p-3 ${
-                    highlightedConnectionId === String(c.id)
-                      ? "border-brand-400 bg-brand-50"
-                      : "border-slate-200"
-                  }`}
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Verbundene Systeme</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Alle aktiven und vorbereiteten Integrationen auf einen Blick — mit klarem Status und empfohlener nächster Aktion.
+            </p>
+          </div>
+          {connections.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-slate-500">
+                Noch keine Verbindung vorhanden. Starten Sie im{" "}
+                <button
+                  type="button"
+                  className="font-medium text-brand-700 underline"
+                  onClick={() => setActiveTab("Integrationsassistent")}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      {editingConnectionId === String(c.id) ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <input
-                            className="rounded border border-slate-300 px-3 py-1.5 text-sm"
-                            value={editingConnectionName}
-                            onChange={(e) => setEditingConnectionName(e.target.value)}
-                          />
-                          <Button
-                            size="sm"
-                            disabled={loading || !editingConnectionName.trim()}
-                            onClick={() => saveConnectionName(String(c.id), editingConnectionName.trim())}
-                          >
-                            Speichern
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingConnectionId(null)}>
-                            Abbrechen
-                          </Button>
-                        </div>
-                      ) : (
-                        <p className="font-medium text-slate-800">{String(c.name)}</p>
-                      )}
-                      <p className="text-xs text-slate-500">
-                        {String((c as { integration_providers?: { name?: string } }).integration_providers?.name ?? "")}
-                        {c.base_url ? ` · ${String(c.base_url)}` : ""}
-                      </p>
-                    </div>
-                    <Badge className={statusBadge(String(c.status))}>{String(c.status)}</Badge>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => triggerSync(String(c.id))} disabled={loading}>
-                      Verbindung testen
-                    </Button>
-                    <Button size="sm" onClick={() => triggerSync(String(c.id))} disabled={loading}>
-                      Synchronisation starten
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => editConnection(String(c.id))}
-                    >
-                      Bearbeiten
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+                  Integrationsassistenten
+                </button>
+                .
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {connections.map((c) => (
+                <ConnectedSystemCard
+                  key={String(c.id)}
+                  connection={c}
+                  syncRuns={syncRuns}
+                  highlighted={highlightedConnectionId === String(c.id)}
+                  editing={editingConnectionId === String(c.id)}
+                  editingName={editingConnectionName}
+                  loading={loading}
+                  onEditingNameChange={setEditingConnectionName}
+                  onSaveName={() => saveConnectionName(String(c.id), editingConnectionName.trim())}
+                  onCancelEdit={() => setEditingConnectionId(null)}
+                  onAction={handleConnectionAction}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {activeTab === "Integrationsassistent" && (

@@ -302,6 +302,11 @@ export function IntegrationWizard({
         "ChannelMessage.Send",
       ],
       sharepointSiteUrl: m365Form.sharepointSiteUrl || null,
+      discovery: {
+        users: selectedGoals.includes("users") ? 128 : 0,
+        departments: selectedGoals.includes("departments") ? 14 : 0,
+        sharepoint: selectedGoals.includes("sharepoint") ? 3 : 0,
+      },
     };
 
     if (mode === "manual") {
