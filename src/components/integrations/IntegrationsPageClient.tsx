@@ -6,7 +6,10 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { IntegrationWizard } from "@/components/integrations/IntegrationWizard";
+import { DuplicateConnectionDialog } from "@/components/integrations/DuplicateConnectionDialog";
 import type { CsvImportType } from "@/lib/integrations/types";
+import type { DuplicateConnectionErrorPayload, IntegrationTechnicalError } from "@/lib/integrations/connection-errors";
+import { sanitizeUserFacingError } from "@/lib/integrations/connection-errors";
 
 const TABS = [
   "Übersicht",
@@ -56,6 +59,11 @@ interface PreviewResponse {
   totalRows: number;
 }
 
+interface TechnicalErrorLogEntry extends IntegrationTechnicalError {
+  context: string;
+  at: string;
+}
+
 export function IntegrationsPageClient({
   tenantId,
   companyName,
@@ -102,6 +110,68 @@ export function IntegrationsPageClient({
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
+  const [highlightedConnectionId, setHighlightedConnectionId] = useState<string | null>(null);
+  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(null);
+  const [editingConnectionName, setEditingConnectionName] = useState("");
+  const [technicalErrorLogs, setTechnicalErrorLogs] = useState<TechnicalErrorLogEntry[]>([]);
+  const [duplicateDialog, setDuplicateDialog] = useState<DuplicateConnectionErrorPayload | null>(null);
+  const [pendingRenameConnectionId, setPendingRenameConnectionId] = useState<string | null>(null);
+
+  function logTechnicalError(entry: IntegrationTechnicalError & { context: string }) {
+    setTechnicalErrorLogs((prev) => [
+      {
+        ...entry,
+        at: new Date().toISOString(),
+      },
+      ...prev,
+    ].slice(0, 50));
+  }
+
+  function openConnection(connectionId: string) {
+    setHighlightedConnectionId(connectionId);
+    setEditingConnectionId(null);
+    setActiveTab("Verbundene Systeme");
+  }
+
+  function editConnection(connectionId: string) {
+    const connection = connections.find((c) => String(c.id) === connectionId);
+    setHighlightedConnectionId(connectionId);
+    setEditingConnectionId(connectionId);
+    setEditingConnectionName(String(connection?.name ?? ""));
+    setActiveTab("Verbundene Systeme");
+  }
+
+  async function saveConnectionName(connectionId: string, name: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/integrations/connections", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: connectionId, name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data.errorType === "duplicate_connection_name") {
+        if (data.technical) {
+          logTechnicalError({ ...data.technical, context: "connection_rename" });
+        }
+        setPendingRenameConnectionId(connectionId);
+        setDuplicateDialog(data as DuplicateConnectionErrorPayload);
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(sanitizeUserFacingError(String(data.error ?? "Speichern fehlgeschlagen")));
+      }
+      setConnections(connections.map((c) => (String(c.id) === connectionId ? data.connection : c)));
+      setEditingConnectionId(null);
+      setPendingRenameConnectionId(null);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function callApi(url: string, method: string, body?: unknown) {
     setLoading(true);
@@ -113,7 +183,7 @@ export function IntegrationsPageClient({
         body: body ? JSON.stringify(body) : undefined,
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Anfrage fehlgeschlagen");
+      if (!res.ok) throw new Error(sanitizeUserFacingError(String(data.error ?? "Anfrage fehlgeschlagen")));
       router.refresh();
       return data;
     } catch (err) {
@@ -267,10 +337,37 @@ export function IntegrationsPageClient({
               <p className="text-sm text-slate-500">Noch keine Verbindung vorhanden.</p>
             ) : (
               connections.map((c) => (
-                <div key={String(c.id)} className="rounded-lg border border-slate-200 p-3">
+                <div
+                  key={String(c.id)}
+                  className={`rounded-lg border p-3 ${
+                    highlightedConnectionId === String(c.id)
+                      ? "border-brand-400 bg-brand-50"
+                      : "border-slate-200"
+                  }`}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-slate-800">{String(c.name)}</p>
+                    <div className="min-w-0 flex-1">
+                      {editingConnectionId === String(c.id) ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            className="rounded border border-slate-300 px-3 py-1.5 text-sm"
+                            value={editingConnectionName}
+                            onChange={(e) => setEditingConnectionName(e.target.value)}
+                          />
+                          <Button
+                            size="sm"
+                            disabled={loading || !editingConnectionName.trim()}
+                            onClick={() => saveConnectionName(String(c.id), editingConnectionName.trim())}
+                          >
+                            Speichern
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingConnectionId(null)}>
+                            Abbrechen
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="font-medium text-slate-800">{String(c.name)}</p>
+                      )}
                       <p className="text-xs text-slate-500">
                         {String((c as { integration_providers?: { name?: string } }).integration_providers?.name ?? "")}
                         {c.base_url ? ` · ${String(c.base_url)}` : ""}
@@ -284,6 +381,13 @@ export function IntegrationsPageClient({
                     </Button>
                     <Button size="sm" onClick={() => triggerSync(String(c.id))} disabled={loading}>
                       Synchronisation starten
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => editConnection(String(c.id))}
+                    >
+                      Bearbeiten
                     </Button>
                   </div>
                 </div>
@@ -300,8 +404,11 @@ export function IntegrationsPageClient({
           onConnectionCreated={(connection) => setConnections([connection, ...connections])}
           onSyncRunCreated={(run) => setSyncRuns([run, ...syncRuns])}
           onError={setError}
+          onLogTechnicalError={logTechnicalError}
           onOpenDeveloperTab={() => setActiveTab("API & Webhooks")}
           onNavigateToConnections={() => setActiveTab("Verbundene Systeme")}
+          onOpenConnection={openConnection}
+          onEditConnection={editConnection}
         />
       )}
 
@@ -444,16 +551,63 @@ export function IntegrationsPageClient({
       {activeTab === "Fehlerprotokoll" && (
         <Card>
           <CardHeader><CardTitle>Fehlerprotokoll</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="space-y-4 text-sm">
             {[...syncRuns.filter((r) => String(r.status) === "failed" || String(r.status) === "partial"), ...connections.filter((c) => Boolean(c.last_error))].slice(0, 20).map((entry, idx) => (
               <div key={idx} className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">
-                {"sync_type" in entry ? `Sync ${String(entry.sync_type)}: ${String(entry.error_message ?? "Teilweise fehlgeschlagen")}` : `Connection ${String(entry.name)}: ${String(entry.last_error ?? "Fehler")}`}
+                {"sync_type" in entry
+                  ? `Sync ${String(entry.sync_type)}: ${sanitizeUserFacingError(String(entry.error_message ?? "Teilweise fehlgeschlagen"))}`
+                  : `Verbindung ${String(entry.name)}: ${sanitizeUserFacingError(String(entry.last_error ?? "Fehler"))}`}
               </div>
             ))}
             {syncRuns.every((r) => String(r.status) !== "failed" && String(r.status) !== "partial") &&
-              connections.every((c) => !c.last_error) && <p className="text-slate-500">Keine Fehler vorhanden.</p>}
+              connections.every((c) => !c.last_error) &&
+              technicalErrorLogs.length === 0 && (
+                <p className="text-slate-500">Keine Fehler vorhanden.</p>
+              )}
+
+            {technicalErrorLogs.length > 0 && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="font-medium text-slate-800">Technische Details (nur für IT / Support)</p>
+                <div className="mt-2 space-y-2">
+                  {technicalErrorLogs.map((entry, idx) => (
+                    <div key={`${entry.at}-${idx}`} className="rounded border border-slate-200 bg-white p-2 text-xs text-slate-600">
+                      <p>{new Date(entry.at).toLocaleString("de-DE")} · {entry.context}</p>
+                      <p>Code: {entry.error_code} · Constraint: {entry.constraint}</p>
+                      <p className="mt-1 break-all">{entry.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
+      )}
+
+      {duplicateDialog && (
+        <DuplicateConnectionDialog
+          payload={duplicateDialog}
+          onOpenExisting={() => {
+            const id = duplicateDialog.existingConnection?.id;
+            setDuplicateDialog(null);
+            if (id) openConnection(id);
+          }}
+          onEditExisting={() => {
+            const id = duplicateDialog.existingConnection?.id ?? pendingRenameConnectionId;
+            setDuplicateDialog(null);
+            if (id) editConnection(id);
+          }}
+          onUseNewName={(name) => {
+            setDuplicateDialog(null);
+            if (pendingRenameConnectionId) {
+              setEditingConnectionId(pendingRenameConnectionId);
+              setEditingConnectionName(name);
+              void saveConnectionName(pendingRenameConnectionId, name);
+              return;
+            }
+            setError(`Bitte verwenden Sie den Namen „${name}“ und versuchen Sie es erneut.`);
+          }}
+          onClose={() => setDuplicateDialog(null)}
+        />
       )}
 
       {activeTab === "Sicherheit & Berechtigungen" && (

@@ -3,6 +3,63 @@ import { createClient } from "@/lib/supabase/server";
 import { getDbErrorMessage, isMissingTableError } from "@/lib/supabase/db-error";
 import { resolveTenantForUser } from "@/lib/integrations/tenant";
 import { encodeSecretPlaceholder, maskSecret } from "@/lib/integrations/secret-store";
+import {
+  buildDuplicateConnectionPayload,
+  buildTechnicalError,
+  isDuplicateConnectionNameError,
+  logIntegrationTechnicalError,
+} from "@/lib/integrations/connection-errors";
+
+async function loadTenantConnectionNames(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string
+): Promise<string[]> {
+  const { data } = await supabase
+    .from("integration_connections")
+    .select("name")
+    .eq("tenant_id", tenantId);
+  return (data ?? []).map((row) => String(row.name));
+}
+
+async function findExistingConnectionByName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string,
+  name: string
+) {
+  const { data } = await supabase
+    .from("integration_connections")
+    .select("id, name, status, provider_id, integration_providers(name)")
+    .eq("tenant_id", tenantId)
+    .eq("name", name.trim())
+    .maybeSingle();
+  return data;
+}
+
+function duplicateResponse(
+  name: string,
+  existingConnection: Awaited<ReturnType<typeof findExistingConnectionByName>>,
+  existingNames: string[],
+  technical = buildTechnicalError(null, "Verbindungsname bereits vergeben")
+) {
+  logIntegrationTechnicalError("duplicate_connection_name", technical);
+  const payload = buildDuplicateConnectionPayload(
+    name,
+    existingConnection
+      ? {
+          id: String(existingConnection.id),
+          name: String(existingConnection.name),
+          status: String(existingConnection.status ?? ""),
+          providerName: String(
+            (existingConnection as { integration_providers?: { name?: string } }).integration_providers
+              ?.name ?? ""
+          ),
+        }
+      : null,
+    existingNames,
+    technical
+  );
+  return NextResponse.json(payload, { status: 409 });
+}
 
 function maskedConnection(row: Record<string, unknown>) {
   return {
@@ -58,12 +115,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "providerId und name sind erforderlich" }, { status: 400 });
   }
 
+  const connectionName = String(body.name).trim();
+  const existingNames = await loadTenantConnectionNames(supabase, tenant.id);
+  const existingConnection = await findExistingConnectionByName(supabase, tenant.id, connectionName);
+
+  if (existingConnection) {
+    return duplicateResponse(connectionName, existingConnection, existingNames);
+  }
+
   const { data, error } = await supabase
     .from("integration_connections")
     .insert({
       tenant_id: tenant.id,
       provider_id: body.providerId,
-      name: String(body.name).trim(),
+      name: connectionName,
       status: body.status ?? "prepared",
       auth_type: body.authType ?? "api_key",
       base_url: body.baseUrl?.trim() || null,
@@ -79,6 +144,15 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
+    if (isDuplicateConnectionNameError(error)) {
+      const existing = await findExistingConnectionByName(supabase, tenant.id, connectionName);
+      return duplicateResponse(
+        connectionName,
+        existing,
+        existingNames,
+        buildTechnicalError(error, error.message ?? "duplicate key")
+      );
+    }
     return NextResponse.json(
       { error: getDbErrorMessage(error), missingTable: isMissingTableError(error) },
       { status: isMissingTableError(error) ? 503 : 500 }
@@ -109,8 +183,17 @@ export async function PATCH(request: Request) {
   const tenant = await resolveTenantForUser(user.id, existing.tenant_id);
   if (!tenant) return NextResponse.json({ error: "Kein Zugriff" }, { status: 403 });
 
+  const nextName = body.name !== undefined ? String(body.name).trim() : String(existing.name);
+  if (nextName !== String(existing.name)) {
+    const existingNames = await loadTenantConnectionNames(supabase, tenant.id);
+    const duplicate = await findExistingConnectionByName(supabase, tenant.id, nextName);
+    if (duplicate && String(duplicate.id) !== String(existing.id)) {
+      return duplicateResponse(nextName, duplicate, existingNames);
+    }
+  }
+
   const updates: Record<string, unknown> = {
-    name: body.name ?? existing.name,
+    name: nextName,
     status: body.status ?? existing.status,
     auth_type: body.authType ?? existing.auth_type,
     base_url: body.baseUrl ?? existing.base_url,
@@ -131,6 +214,18 @@ export async function PATCH(request: Request) {
     .select("*")
     .single();
 
-  if (error) return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
+  if (error) {
+    if (isDuplicateConnectionNameError(error)) {
+      const existingNames = await loadTenantConnectionNames(supabase, tenant.id);
+      const duplicate = await findExistingConnectionByName(supabase, tenant.id, nextName);
+      return duplicateResponse(
+        nextName,
+        duplicate,
+        existingNames,
+        buildTechnicalError(error, error.message ?? "duplicate key")
+      );
+    }
+    return NextResponse.json({ error: getDbErrorMessage(error) }, { status: 500 });
+  }
   return NextResponse.json({ connection: maskedConnection(data as Record<string, unknown>) });
 }

@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { DuplicateConnectionDialog } from "@/components/integrations/DuplicateConnectionDialog";
 import type { CsvImportType } from "@/lib/integrations/types";
+import type { DuplicateConnectionErrorPayload, IntegrationTechnicalError } from "@/lib/integrations/connection-errors";
+import { sanitizeUserFacingError } from "@/lib/integrations/connection-errors";
 import {
   CSV_GOAL_TO_TYPE,
   CSV_TYPE_LABELS,
@@ -47,9 +50,18 @@ interface IntegrationWizardProps {
   onConnectionCreated: (connection: Record<string, unknown>) => void;
   onSyncRunCreated: (run: Record<string, unknown>) => void;
   onError: (message: string | null) => void;
+  onLogTechnicalError: (entry: IntegrationTechnicalError & { context: string }) => void;
   onOpenDeveloperTab: () => void;
   onNavigateToConnections: () => void;
+  onOpenConnection: (connectionId: string) => void;
+  onEditConnection: (connectionId: string) => void;
 }
+
+type PendingConnectionCreate = {
+  systemKey: WizardSystemKey;
+  body: Record<string, unknown>;
+  onSuccess: (connection: Record<string, unknown>) => void;
+};
 
 function providerIdFor(providers: Record<string, unknown>[], key: string): string {
   return String(providers.find((p) => String(p.key) === key)?.id ?? "");
@@ -79,8 +91,11 @@ export function IntegrationWizard({
   onConnectionCreated,
   onSyncRunCreated,
   onError,
+  onLogTechnicalError,
   onOpenDeveloperTab,
   onNavigateToConnections,
+  onOpenConnection,
+  onEditConnection,
 }: IntegrationWizardProps) {
   const router = useRouter();
   const [wizardStep, setWizardStep] = useState(1);
@@ -133,6 +148,8 @@ export function IntegrationWizard({
   const [importFile, setImportFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [duplicateDialog, setDuplicateDialog] = useState<DuplicateConnectionErrorPayload | null>(null);
+  const [pendingCreate, setPendingCreate] = useState<PendingConnectionCreate | null>(null);
 
   const systemCard = useMemo(
     () => WIZARD_SYSTEMS.find((s) => s.key === selectedSystem) ?? null,
@@ -140,6 +157,64 @@ export function IntegrationWizard({
   );
 
   const goalsForSystem = selectedSystem ? WIZARD_GOALS[selectedSystem] : [];
+
+  async function createIntegrationConnection(
+    systemKey: WizardSystemKey,
+    body: Record<string, unknown>,
+    onSuccess: (connection: Record<string, unknown>) => void
+  ) {
+    setPendingCreate({ systemKey, body, onSuccess });
+    setLoading(true);
+    onError(null);
+    try {
+      const res = await fetch("/api/integrations/connections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data.errorType === "duplicate_connection_name") {
+        if (data.technical) {
+          onLogTechnicalError({
+            ...data.technical,
+            context: `connection_create_${systemKey}`,
+          });
+        }
+        setDuplicateDialog(data as DuplicateConnectionErrorPayload);
+        return null;
+      }
+      if (!res.ok) {
+        throw new Error(sanitizeUserFacingError(String(data.error ?? "Anfrage fehlgeschlagen")));
+      }
+      router.refresh();
+      onSuccess(data.connection as Record<string, unknown>);
+      setPendingCreate(null);
+      return data.connection as Record<string, unknown>;
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Fehler");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function updateConnectionName(systemKey: WizardSystemKey, name: string) {
+    if (systemKey === "microsoft365") setM365Form((f) => ({ ...f, name }));
+    if (systemKey === "jira") setJiraForm((f) => ({ ...f, name }));
+    if (systemKey === "servicenow") setSnowForm((f) => ({ ...f, name }));
+  }
+
+  function retryWithConnectionName(name: string) {
+    if (!pendingCreate) return;
+    const body = { ...pendingCreate.body, name };
+    updateConnectionName(pendingCreate.systemKey, name);
+    setDuplicateDialog(null);
+    void createIntegrationConnection(
+      pendingCreate.systemKey,
+      body,
+      pendingCreate.onSuccess
+    );
+  }
 
   async function callApi(url: string, method: string, body?: unknown) {
     setLoading(true);
@@ -151,7 +226,7 @@ export function IntegrationWizard({
         body: body ? JSON.stringify(body) : undefined,
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Anfrage fehlgeschlagen");
+      if (!res.ok) throw new Error(sanitizeUserFacingError(String(data.error ?? "Anfrage fehlgeschlagen")));
       router.refresh();
       return data;
     } catch (err) {
@@ -234,7 +309,7 @@ export function IntegrationWizard({
       config.redirectUri = m365Form.redirectUri;
     }
 
-    const data = await callApi("/api/integrations/connections", "POST", {
+    const data = await createIntegrationConnection("microsoft365", {
       tenantId,
       providerId,
       name: m365Form.name,
@@ -243,35 +318,36 @@ export function IntegrationWizard({
       clientId: mode === "manual" ? m365Form.clientId : undefined,
       clientSecret: mode === "manual" ? m365Form.clientSecret : undefined,
       config,
+    }, (connection) => {
+      onConnectionCreated(connection);
+
+      const discovery = {
+        users: selectedGoals.includes("users") ? 128 : 0,
+        departments: selectedGoals.includes("departments") ? 14 : 0,
+        sharepoint: selectedGoals.includes("sharepoint") ? 3 : 0,
+      };
+
+      setResult({
+        kind: "connected",
+        title: "Microsoft 365 wurde verbunden.",
+        summary: mode === "oauth"
+          ? "Die Anmeldung wurde vorbereitet. TKND kann nun die ausgewählten Daten übernehmen."
+          : "Die Verbindung wurde für Ihre IT manuell vorbereitet.",
+        stats: [
+          ...(discovery.users ? [{ label: "Benutzer erkannt", value: discovery.users }] : []),
+          ...(discovery.departments ? [{ label: "Abteilungen erkannt", value: discovery.departments }] : []),
+          ...(discovery.sharepoint ? [{ label: "SharePoint-Bibliotheken verfügbar", value: discovery.sharepoint }] : []),
+        ],
+        nextSteps: [
+          "Erste Synchronisation im Tab „Verbundene Systeme“ starten",
+          "Datenzuordnung bei Bedarf anpassen",
+          "Benachrichtigungen in Teams oder Outlook aktivieren",
+        ],
+      });
+      setWizardStep(4);
     });
 
-    if (!data?.connection) return;
-    onConnectionCreated(data.connection);
-
-    const discovery = {
-      users: selectedGoals.includes("users") ? 128 : 0,
-      departments: selectedGoals.includes("departments") ? 14 : 0,
-      sharepoint: selectedGoals.includes("sharepoint") ? 3 : 0,
-    };
-
-    setResult({
-      kind: "connected",
-      title: "Microsoft 365 wurde verbunden.",
-      summary: mode === "oauth"
-        ? "Die Anmeldung wurde vorbereitet. TKND kann nun die ausgewählten Daten übernehmen."
-        : "Die Verbindung wurde für Ihre IT manuell vorbereitet.",
-      stats: [
-        ...(discovery.users ? [{ label: "Benutzer erkannt", value: discovery.users }] : []),
-        ...(discovery.departments ? [{ label: "Abteilungen erkannt", value: discovery.departments }] : []),
-        ...(discovery.sharepoint ? [{ label: "SharePoint-Bibliotheken verfügbar", value: discovery.sharepoint }] : []),
-      ],
-      nextSteps: [
-        "Erste Synchronisation im Tab „Verbundene Systeme“ starten",
-        "Datenzuordnung bei Bedarf anpassen",
-        "Benachrichtigungen in Teams oder Outlook aktivieren",
-      ],
-    });
-    setWizardStep(4);
+    if (!data) return;
   }
 
   async function connectJira() {
@@ -285,7 +361,7 @@ export function IntegrationWizard({
       return;
     }
 
-    const data = await callApi("/api/integrations/connections", "POST", {
+    const data = await createIntegrationConnection("jira", {
       tenantId,
       providerId,
       name: jiraForm.name,
@@ -303,26 +379,27 @@ export function IntegrationWizard({
           erledigt: "Done",
         },
       },
+    }, (connection) => {
+      onConnectionCreated(connection);
+
+      setResult({
+        kind: "connected",
+        title: "Jira-Verbindung erfolgreich eingerichtet.",
+        summary: "Die Verbindung wurde gespeichert und kann getestet werden.",
+        stats: [
+          { label: "Gewählte Synchronisationen", value: selectedGoals.length },
+          { label: "Jira-Instanz", value: jiraForm.baseUrl },
+        ],
+        nextSteps: [
+          "Verbindung unter „Verbundene Systeme“ testen",
+          "Erste TKND-Maßnahme als Ticket synchronisieren",
+          "Status-Rücksync aktivieren",
+        ],
+      });
+      setWizardStep(4);
     });
 
-    if (!data?.connection) return;
-    onConnectionCreated(data.connection);
-
-    setResult({
-      kind: "connected",
-      title: "Jira-Verbindung erfolgreich eingerichtet.",
-      summary: "Die Verbindung wurde gespeichert und kann getestet werden.",
-      stats: [
-        { label: "Gewählte Synchronisationen", value: selectedGoals.length },
-        { label: "Jira-Instanz", value: jiraForm.baseUrl },
-      ],
-      nextSteps: [
-        "Verbindung unter „Verbundene Systeme“ testen",
-        "Erste TKND-Maßnahme als Ticket synchronisieren",
-        "Status-Rücksync aktivieren",
-      ],
-    });
-    setWizardStep(4);
+    if (!data) return;
   }
 
   function createSapChecklist() {
@@ -394,7 +471,7 @@ export function IntegrationWizard({
       return;
     }
 
-    const data = await callApi("/api/integrations/connections", "POST", {
+    const data = await createIntegrationConnection("servicenow", {
       tenantId,
       providerId,
       name: snowForm.name,
@@ -407,28 +484,29 @@ export function IntegrationWizard({
         syncTargets: selectedGoals,
         authMethod: snowForm.authMethod,
       },
+    }, (connection) => {
+      onConnectionCreated(connection);
+
+      setResult({
+        kind: snowForm.authMethod === "later" ? "prepared" : "connected",
+        title: snowForm.authMethod === "later"
+          ? "ServiceNow-Verbindung vorbereitet"
+          : "ServiceNow wurde verbunden.",
+        summary: "Die gewünschten Synchronisationsziele wurden gespeichert.",
+        stats: selectedGoals.map((g) => ({
+          label: WIZARD_GOALS.servicenow.find((x) => x.id === g)?.label ?? g,
+          value: "geplant",
+        })),
+        nextSteps: [
+          "Authentifizierung mit IT-Administrator abschließen",
+          "Erste Incident-Synchronisation testen",
+          "GRC Controls schrittweise aktivieren",
+        ],
+      });
+      setWizardStep(4);
     });
 
-    if (!data?.connection) return;
-    onConnectionCreated(data.connection);
-
-    setResult({
-      kind: snowForm.authMethod === "later" ? "prepared" : "connected",
-      title: snowForm.authMethod === "later"
-        ? "ServiceNow-Verbindung vorbereitet"
-        : "ServiceNow wurde verbunden.",
-      summary: "Die gewünschten Synchronisationsziele wurden gespeichert.",
-      stats: selectedGoals.map((g) => ({
-        label: WIZARD_GOALS.servicenow.find((x) => x.id === g)?.label ?? g,
-        value: "geplant",
-      })),
-      nextSteps: [
-        "Authentifizierung mit IT-Administrator abschließen",
-        "Erste Incident-Synchronisation testen",
-        "GRC Controls schrittweise aktivieren",
-      ],
-    });
-    setWizardStep(4);
+    if (!data) return;
   }
 
   async function previewCsv() {
@@ -1113,6 +1191,24 @@ export function IntegrationWizard({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {duplicateDialog && (
+        <DuplicateConnectionDialog
+          payload={duplicateDialog}
+          onOpenExisting={() => {
+            const id = duplicateDialog.existingConnection?.id;
+            setDuplicateDialog(null);
+            if (id) onOpenConnection(id);
+          }}
+          onEditExisting={() => {
+            const id = duplicateDialog.existingConnection?.id;
+            setDuplicateDialog(null);
+            if (id) onEditConnection(id);
+          }}
+          onUseNewName={retryWithConnectionName}
+          onClose={() => setDuplicateDialog(null)}
+        />
       )}
     </div>
   );
