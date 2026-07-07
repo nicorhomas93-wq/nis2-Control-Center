@@ -1,16 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { IntegrationWizard } from "@/components/integrations/IntegrationWizard";
 import type { CsvImportType } from "@/lib/integrations/types";
 
 const TABS = [
   "Übersicht",
   "Verbundene Systeme",
-  "Neue Integration",
+  "Integrationsassistent",
   "Datenzuordnung / Mapping",
   "Synchronisationsläufe",
   "API & Webhooks",
@@ -81,26 +82,6 @@ export function IntegrationsPageClient({
   const [syncRuns, setSyncRuns] = useState(initialSyncRuns);
   const [webhooks, setWebhooks] = useState(initialWebhooks);
 
-  const [connectionForm, setConnectionForm] = useState({
-    providerId: "",
-    name: "",
-    authType: "api_key",
-    baseUrl: "",
-    clientId: "",
-    clientSecret: "",
-    apiKey: "",
-    jiraProjectKey: "",
-    jiraIssueType: "Task",
-    jiraDefaultPriority: "Medium",
-    m365TenantId: "",
-    m365RedirectUri: "",
-    m365SharepointSiteUrl: "",
-    sapSystemName: "",
-    sapOdataEndpoint: "",
-    sapEntitySet: "",
-    sapTestQuery: "",
-  });
-
   const [mappingForm, setMappingForm] = useState({
     connectionId: "",
     sourceObject: "",
@@ -122,11 +103,6 @@ export function IntegrationsPageClient({
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
 
-  const selectedProvider = useMemo(
-    () => providers.find((p) => String(p.id) === connectionForm.providerId) ?? null,
-    [providers, connectionForm.providerId]
-  );
-
   async function callApi(url: string, method: string, body?: unknown) {
     setLoading(true);
     setError(null);
@@ -146,73 +122,6 @@ export function IntegrationsPageClient({
     } finally {
       setLoading(false);
     }
-  }
-
-  async function createConnection() {
-    if (!connectionForm.providerId || !connectionForm.name.trim()) return;
-    const config: Record<string, unknown> = {};
-    if (selectedProvider && String(selectedProvider.key) === "jira") {
-      config.projectKey = connectionForm.jiraProjectKey;
-      config.issueType = connectionForm.jiraIssueType;
-      config.defaultPriority = connectionForm.jiraDefaultPriority;
-      config.statusMapping = {
-        offen: "To Do",
-        in_bearbeitung: "In Progress",
-        erledigt: "Done",
-      };
-    }
-    if (selectedProvider && String(selectedProvider.key) === "microsoft365") {
-      config.tenantId = connectionForm.m365TenantId;
-      config.redirectUri = connectionForm.m365RedirectUri;
-      config.sharepointSiteUrl = connectionForm.m365SharepointSiteUrl;
-      config.permissions = [
-        "User.Read.All",
-        "Group.Read.All",
-        "Sites.Read.All",
-        "Mail.Send",
-        "ChannelMessage.Send",
-      ];
-    }
-    if (selectedProvider && String(selectedProvider.key) === "sap") {
-      config.sapSystemName = connectionForm.sapSystemName;
-      config.odataEndpoint = connectionForm.sapOdataEndpoint;
-      config.entitySet = connectionForm.sapEntitySet;
-      config.testQuery = connectionForm.sapTestQuery;
-    }
-
-    const data = await callApi("/api/integrations/connections", "POST", {
-      tenantId,
-      providerId: connectionForm.providerId,
-      name: connectionForm.name,
-      authType: connectionForm.authType,
-      baseUrl: connectionForm.baseUrl,
-      clientId: connectionForm.clientId,
-      clientSecret: connectionForm.clientSecret,
-      apiKey: connectionForm.apiKey,
-      config,
-    });
-    if (!data?.connection) return;
-    setConnections([data.connection, ...connections]);
-    setConnectionForm({
-      providerId: "",
-      name: "",
-      authType: "api_key",
-      baseUrl: "",
-      clientId: "",
-      clientSecret: "",
-      apiKey: "",
-      jiraProjectKey: "",
-      jiraIssueType: "Task",
-      jiraDefaultPriority: "Medium",
-      m365TenantId: "",
-      m365RedirectUri: "",
-      m365SharepointSiteUrl: "",
-      sapSystemName: "",
-      sapOdataEndpoint: "",
-      sapEntitySet: "",
-      sapTestQuery: "",
-    });
-    setActiveTab("Verbundene Systeme");
   }
 
   async function createWebhook() {
@@ -334,7 +243,7 @@ export function IntegrationsPageClient({
                 <p className="text-slate-600">{String(provider.description ?? "")}</p>
                 <p className="text-xs text-slate-500">{String(provider.category)}</p>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => setActiveTab("Neue Integration")}>Verbinden</Button>
+                  <Button size="sm" onClick={() => setActiveTab("Integrationsassistent")}>Verbinden</Button>
                   <Button size="sm" variant="outline" onClick={() => setActiveTab("Datenzuordnung / Mapping")}>
                     Konfigurieren
                   </Button>
@@ -384,123 +293,16 @@ export function IntegrationsPageClient({
         </Card>
       )}
 
-      {activeTab === "Neue Integration" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Neue Integration anlegen</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
-            <label className="text-sm">
-              Provider
-              <select
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
-                value={connectionForm.providerId}
-                onChange={(e) => setConnectionForm({ ...connectionForm, providerId: e.target.value })}
-              >
-                <option value="">Bitte wählen</option>
-                {providers.map((p) => (
-                  <option key={String(p.id)} value={String(p.id)}>
-                    {String(p.name)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm">
-              Verbindungsname
-              <input
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
-                value={connectionForm.name}
-                onChange={(e) => setConnectionForm({ ...connectionForm, name: e.target.value })}
-                placeholder="z. B. Jira Produktion"
-              />
-            </label>
-            <label className="text-sm">
-              Auth-Typ
-              <select
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
-                value={connectionForm.authType}
-                onChange={(e) => setConnectionForm({ ...connectionForm, authType: e.target.value })}
-              >
-                <option value="api_key">API Key</option>
-                <option value="basic_auth">Basic Auth</option>
-                <option value="oauth2">OAuth2</option>
-                <option value="bearer_token">Bearer Token</option>
-                <option value="webhook_secret">Webhook Secret</option>
-                <option value="file_import">Dateiimport</option>
-              </select>
-            </label>
-            <label className="text-sm">
-              Base URL
-              <input
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
-                value={connectionForm.baseUrl}
-                onChange={(e) => setConnectionForm({ ...connectionForm, baseUrl: e.target.value })}
-              />
-            </label>
-            <label className="text-sm">
-              Client ID / API User
-              <input
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
-                value={connectionForm.clientId}
-                onChange={(e) => setConnectionForm({ ...connectionForm, clientId: e.target.value })}
-              />
-            </label>
-            <label className="text-sm">
-              Secret / Token (wird maskiert)
-              <input
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
-                type="password"
-                value={connectionForm.clientSecret}
-                onChange={(e) => setConnectionForm({ ...connectionForm, clientSecret: e.target.value })}
-              />
-            </label>
-
-            {selectedProvider && String(selectedProvider.key) === "jira" && (
-              <>
-                <label className="text-sm">
-                  Jira Projekt-Key
-                  <input className="mt-1 w-full rounded border border-slate-300 px-3 py-2" value={connectionForm.jiraProjectKey} onChange={(e) => setConnectionForm({ ...connectionForm, jiraProjectKey: e.target.value })} />
-                </label>
-                <label className="text-sm">
-                  Issue Type
-                  <input className="mt-1 w-full rounded border border-slate-300 px-3 py-2" value={connectionForm.jiraIssueType} onChange={(e) => setConnectionForm({ ...connectionForm, jiraIssueType: e.target.value })} />
-                </label>
-              </>
-            )}
-
-            {selectedProvider && String(selectedProvider.key) === "microsoft365" && (
-              <>
-                <label className="text-sm">
-                  Tenant ID
-                  <input className="mt-1 w-full rounded border border-slate-300 px-3 py-2" value={connectionForm.m365TenantId} onChange={(e) => setConnectionForm({ ...connectionForm, m365TenantId: e.target.value })} />
-                </label>
-                <label className="text-sm">
-                  SharePoint Site URL
-                  <input className="mt-1 w-full rounded border border-slate-300 px-3 py-2" value={connectionForm.m365SharepointSiteUrl} onChange={(e) => setConnectionForm({ ...connectionForm, m365SharepointSiteUrl: e.target.value })} />
-                </label>
-              </>
-            )}
-
-            {selectedProvider && String(selectedProvider.key) === "sap" && (
-              <>
-                <label className="text-sm">
-                  SAP System Name
-                  <input className="mt-1 w-full rounded border border-slate-300 px-3 py-2" value={connectionForm.sapSystemName} onChange={(e) => setConnectionForm({ ...connectionForm, sapSystemName: e.target.value })} />
-                </label>
-                <label className="text-sm">
-                  OData Endpoint
-                  <input className="mt-1 w-full rounded border border-slate-300 px-3 py-2" value={connectionForm.sapOdataEndpoint} onChange={(e) => setConnectionForm({ ...connectionForm, sapOdataEndpoint: e.target.value })} />
-                </label>
-              </>
-            )}
-
-            <div className="md:col-span-2">
-              <Button onClick={createConnection} disabled={loading || !connectionForm.providerId || !connectionForm.name.trim()}>
-                Verbindung speichern
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {activeTab === "Integrationsassistent" && (
+        <IntegrationWizard
+          tenantId={tenantId}
+          providers={providers}
+          onConnectionCreated={(connection) => setConnections([connection, ...connections])}
+          onSyncRunCreated={(run) => setSyncRuns([run, ...syncRuns])}
+          onError={setError}
+          onOpenDeveloperTab={() => setActiveTab("API & Webhooks")}
+          onNavigateToConnections={() => setActiveTab("Verbundene Systeme")}
+        />
       )}
 
       {activeTab === "Datenzuordnung / Mapping" && (
