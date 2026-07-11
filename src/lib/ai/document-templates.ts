@@ -1,5 +1,6 @@
 import type { Company } from "@/lib/types";
 import { getNis2StatusLabel } from "@/lib/nis2/betroffenheit";
+import { formatCriticalityContextBlock } from "@/lib/nis2/criticality-assessment";
 import { formatCurrency } from "@/lib/utils";
 
 export const NIS2_COMPLIANCE_REFERENCE =
@@ -67,6 +68,7 @@ IT-Dienstleister vorhanden: ${company.has_it_service_provider ? "Ja" : "Nein"}
 Ansprechpartner Informationssicherheit: ${contact}
 NIS2-Status: ${getNis2StatusLabel(company.nis2_status)}
 Compliance-Score: ${company.compliance_score}%
+${formatCriticalityContextBlock(company)}
 `.trim();
 }
 

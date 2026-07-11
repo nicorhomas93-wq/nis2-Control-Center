@@ -44,6 +44,15 @@ export default async function CompanyPage() {
             publicly_accessible_systems: company.publicly_accessible_systems,
             security_contact_name: company.security_contact_name ?? "",
             security_contact_email: company.security_contact_email ?? "",
+            business_criticality_types: Array.isArray(company.business_criticality_types)
+              ? company.business_criticality_types
+              : [],
+            processed_data_types: Array.isArray(company.processed_data_types)
+              ? company.processed_data_types
+              : [],
+            infrastructure_types: Array.isArray(company.infrastructure_types)
+              ? company.infrastructure_types
+              : [],
           }}
         />
       )}

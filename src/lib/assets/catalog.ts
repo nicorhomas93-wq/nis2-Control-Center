@@ -1,6 +1,7 @@
 import type { Company } from "@/lib/types";
 import type { AssetCategory, AssetCriticality } from "@/lib/assets/types";
 import { DEFAULT_COMPANY_RISK_ASSET_NAME } from "@/lib/assets/types";
+import { parseCriticalityArrays } from "@/lib/nis2/criticality-assessment";
 
 export interface AssetCatalogEntry {
   name: string;
@@ -96,6 +97,44 @@ export function buildSuggestedAssets(company: Company): AssetCatalogEntry[] {
       name: "Öffentlich erreichbare Webanwendungen",
       category: "it_systems",
       description: "Nach außen erreichbare Systeme und Schnittstellen",
+      criticality: "high",
+    });
+  }
+
+  const criticality = parseCriticalityArrays(company);
+
+  if (criticality.processed_data_types.includes("financial_data")) {
+    entries.push({
+      name: "Finanzdaten",
+      category: "data",
+      description: "Buchhaltungs-, Zahlungs- und Finanzinformationen",
+      criticality: "high",
+    });
+  }
+
+  if (criticality.processed_data_types.includes("health_data")) {
+    entries.push({
+      name: "Gesundheitsdaten",
+      category: "data",
+      description: "Besonders schützenswerte personenbezogene Daten",
+      criticality: "high",
+    });
+  }
+
+  if (criticality.infrastructure_types.includes("critical_networks")) {
+    entries.push({
+      name: "Kritische Netzwerke",
+      category: "it_systems",
+      description: "Segmente mit erhöhtem Schutzbedarf",
+      criticality: "high",
+    });
+  }
+
+  if (criticality.infrastructure_types.includes("vpn")) {
+    entries.push({
+      name: "VPN-Zugänge",
+      category: "it_systems",
+      description: "Fernzugriff und sichere Verbindungen",
       criticality: "high",
     });
   }

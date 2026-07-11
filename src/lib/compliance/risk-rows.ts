@@ -1,5 +1,9 @@
 import type { Company, RiskLevel } from "@/lib/types";
 import { isPlaceholderValue } from "@/lib/compliance/risk-display";
+import {
+  getCompanyCriticalityScores,
+  parseCriticalityArrays,
+} from "@/lib/nis2/criticality-assessment";
 
 export interface RiskTemplate {
   asset: string;
@@ -126,7 +130,69 @@ export function buildRiskTemplates(company: Company): RiskTemplate[] {
     });
   }
 
-  return templates.slice(0, 6);
+  const criticality = parseCriticalityArrays(company);
+  const scores = getCompanyCriticalityScores(company);
+
+  if (criticality.processed_data_types.includes("health_data")) {
+    templates.push({
+      asset: "Gesundheitsdaten",
+      threat: "Unbefugter Zugriff auf besonders schützenswerte Daten",
+      vulnerability: "Fehlende TOMs für besondere Kategorien personenbezogener Daten",
+      risk_level: "high",
+      measure: "Verarbeitung von Gesundheitsdaten dokumentieren und Schutzmaßnahmen prüfen",
+      business_impact: "Verletzungen können zu hohen Bußgeldern und Reputationsschäden führen.",
+      is_mandatory: true,
+      deadline_days: 30,
+      criticality: "critical",
+    });
+  }
+
+  if (criticality.processed_data_types.includes("trade_secrets")) {
+    templates.push({
+      asset: "Betriebsgeheimnisse",
+      threat: "Wirtschaftsspionage oder Datenabfluss",
+      vulnerability: "Zugriff nicht nach Need-to-know eingeschränkt",
+      risk_level: "high",
+      measure: "Zugriffskontrollen und Geheimhaltungsregelungen für kritische Informationen prüfen",
+      business_impact: "Verlust von Betriebsgeheimnissen gefährdet Wettbewerbsvorteile.",
+      is_mandatory: true,
+      deadline_days: 45,
+      criticality: "critical",
+    });
+  }
+
+  if (criticality.infrastructure_types.includes("internet_exposed")) {
+    templates.push({
+      asset: "Internet-exponierte Systeme",
+      threat: "Angriffe aus dem Internet",
+      vulnerability: "Fehlende Härtung und Überwachung externer Dienste",
+      risk_level: "high",
+      measure: "Exponierte Systeme inventarisieren und Absicherung dokumentieren",
+      business_impact: "Direkt erreichbare Systeme sind häufiges Ziel automatisierter Angriffe.",
+      is_mandatory: true,
+      deadline_days: 30,
+      criticality: "critical",
+    });
+  }
+
+  if (
+    criticality.business_criticality_types.includes("time_critical") ||
+    criticality.business_criticality_types.includes("high_critical")
+  ) {
+    templates.push({
+      asset: "Geschäftskritische Prozesse",
+      threat: "Betriebsunterbrechung bei Ausfall kritischer Abläufe",
+      vulnerability: "Notfall- und Wiederanlaufplan nicht dokumentiert",
+      risk_level: "high",
+      measure: "Business-Continuity-Plan für kritische Prozesse erstellen oder aktualisieren",
+      business_impact: "Ausfälle können unmittelbar Umsatz und Lieferfähigkeit beeinträchtigen.",
+      is_mandatory: true,
+      deadline_days: 45,
+      criticality: scores.level === "kritisch" ? "critical" : "high",
+    });
+  }
+
+  return templates.slice(0, 8);
 }
 
 export function templateToRiskRow(

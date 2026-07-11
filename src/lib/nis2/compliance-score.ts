@@ -1,4 +1,5 @@
 import type { Document, Measure, Company } from "@/lib/types";
+import { getCompanyCriticalityScores } from "@/lib/nis2/criticality-assessment";
 
 export function calculateComplianceScore(
   company: Company | null,
@@ -18,7 +19,14 @@ export function calculateComplianceScore(
     company.critical_business_processes,
   ];
   const filled = profileFields.filter(Boolean).length;
-  score += Math.round((filled / profileFields.length) * weights.profile);
+  let profileScore = Math.round((filled / profileFields.length) * weights.profile);
+
+  const criticality = getCompanyCriticalityScores(company);
+  if (criticality.level !== "unbekannt") {
+    profileScore = Math.min(weights.profile, profileScore + 5);
+  }
+
+  score += profileScore;
 
   if (company.nis2_status && company.nis2_status !== "unbekannt") {
     score += weights.assessment;

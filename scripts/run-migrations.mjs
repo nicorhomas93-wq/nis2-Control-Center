@@ -77,6 +77,7 @@ const ORDER = [
   "add_jarvis_lead_research_scrapers.sql",
   "add_jarvis_lead_research_qualification.sql",
   "add_integrations_module.sql",
+  "add_company_criticality_assessment.sql",
 ];
 
 const url = process.env.DATABASE_URL;

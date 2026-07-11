@@ -82,6 +82,14 @@ export interface Company {
   publicly_accessible_systems: boolean;
   security_contact_name: string | null;
   security_contact_email: string | null;
+  business_criticality_types?: string[];
+  processed_data_types?: string[];
+  infrastructure_types?: string[];
+  business_criticality_score?: number;
+  data_criticality_score?: number;
+  infrastructure_criticality_score?: number;
+  criticality_score?: number;
+  criticality_level?: string;
   nis2_status: Nis2Status;
   compliance_score: number;
   plan?: string | null;
@@ -130,6 +138,9 @@ export interface CompanyFormData {
   publicly_accessible_systems: boolean;
   security_contact_name: string;
   security_contact_email: string;
+  business_criticality_types: string[];
+  processed_data_types: string[];
+  infrastructure_types: string[];
 }
 
 export interface Nis2Assessment {

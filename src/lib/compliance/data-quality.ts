@@ -103,6 +103,28 @@ export function calculateDataQuality(input: {
     });
   }
 
+  if (!input.company?.criticality_level || input.company.criticality_level === "unbekannt") {
+    checks.push({
+      checkKey: "criticality_assessment",
+      status: "missing",
+      qualityLevel: "medium",
+      reason: "Kritikalitätsbewertung noch nicht durchgeführt",
+      relatedType: "company",
+    });
+    hints.push("Ergänzen Sie die Kritikalitätsbewertung im Unternehmensprofil für präziseres Risiko-Scoring.");
+  } else {
+    checks.push({
+      checkKey: "criticality_assessment",
+      status: "confirmed",
+      qualityLevel:
+        input.company.criticality_level === "kritisch" || input.company.criticality_level === "hoch"
+          ? "critical"
+          : "high",
+      reason: `Kritikalitätsbewertung: ${input.company.criticality_level}`,
+      relatedType: "company",
+    });
+  }
+
   let unconfirmedRisks = 0;
   let contradictory = 0;
   for (const risk of input.risks) {

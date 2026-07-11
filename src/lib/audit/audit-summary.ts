@@ -1,5 +1,6 @@
 import type { Company, Document, Measure, Risk, Nis2Status } from "@/lib/types";
 import { getNis2StatusLabel } from "@/lib/nis2/betroffenheit";
+import { getCriticalityLevelLabel, type CriticalityLevel } from "@/lib/nis2/criticality-assessment";
 import { getDocumentTypeLabel } from "@/lib/nis2/document-types";
 import { formatDate } from "@/lib/utils";
 import {
@@ -50,6 +51,8 @@ export interface AuditSummaryReportData {
   nis2ScopeNotice: string;
   securityScore: number;
   complianceScore: number;
+  criticalityLevel: string;
+  criticalityScore: number;
   auditReadinessPercent: number;
   dataQualityPercent: number;
   auditFolderPercent: number;
@@ -157,6 +160,10 @@ export function buildAuditSummaryReportData({
     nis2ScopeNotice: getNis2ScopeNotice(company),
     securityScore: securityScore ?? company.security_score ?? 0,
     complianceScore: company.compliance_score ?? 0,
+    criticalityLevel: getCriticalityLevelLabel(
+      (company.criticality_level as CriticalityLevel) ?? "unbekannt"
+    ),
+    criticalityScore: company.criticality_score ?? 0,
     auditReadinessPercent: auditReadinessPercent ?? 0,
     dataQualityPercent: dataQualityPercent ?? 0,
     auditFolderPercent: score.percent,
@@ -192,6 +199,7 @@ export function buildStructuredAuditSummary(params: BuildAuditSummaryParams): st
     `Audit-Vorbereitungsstand: ${score.percent}% (${score.complete} vollständig, ${score.incomplete} unvollständig, ${score.missing} fehlend)`,
     `NIS2-Status: ${data.nis2Status}`,
     `Compliance-Score: ${data.complianceScore}%`,
+    `Kritikalitätsbewertung: ${data.criticalityLevel} (${data.criticalityScore} Punkte)`,
     "",
     "KENNZAHLEN",
     "----------",

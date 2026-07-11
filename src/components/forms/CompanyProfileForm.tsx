@@ -11,6 +11,13 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { CriticalityAssessmentCard } from "@/components/forms/CriticalityAssessmentCard";
+import { calculateCriticalityScores } from "@/lib/nis2/criticality-assessment";
+import type {
+  BusinessCriticalityType,
+  InfrastructureType,
+  ProcessedDataType,
+} from "@/lib/nis2/criticality-assessment";
 import { DB_SETUP_HINT } from "@/lib/supabase/db-error";
 
 const INDUSTRIES = [
@@ -25,6 +32,7 @@ const defaultForm: CompanyFormData = {
   uses_microsoft_365: false, uses_cloud_services: false, critical_business_processes: "",
   has_it_service_provider: false, publicly_accessible_systems: false,
   security_contact_name: "", security_contact_email: "",
+  business_criticality_types: [], processed_data_types: [], infrastructure_types: [],
 };
 
 interface CompanyProfileFormProps {
@@ -48,6 +56,12 @@ export function CompanyProfileForm({ initialData, companyId }: CompanyProfileFor
     setMessage(null);
 
     const supabase = createClient();
+    const criticality = calculateCriticalityScores({
+      business_criticality_types: form.business_criticality_types as BusinessCriticalityType[],
+      processed_data_types: form.processed_data_types as ProcessedDataType[],
+      infrastructure_types: form.infrastructure_types as InfrastructureType[],
+    });
+
     const { error } = await supabase.from("companies").update({
       company_name: form.company_name,
       industry: form.industry,
@@ -63,6 +77,14 @@ export function CompanyProfileForm({ initialData, companyId }: CompanyProfileFor
       publicly_accessible_systems: form.publicly_accessible_systems,
       security_contact_name: form.security_contact_name,
       security_contact_email: form.security_contact_email,
+      business_criticality_types: form.business_criticality_types,
+      processed_data_types: form.processed_data_types,
+      infrastructure_types: form.infrastructure_types,
+      business_criticality_score: criticality.business,
+      data_criticality_score: criticality.data,
+      infrastructure_criticality_score: criticality.infrastructure,
+      criticality_score: criticality.total,
+      criticality_level: criticality.level,
     }).eq("id", companyId);
 
     if (error) {
@@ -140,6 +162,15 @@ export function CompanyProfileForm({ initialData, companyId }: CompanyProfileFor
           </div>
         </CardContent>
       </Card>
+
+      <CriticalityAssessmentCard
+        businessTypes={form.business_criticality_types as BusinessCriticalityType[]}
+        dataTypes={form.processed_data_types as ProcessedDataType[]}
+        infrastructureTypes={form.infrastructure_types as InfrastructureType[]}
+        onBusinessChange={(types) => updateField("business_criticality_types", types)}
+        onDataChange={(types) => updateField("processed_data_types", types)}
+        onInfrastructureChange={(types) => updateField("infrastructure_types", types)}
+      />
 
       <Card>
         <CardHeader>

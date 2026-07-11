@@ -1,4 +1,9 @@
 import type { AssessmentResult, Company, Nis2Status } from "@/lib/types";
+import {
+  criticalityBoostForNis2Score,
+  hasHighCriticalityIndicators,
+  parseCriticalityArrays,
+} from "@/lib/nis2/criticality-assessment";
 
 const ANNEX_I_INDUSTRIES = [
   "energie", "transport", "bankwesen", "finanzmarkt", "gesundheit",
@@ -45,11 +50,16 @@ export function assessNis2(company: Company): AssessmentResult {
     company.publicly_accessible_systems ||
     company.has_it_service_provider;
 
+  const criticality = parseCriticalityArrays(company);
+  const hasCriticalProcesses = criticality.business_criticality_types.length > 0;
+  const highCriticality = hasHighCriticalityIndicators(company);
+  const scoreBoost = criticalityBoostForNis2Score(company);
+
   if (sectorRelevant && large) {
     return {
       status: "wahrscheinlich_besonders_wichtige_einrichtung",
-      reasoning: `Das Unternehmen ist in einem NIS2-regulierten Sektor (${company.industry}) tätig und erfüllt die Schwellenwerte einer großen Unternehmung.`,
-      score: 85,
+      reasoning: `Das Unternehmen ist in einem NIS2-regulierten Sektor (${company.industry}) tätig und erfüllt die Schwellenwerte einer großen Unternehmung.${highCriticality ? " Die Kritikalitätsbewertung bestätigt einen erhöhten Schutzbedarf." : ""}`,
+      score: Math.min(85 + scoreBoost, 100),
       nextSteps: [
         "Registrierung bei der zuständigen Behörde prüfen",
         "Umfassendes ISMS nach NIS2 aufbauen",
@@ -62,8 +72,8 @@ export function assessNis2(company: Company): AssessmentResult {
   if (sectorRelevant && medium) {
     return {
       status: "wahrscheinlich_wichtige_einrichtung",
-      reasoning: `Das Unternehmen ist in einem regulierten Sektor (${company.industry}) tätig und erfüllt die Größenschwellenwerte.`,
-      score: 70,
+      reasoning: `Das Unternehmen ist in einem regulierten Sektor (${company.industry}) tätig und erfüllt die Größenschwellenwerte.${highCriticality ? " Die dokumentierte Kritikalität unterstützt eine erhöhte Betroffenheit." : ""}`,
+      score: Math.min(70 + scoreBoost, 95),
       nextSteps: [
         "NIS2-Pflichten für wichtige Einrichtungen umsetzen",
         "Risikoanalyse und Maßnahmenplan erstellen",
@@ -75,11 +85,25 @@ export function assessNis2(company: Company): AssessmentResult {
   if (digitalExposure && (medium || company.eu_operations)) {
     return {
       status: "moeglicherweise_betroffen",
-      reasoning: "Digitale Infrastruktur, EU-Tätigkeit oder Größenschwellen sprechen für eine mögliche NIS2-Betroffenheit.",
-      score: 45,
+      reasoning: "Digitale Infrastruktur, EU-Tätigkeit oder Größenschwellen sprechen für eine mögliche NIS2-Betroffenheit." +
+        (hasCriticalProcesses ? " Geschäftskritische Prozesse wurden in der Kritikalitätsbewertung dokumentiert." : ""),
+      score: Math.min(45 + scoreBoost, 75),
       nextSteps: [
         "Rechtliche Einordnung durch Fachberatung prüfen",
         "Vorläufige Risikoanalyse durchführen",
+        "Grundlegende Sicherheitsdokumentation erstellen",
+      ],
+    };
+  }
+
+  if (highCriticality) {
+    return {
+      status: "moeglicherweise_betroffen",
+      reasoning: "Die Kritikalitätsbewertung weist auf geschäftlich oder technisch relevante Abhängigkeiten hin, die eine NIS2-Prüfung nahelegen.",
+      score: Math.min(40 + scoreBoost, 65),
+      nextSteps: [
+        "Rechtliche Einordnung durch Fachberatung prüfen",
+        "Kritikalitätsbewertung in Risikoanalyse übernehmen",
         "Grundlegende Sicherheitsdokumentation erstellen",
       ],
     };
