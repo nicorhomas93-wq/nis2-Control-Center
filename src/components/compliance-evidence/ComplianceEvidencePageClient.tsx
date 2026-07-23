@@ -504,12 +504,12 @@ export function ComplianceEvidencePageClient({
             key={section.id}
             type="button"
             onClick={() => navigateSection(section.id)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 active:scale-95 ${
               activeSection === section.id ||
               (section.id === "detail" && detailTab === "detail" && selected) ||
               (section.id === "files" && detailTab === "files" && selected)
-                ? "bg-brand-600 text-white"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                ? "bg-brand-600 text-white shadow-sm shadow-brand-500/30"
+                : "bg-slate-100 text-slate-700 hover:-translate-y-0.5 hover:bg-slate-200"
             }`}
           >
             {section.label}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { cn } from "@/lib/utils";
 import { ConnectedSystemCard } from "@/components/integrations/ConnectedSystemCard";
 import { IntegrationWizard } from "@/components/integrations/IntegrationWizard";
 import { DuplicateConnectionDialog } from "@/components/integrations/DuplicateConnectionDialog";
@@ -57,6 +58,13 @@ function statusBadge(status: string, displayStatus?: ConnectionDisplayStatus) {
   if (status === "partial") return "bg-amber-100 text-amber-800";
   if (status === "prepared") return "bg-slate-100 text-slate-700";
   return "bg-slate-100 text-slate-700";
+}
+
+function statusAccentClass(status: string) {
+  if (status === "active" || status === "success") return "border-t-emerald-400 hover:shadow-emerald-500/15";
+  if (status === "error" || status === "failed") return "border-t-red-400 hover:shadow-red-500/15";
+  if (status === "partial") return "border-t-amber-400 hover:shadow-amber-500/15";
+  return "border-t-brand-300 hover:shadow-brand-500/10";
 }
 
 interface PreviewResponse {
@@ -388,7 +396,7 @@ export function IntegrationsPageClient({
           <button
             key={tab}
             type="button"
-            className={`rounded-lg px-3 py-1.5 text-sm ${activeTab === tab ? "bg-brand-100 text-brand-800" : "bg-white text-slate-600 hover:bg-slate-100"}`}
+            className={`rounded-lg px-3 py-1.5 text-sm transition-all duration-200 active:scale-95 ${activeTab === tab ? "bg-brand-100 text-brand-800 shadow-sm" : "bg-white text-slate-600 hover:-translate-y-0.5 hover:bg-slate-100"}`}
             onClick={() => setActiveTab(tab)}
           >
             {tab}
@@ -399,7 +407,11 @@ export function IntegrationsPageClient({
       {activeTab === "Übersicht" && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {providers.map((provider) => (
-            <Card key={String(provider.id)}>
+            <Card
+              key={String(provider.id)}
+              interactive
+              className={cn("border-t-2", statusAccentClass(String(provider.status)))}
+            >
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle>{String(provider.name)}</CardTitle>

@@ -96,10 +96,10 @@ export function DemoPageClient() {
           <button
             key={id}
             onClick={() => setActiveTab(id)}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 active:scale-95 ${
               activeTab === id
-                ? "bg-brand-600 text-white"
-                : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                ? "bg-brand-600 text-white shadow-sm shadow-brand-500/30"
+                : "bg-white text-slate-600 hover:-translate-y-0.5 hover:bg-slate-50 border border-slate-200"
             }`}
           >
             <Icon className="h-4 w-4" />

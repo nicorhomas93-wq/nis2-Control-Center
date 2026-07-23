@@ -164,10 +164,10 @@ export function TasksClient({ companyId, initialTaskId }: TasksClientProps) {
               type="button"
               onClick={() => setFilter(f.key)}
               className={cn(
-                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                "rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 active:scale-95",
                 filter === f.key
-                  ? "bg-brand-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "bg-brand-600 text-white shadow-sm shadow-brand-500/30"
+                  : "bg-slate-100 text-slate-600 hover:-translate-y-0.5 hover:bg-slate-200"
               )}
             >
               {f.label}

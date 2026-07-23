@@ -113,10 +113,10 @@ export function QuestionnaireClient({ companyId }: QuestionnaireClientProps) {
               type="button"
               onClick={() => void switchArea(q.areaKey)}
               className={cn(
-                "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-all duration-200 active:scale-[0.98]",
                 activeArea === q.areaKey
-                  ? "bg-brand-600 text-white"
-                  : "text-slate-700 hover:bg-slate-100"
+                  ? "bg-brand-600 text-white shadow-sm shadow-brand-500/30"
+                  : "text-slate-700 hover:translate-x-0.5 hover:bg-slate-100"
               )}
             >
               <span>{q.title}</span>
