@@ -144,7 +144,7 @@ function SidebarPanel({
               }
               className={cn(
                 "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                active ? "text-white" : "text-slate-300 hover:translate-x-0.5 hover:bg-slate-800 hover:text-white"
+                active ? "text-white" : "text-slate-300 hover:translate-x-1 hover:bg-slate-800 hover:text-white"
               )}
             >
               {active && (

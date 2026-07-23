@@ -10,13 +10,13 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "primary", size = "md", ...props }, ref) => {
     const variants = {
       primary:
-        "bg-gradient-to-b from-brand-500 to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 shadow-sm hover:shadow-glow-brand hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm disabled:bg-brand-300 disabled:from-brand-300 disabled:to-brand-300 disabled:shadow-none disabled:translate-y-0",
+        "bg-gradient-to-b from-brand-500 to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 shadow-sm hover:shadow-glow-brand hover:-translate-y-1 active:translate-y-0 active:shadow-sm disabled:bg-brand-300 disabled:from-brand-300 disabled:to-brand-300 disabled:shadow-none disabled:translate-y-0",
       secondary:
-        "bg-slate-800 text-white hover:bg-slate-900 shadow-sm hover:shadow-lg hover:shadow-slate-900/20 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm disabled:bg-slate-400 disabled:shadow-none disabled:translate-y-0",
+        "bg-slate-800 text-white hover:bg-slate-900 shadow-sm hover:shadow-lg hover:shadow-slate-900/20 hover:-translate-y-1 active:translate-y-0 active:shadow-sm disabled:bg-slate-400 disabled:shadow-none disabled:translate-y-0",
       outline:
         "border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50",
       ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-      danger: "bg-red-600 text-white hover:bg-red-700 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
+      danger: "bg-red-600 text-white hover:bg-red-700 shadow-sm hover:shadow-md hover:-translate-y-1 active:translate-y-0",
     };
 
     const sizes = {

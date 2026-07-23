@@ -13,7 +13,7 @@ export function Card({ children, className, interactive = false, style }: CardPr
       style={style}
       className={cn(
         "rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow duration-200",
-        interactive && "hover:-translate-y-0.5 hover:shadow-md transition-[box-shadow,transform]",
+        interactive && "hover:-translate-y-1 hover:shadow-lg transition-[box-shadow,transform] duration-300",
         className
       )}
     >

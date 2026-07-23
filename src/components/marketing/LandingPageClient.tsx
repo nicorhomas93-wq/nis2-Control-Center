@@ -19,6 +19,7 @@ import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { SecurityNet } from "@/components/marketing/SecurityNet";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { CountUp } from "@/components/ui/CountUp";
 import { Reveal } from "@/components/ui/Reveal";
 import { trackCtaClick } from "@/lib/acquisition/client";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,8 @@ const problemItems = [
 const triggerStats = [
   {
     value: "72h",
+    countTo: 72,
+    suffix: "h",
     label: "Meldefrist bei erheblichen Sicherheitsvorfällen",
     color: "animate-signal",
     glow: true,
@@ -295,7 +298,9 @@ export function LandingPageClient() {
                     stat.glow && "shadow-lg shadow-red-500/20"
                   )}
                 >
-                  <p className={`text-3xl font-bold tabular-nums ${stat.color}`}>{stat.value}</p>
+                  <p className={`text-3xl font-bold tabular-nums ${stat.color}`}>
+                    {stat.countTo ? <CountUp to={stat.countTo} suffix={stat.suffix} /> : stat.value}
+                  </p>
                   <p className="mt-2 text-sm text-slate-400">{stat.label}</p>
                 </div>
               </Reveal>
