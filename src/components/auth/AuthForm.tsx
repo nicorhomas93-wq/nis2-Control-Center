@@ -6,7 +6,7 @@ import { Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { loginAccount, registerAccount, type AuthNotice } from "@/lib/auth/register";
 import { formatAuthError, resolveNoticeMessage } from "@/lib/auth/errors";
-import { Button } from "@/components/ui/Button";
+import { AuthGlowButton } from "@/components/auth/AuthGlowButton";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -296,13 +296,13 @@ export function AuthForm({ mode, redirectTo, invitedEmail }: AuthFormProps) {
                 </div>
               ) : null}
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              <AuthGlowButton loading={loading} disabled={loading}>
                 {loading
                   ? "Wird verarbeitet..."
                   : mode === "login"
                     ? "Anmelden"
                     : "Registrieren"}
-              </Button>
+              </AuthGlowButton>
 
               {mode === "login" ? (
                 <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">

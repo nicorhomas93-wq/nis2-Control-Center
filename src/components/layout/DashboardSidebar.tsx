@@ -167,10 +167,18 @@ function SidebarPanel({
                   />
                 </>
               )}
-              <Icon
-                className={cn("h-4 w-4 shrink-0 transition-colors duration-200", !active && "text-slate-400 group-hover:text-white")}
-                style={active ? { color: tone.hex } : undefined}
-              />
+              <span
+                className={cn(
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
+                  active ? "scale-110" : "scale-100"
+                )}
+                style={active ? { backgroundColor: hexToRgba(tone.hex, 0.18) } : undefined}
+              >
+                <Icon
+                  className={cn("h-4 w-4 shrink-0 transition-colors duration-200", !active && "text-slate-400 group-hover:text-white")}
+                  style={active ? { color: tone.hex } : undefined}
+                />
+              </span>
               {label}
             </Link>
           );

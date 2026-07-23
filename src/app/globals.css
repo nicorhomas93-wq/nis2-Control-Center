@@ -34,6 +34,7 @@
   --animate-ring: ring-in 1s ease-out both;
   --animate-signal: signal-color 2.4s ease-in-out 0.5s both;
   --animate-net-pulse: net-pulse 3.5s ease-in-out infinite;
+  --animate-spin-slow: spin-glow 6s linear infinite;
 
   @keyframes fade-in-up {
     from {
@@ -116,6 +117,12 @@
       r: 4;
     }
   }
+
+  @keyframes spin-glow {
+    to {
+      transform: rotate(360deg);
+    }
+  }
 }
 
 body {
@@ -189,6 +196,22 @@ body {
   box-shadow:
     0 8px 24px -8px rgb(37 99 235 / 0.45),
     0 2px 8px -2px rgb(37 99 235 / 0.3);
+}
+
+/* Rotating conic-gradient ring for the login/auth submit button — same
+   "hover expanding glow" idea as the neon reference, restyled in the brand
+   blue/teal palette so it reads as premium rather than gaming/neon. */
+.auth-glow-ring {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 40deg,
+    #60a5fa 40deg 55deg,
+    transparent 55deg 180deg,
+    #2dd4bf 180deg 195deg,
+    transparent 195deg 320deg,
+    #60a5fa 320deg 335deg,
+    transparent 335deg 360deg
+  );
 }
 
 @media (prefers-reduced-motion: reduce) {
