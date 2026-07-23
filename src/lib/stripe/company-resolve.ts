@@ -16,10 +16,16 @@ export async function findCompanyIdByEmail(email: string | null | undefined): Pr
     .maybeSingle();
 
   if (profile?.id) {
+    // A consultant owns one company per mandant plus their own — all under
+    // the same user_id — so this must stay narrowed to their own (non-
+    // mandant) company, or .maybeSingle() silently returns null on the
+    // ambiguity and the payment goes unattributed.
     const { data: company } = await admin
       .from("companies")
       .select("id")
       .eq("user_id", profile.id)
+      .eq("is_mandant", false)
+      .is("deleted_at", null)
       .maybeSingle();
     if (company?.id) return company.id;
   }
@@ -28,6 +34,8 @@ export async function findCompanyIdByEmail(email: string | null | undefined): Pr
     .from("companies")
     .select("id")
     .ilike("billing_email", normalized)
+    .eq("is_mandant", false)
+    .is("deleted_at", null)
     .maybeSingle();
 
   return byBillingEmail?.id ?? null;
