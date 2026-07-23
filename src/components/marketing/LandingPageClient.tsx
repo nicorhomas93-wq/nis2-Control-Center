@@ -144,6 +144,17 @@ const audiences = [
   "Microsoft-365-Nutzer im Mittelstand",
 ];
 
+// Same soft-pastel-per-item language as the app sidebar, so the landing page
+// and the product feel like one design system rather than two.
+const audienceTones = [
+  { tile: "bg-brand-100 text-brand-600", hoverShadow: "hover:shadow-brand-500/15" },
+  { tile: "bg-violet-100 text-violet-600", hoverShadow: "hover:shadow-violet-500/15" },
+  { tile: "bg-teal-100 text-teal-600", hoverShadow: "hover:shadow-teal-500/15" },
+  { tile: "bg-amber-100 text-amber-600", hoverShadow: "hover:shadow-amber-500/15" },
+  { tile: "bg-rose-100 text-rose-600", hoverShadow: "hover:shadow-rose-500/15" },
+  { tile: "bg-slate-200 text-slate-600", hoverShadow: "hover:shadow-slate-500/15" },
+];
+
 function PrimaryCta({ className = "" }: { className?: string }) {
   return (
     <Link href="/check" onClick={() => trackCtaClick("landing_primary")}>
@@ -191,7 +202,7 @@ export function LandingPageClient() {
             NIS2 betrifft mehr Mittelständler als Sie denken
           </div>
           <h1
-            className="animate-fade-in-up mx-auto max-w-3xl text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl md:text-6xl"
+            className="text-gradient-serious animate-fade-in-up mx-auto max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl"
             style={{ animationDelay: "80ms" }}
           >
             Sind Sie NIS2-pflichtig — und können Sie das morgen beweisen?
@@ -246,7 +257,7 @@ export function LandingPageClient() {
           <ul className="mx-auto mt-10 max-w-3xl space-y-5">
             {problemItems.map((item, i) => (
               <Reveal key={item.title} as="li" delay={i * 60}>
-                <Card interactive className="border-l-4 border-l-amber-400 p-5">
+                <Card interactive className="border-l-4 border-l-amber-400 p-5 hover:shadow-amber-500/15">
                   <div className="flex items-start gap-4">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100">
                       <AlertTriangle className="h-5 w-5 text-amber-600" />
@@ -294,8 +305,8 @@ export function LandingPageClient() {
               <Reveal key={stat.value} delay={i * 80}>
                 <div
                   className={cn(
-                    "rounded-xl border border-slate-700 bg-slate-800/80 p-5 backdrop-blur-sm transition-colors duration-200 hover:border-slate-600",
-                    stat.glow && "shadow-lg shadow-red-500/20"
+                    "rounded-xl border border-slate-700/80 bg-slate-800/60 p-5 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-slate-500 hover:bg-slate-800/80",
+                    stat.glow ? "shadow-lg shadow-red-500/20" : "shadow-lg shadow-black/20"
                   )}
                 >
                   <p className={`text-3xl font-bold tabular-nums ${stat.color}`}>
@@ -339,7 +350,7 @@ export function LandingPageClient() {
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {solutionSteps.map((step, i) => (
               <Reveal key={step.title} delay={i * 50}>
-                <Card interactive className="flex h-full gap-3 p-4">
+                <Card interactive className="flex h-full gap-3 p-4 hover:shadow-brand-500/15">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-brand-700 text-sm font-bold text-white shadow-sm">
                     {i + 1}
                   </div>
@@ -370,7 +381,7 @@ export function LandingPageClient() {
           <div className="mt-10 grid gap-6 sm:grid-cols-2">
             {features.map(({ icon: Icon, title, description }, i) => (
               <Reveal key={title} delay={i * 40}>
-                <Card interactive className="h-full p-5">
+                <Card interactive className="h-full p-5 hover:shadow-brand-500/15">
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-sm">
                     <Icon className="h-5 w-5 text-white" />
                   </div>
@@ -397,8 +408,10 @@ export function LandingPageClient() {
           </Reveal>
           <ul className="mx-auto mt-8 max-w-2xl space-y-3">
             {trustPoints.map((item, i) => (
-              <Reveal key={item} as="li" delay={i * 40} className="flex items-start gap-2 text-slate-700">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+              <Reveal key={item} as="li" delay={i * 40} className="flex items-center gap-3 text-slate-700">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                </span>
                 {item}
               </Reveal>
             ))}
@@ -407,25 +420,35 @@ export function LandingPageClient() {
             Geeignet für
           </p>
           <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {audiences.map((item, i) => (
-              <Reveal key={item} as="li" delay={i * 40}>
-                <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 text-slate-700 shadow-sm transition-shadow duration-200 hover:shadow-md">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                  {item}
-                </div>
-              </Reveal>
-            ))}
+            {audiences.map((item, i) => {
+              const tone = audienceTones[i % audienceTones.length];
+              return (
+                <Reveal key={item} as="li" delay={i * 40}>
+                  <div
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg bg-white px-4 py-3 text-slate-700 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
+                      tone.hoverShadow
+                    )}
+                  >
+                    <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", tone.tile)}>
+                      <CheckCircle2 className="h-4 w-4" />
+                    </span>
+                    {item}
+                  </div>
+                </Reveal>
+              );
+            })}
           </ul>
           <SectionCta />
         </div>
       </section>
 
       {/* Final CTA */}
-      <section className="relative overflow-hidden bg-slate-900 py-20 text-white sm:py-24">
-        <div className="bg-mesh-dark pointer-events-none absolute inset-0" aria-hidden />
+      <section className="relative overflow-hidden bg-slate-900 py-24 text-white sm:py-28">
+        <div className="bg-mesh-dark bg-spotlight-dark pointer-events-none absolute inset-0" aria-hidden />
         <div className="relative mx-auto max-w-6xl px-6 text-center">
           <Reveal>
-            <h2 className="text-3xl font-bold">Wissen Sie heute, wo Sie stehen?</h2>
+            <h2 className="text-4xl font-bold sm:text-5xl">Wissen Sie heute, wo Sie stehen?</h2>
             <p className="mx-auto mt-4 max-w-xl text-slate-300">
               Wenn nicht: In 3 Minuten haben Sie Klarheit.
               <br />

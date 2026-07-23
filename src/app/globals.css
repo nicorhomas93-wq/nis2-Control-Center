@@ -144,6 +144,19 @@ body {
     radial-gradient(ellipse 50% 40% at 90% 90%, rgb(37 99 235 / 0.18), transparent);
 }
 
+/* A bigger, centered glow for the closing CTA — the one moment the landing
+   page is allowed to feel like a spotlight rather than an ambient texture */
+.bg-spotlight-dark {
+  background-image: radial-gradient(ellipse 70% 65% at 50% 20%, rgb(59 130 246 / 0.3), transparent 70%);
+}
+
+.text-gradient-serious {
+  background-image: linear-gradient(90deg, #0f172a, #1d4ed8);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
 /* Drifting glow blobs for the hero — slow, ambient, never distracting */
 .bg-blobs::before,
 .bg-blobs::after {

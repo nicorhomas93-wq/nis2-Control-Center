@@ -3,11 +3,11 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/Card";
 
 const tones = {
-  brand: { icon: "bg-brand-50 text-brand-600", ring: "ring-brand-100" },
-  emerald: { icon: "bg-emerald-50 text-emerald-600", ring: "ring-emerald-100" },
-  amber: { icon: "bg-amber-50 text-amber-600", ring: "ring-amber-100" },
-  red: { icon: "bg-red-50 text-red-600", ring: "ring-red-100" },
-  slate: { icon: "bg-slate-100 text-slate-600", ring: "ring-slate-200" },
+  brand: { icon: "bg-brand-50 text-brand-600", ring: "ring-brand-100", glow: "hover:shadow-brand-500/15" },
+  emerald: { icon: "bg-emerald-50 text-emerald-600", ring: "ring-emerald-100", glow: "hover:shadow-emerald-500/15" },
+  amber: { icon: "bg-amber-50 text-amber-600", ring: "ring-amber-100", glow: "hover:shadow-amber-500/15" },
+  red: { icon: "bg-red-50 text-red-600", ring: "ring-red-100", glow: "hover:shadow-red-500/15" },
+  slate: { icon: "bg-slate-100 text-slate-600", ring: "ring-slate-200", glow: "hover:shadow-slate-500/15" },
 } as const;
 
 interface StatCardProps {
@@ -35,7 +35,7 @@ export function StatCard({
   return (
     <Card
       interactive
-      className={cn("animate-fade-in-up p-5", className)}
+      className={cn("animate-fade-in-up p-5", t.glow, className)}
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className={cn("mb-3 flex h-10 w-10 items-center justify-center rounded-lg ring-1", t.icon, t.ring)}>
