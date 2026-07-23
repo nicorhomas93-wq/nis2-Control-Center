@@ -16,13 +16,22 @@ export function MarketingHeader() {
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm text-slate-600 md:flex">
-          <Link href="/demo" className="hover:text-brand-600">
+          <Link
+            href="/demo"
+            className="relative py-1 transition-colors hover:text-brand-600 after:absolute after:bottom-0 after:left-0 after:h-px after:w-0 after:bg-brand-600 after:transition-all after:duration-200 hover:after:w-full"
+          >
             Demo
           </Link>
-          <Link href="/pricing" className="hover:text-brand-600">
+          <Link
+            href="/pricing"
+            className="relative py-1 transition-colors hover:text-brand-600 after:absolute after:bottom-0 after:left-0 after:h-px after:w-0 after:bg-brand-600 after:transition-all after:duration-200 hover:after:w-full"
+          >
             Preise
           </Link>
-          <Link href="/legal" className="hover:text-brand-600">
+          <Link
+            href="/legal"
+            className="relative py-1 transition-colors hover:text-brand-600 after:absolute after:bottom-0 after:left-0 after:h-px after:w-0 after:bg-brand-600 after:transition-all after:duration-200 hover:after:w-full"
+          >
             Rechtliches
           </Link>
         </nav>

@@ -53,6 +53,38 @@ const navItems = [
   { href: "/settings", label: "Einstellungen", icon: Settings },
 ];
 
+// Each nav item gets its own soft pastel identity color when active.
+// "/incidents" is the one deliberate exception to the otherwise subtle glow —
+// a security incident deserves to read as more urgent than the rest.
+const NAV_TONES: Record<string, { hex: string; critical?: boolean }> = {
+  "/dashboard": { hex: "#60a5fa" },
+  "/mandanten": { hex: "#a78bfa" },
+  "/company": { hex: "#818cf8" },
+  "/assessment": { hex: "#2dd4bf" },
+  "/documents": { hex: "#38bdf8" },
+  "/lieferanten": { hex: "#fbbf24" },
+  "/schulungen": { hex: "#f472b6" },
+  "/fragebogen": { hex: "#22d3ee" },
+  "/risks": { hex: "#fb7185" },
+  "/measures": { hex: "#34d399" },
+  "/aufgaben": { hex: "#fb923c" },
+  "/incidents": { hex: "#f87171", critical: true },
+  "/audit": { hex: "#c084fc" },
+  "/integrationen": { hex: "#94a3b8" },
+  "/jarvis": { hex: "#e879f9" },
+  "/owner": { hex: "#94a3b8" },
+  "/settings": { hex: "#94a3b8" },
+};
+const DEFAULT_TONE = { hex: "#60a5fa" };
+
+function hexToRgba(hex: string, alpha: number) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function SidebarPanel({
   onNavigate,
   showClose,
@@ -93,19 +125,52 @@ function SidebarPanel({
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {visibleNavItems.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
+          const tone = NAV_TONES[href] ?? DEFAULT_TONE;
           return (
             <Link
               key={href}
               href={href}
               onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+              style={
                 active
-                  ? "bg-brand-600 text-white"
-                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  ? {
+                      background: `linear-gradient(90deg, ${hexToRgba(tone.hex, 0.22)}, ${hexToRgba(tone.hex, 0.05)})`,
+                      boxShadow: `0 0 ${tone.critical ? 18 : 10}px 0 ${hexToRgba(
+                        tone.hex,
+                        tone.critical ? 0.4 : 0.18
+                      )}`,
+                    }
+                  : undefined
+              }
+              className={cn(
+                "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                active ? "text-white" : "text-slate-300 hover:translate-x-0.5 hover:bg-slate-800 hover:text-white"
               )}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              {active && (
+                <>
+                  <span
+                    aria-hidden
+                    className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full"
+                    style={{ backgroundColor: tone.hex }}
+                  />
+                  <span
+                    aria-hidden
+                    className="absolute right-1 top-1/2 h-4 w-2.5 -translate-y-1/2 [clip-path:polygon(0_0,100%_50%,0_100%)]"
+                    style={{
+                      backgroundColor: tone.hex,
+                      filter: `drop-shadow(0 0 ${tone.critical ? 7 : 4}px ${hexToRgba(
+                        tone.hex,
+                        tone.critical ? 0.85 : 0.6
+                      )})`,
+                    }}
+                  />
+                </>
+              )}
+              <Icon
+                className={cn("h-4 w-4 shrink-0 transition-colors duration-200", !active && "text-slate-400 group-hover:text-white")}
+                style={active ? { color: tone.hex } : undefined}
+              />
               {label}
             </Link>
           );

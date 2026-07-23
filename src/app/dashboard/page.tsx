@@ -25,10 +25,20 @@ import { getNis2StatusColor, getNis2StatusLabel } from "@/lib/nis2/betroffenheit
 import { formatDate } from "@/lib/utils";
 import type { ActivityItem, Document, Incident, Measure, Nis2Assessment, Risk, VendorWithDetails } from "@/lib/types";
 import Link from "next/link";
-import { ArrowRight, Building2 } from "lucide-react";
+import {
+  ArrowRight,
+  Building2,
+  CalendarClock,
+  ClipboardCheck,
+  FileCheck,
+  ShieldAlert,
+  ShieldCheck,
+} from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { StatCard } from "@/components/ui/StatCard";
+import { ProgressRing } from "@/components/ui/ProgressRing";
 import { FunnelWelcomeBanner } from "@/components/funnel/FunnelWelcomeBanner";
 import { loadVendorsWithDetails, buildVendorDashboardStats } from "@/lib/vendors/service";
 import { redirect } from "next/navigation";
@@ -324,41 +334,43 @@ export default async function DashboardPage({
       )}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Audit-Score</p>
-            <p className="mt-1 text-3xl font-bold text-slate-900">{auditScore.percent}%</p>
-            <p className="mt-1 text-xs text-slate-400">
-              {auditScore.present}/{auditScore.total} Bereiche
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Dokumente erstellt</p>
-            <p className="mt-1 text-3xl font-bold text-slate-900">{docs.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Offene Maßnahmen</p>
-            <p className="mt-1 text-3xl font-bold text-slate-900">{openMeasures}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Risiken erfasst</p>
-            <p className="mt-1 text-3xl font-bold text-slate-900">{risks.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Letzter Audit-Export</p>
-            <p className="mt-1 text-sm font-medium text-slate-900">
-              {lastAuditExport ? formatDate(lastAuditExport) : "—"}
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          icon={ShieldCheck}
+          tone="brand"
+          label="Audit-Score"
+          value={`${auditScore.percent}%`}
+          detail={`${auditScore.present}/${auditScore.total} Bereiche`}
+          delay={0}
+        />
+        <StatCard
+          icon={FileCheck}
+          tone="emerald"
+          label="Dokumente erstellt"
+          value={docs.length}
+          delay={60}
+        />
+        <StatCard
+          icon={ClipboardCheck}
+          tone="amber"
+          label="Offene Maßnahmen"
+          value={openMeasures}
+          delay={120}
+        />
+        <StatCard
+          icon={ShieldAlert}
+          tone="red"
+          label="Risiken erfasst"
+          value={risks.length}
+          delay={180}
+        />
+        <StatCard
+          icon={CalendarClock}
+          tone="slate"
+          label="Letzter Audit-Export"
+          value={lastAuditExport ? formatDate(lastAuditExport) : "—"}
+          valueClassName="text-base"
+          delay={240}
+        />
       </div>
 
       {company && (
@@ -409,22 +421,18 @@ export default async function DashboardPage({
       )}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">NIS2-Status</p>
-            <Badge className={`mt-2 ${getNis2StatusColor(company?.nis2_status ?? "unbekannt")}`}>
-              {getNis2StatusLabel(company?.nis2_status ?? "unbekannt")}
-            </Badge>
-          </CardContent>
+        <Card interactive className="p-6">
+          <p className="text-sm text-slate-500">NIS2-Status</p>
+          <Badge className={`mt-2 ${getNis2StatusColor(company?.nis2_status ?? "unbekannt")}`}>
+            {getNis2StatusLabel(company?.nis2_status ?? "unbekannt")}
+          </Badge>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
+        <Card interactive className="flex items-center gap-5 p-6">
+          <ProgressRing value={score} size={84} strokeWidth={8} />
+          <div>
             <p className="text-sm text-slate-500">Compliance-Score</p>
-            <p className="mt-1 text-3xl font-bold text-slate-900">{score}%</p>
-            <div className="mt-2 h-2 rounded-full bg-slate-100">
-              <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: `${score}%` }} />
-            </div>
-          </CardContent>
+            <p className="mt-1 text-3xl font-bold tabular-nums text-slate-900">{score}%</p>
+          </div>
         </Card>
       </div>
 

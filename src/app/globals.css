@@ -9,6 +9,8 @@
   --brand-500: #3b82f6;
   --brand-600: #2563eb;
   --brand-700: #1d4ed8;
+  --brand-800: #1e40af;
+  --brand-900: #1e3a8a;
 }
 
 @theme inline {
@@ -20,14 +22,171 @@
   --color-brand-500: var(--brand-500);
   --color-brand-600: var(--brand-600);
   --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --animate-fade-in-up: fade-in-up 0.6s ease-out both;
+  --animate-fade-in: fade-in 0.6s ease-out both;
+  --animate-slide-in-left: slide-in-left 0.7s ease-out both;
+  --animate-slide-in-right: slide-in-right 0.7s ease-out both;
+  --animate-drift: drift 16s ease-in-out infinite;
+  --animate-ring: ring-in 1s ease-out both;
+  --animate-signal: signal-color 2.4s ease-in-out 0.5s both;
+  --animate-net-pulse: net-pulse 3.5s ease-in-out infinite;
+
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slide-in-left {
+    from {
+      opacity: 0;
+      transform: translateX(-24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes drift {
+    0%,
+    100% {
+      transform: translate(0, 0) scale(1);
+    }
+    50% {
+      transform: translate(3%, -4%) scale(1.08);
+    }
+  }
+
+  @keyframes ring-in {
+    from {
+      stroke-dashoffset: var(--ring-circumference, 283);
+    }
+  }
+
+  @keyframes signal-color {
+    0% {
+      color: #10b981;
+    }
+    55% {
+      color: #10b981;
+    }
+    100% {
+      color: #dc2626;
+    }
+  }
+
+  @keyframes net-pulse {
+    0%,
+    100% {
+      opacity: 0.35;
+      r: 2.5;
+    }
+    50% {
+      opacity: 1;
+      r: 4;
+    }
+  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Subtle textures for "seriös" enterprise sections — pure CSS, no images */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgb(148 163 184 / 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(148 163 184 / 0.08) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.bg-mesh {
+  background-image:
+    radial-gradient(ellipse 60% 50% at 20% 0%, rgb(37 99 235 / 0.16), transparent),
+    radial-gradient(ellipse 50% 40% at 85% 20%, rgb(59 130 246 / 0.14), transparent);
+}
+
+.bg-mesh-dark {
+  background-image:
+    radial-gradient(ellipse 60% 50% at 15% 10%, rgb(59 130 246 / 0.22), transparent),
+    radial-gradient(ellipse 50% 40% at 90% 90%, rgb(37 99 235 / 0.18), transparent);
+}
+
+/* Drifting glow blobs for the hero — slow, ambient, never distracting */
+.bg-blobs::before,
+.bg-blobs::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  z-index: 0;
+  animation: var(--animate-drift);
+}
+
+.bg-blobs::before {
+  top: -10%;
+  left: -5%;
+  width: 26rem;
+  height: 26rem;
+  background: radial-gradient(circle, rgb(37 99 235 / 0.22), transparent 70%);
+}
+
+.bg-blobs::after {
+  bottom: -15%;
+  right: -5%;
+  width: 24rem;
+  height: 24rem;
+  background: radial-gradient(circle, rgb(96 165 250 / 0.20), transparent 70%);
+  animation-delay: -8s;
+}
+
+.shadow-glow-brand {
+  box-shadow:
+    0 8px 24px -8px rgb(37 99 235 / 0.45),
+    0 2px 8px -2px rgb(37 99 235 / 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Dokument-Markdown (Bildschirm) */
