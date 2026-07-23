@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DOCUMENT_TYPES } from "@/lib/nis2/document-types";
 import type { Document, DocumentType } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { resolveObligationStatus } from "@/lib/compliance/obligations";
 import { OBLIGATION_STATUS_LABELS } from "@/lib/compliance/types";
 import { Button } from "@/components/ui/Button";
@@ -138,7 +138,14 @@ export function DocumentsPageClient({
           const isLoading = loadingType === docType.id;
 
           return (
-            <Card key={docType.id} className="flex flex-col">
+            <Card
+              key={docType.id}
+              interactive
+              className={cn(
+                "flex flex-col border-t-2",
+                existing ? "border-t-emerald-400 hover:shadow-emerald-500/15" : "border-t-slate-200 hover:shadow-brand-500/10"
+              )}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start gap-2">
                   <FileText className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />

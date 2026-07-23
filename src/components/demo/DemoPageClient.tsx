@@ -25,13 +25,17 @@ import { Badge } from "@/components/ui/Badge";
 import {
   Building2,
   CheckCircle2,
+  ClipboardCheck,
   Download,
+  FileCheck,
   FileText,
   FolderArchive,
   LayoutDashboard,
   Loader2,
+  ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
+import { StatCard } from "@/components/ui/StatCard";
 
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -111,30 +115,10 @@ export function DemoPageClient() {
       {activeTab === "dashboard" && (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-slate-500">Audit-Score</p>
-                <p className="mt-1 text-3xl font-bold text-emerald-600">{auditScore.percent}%</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-slate-500">Dokumente</p>
-                <p className="mt-1 text-3xl font-bold">{DEMO_DOCUMENTS.length}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-slate-500">Offene Maßnahmen</p>
-                <p className="mt-1 text-3xl font-bold">{openMeasures}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-slate-500">Risiken erfasst</p>
-                <p className="mt-1 text-3xl font-bold">{DEMO_RISKS.length}</p>
-              </CardContent>
-            </Card>
+            <StatCard icon={ShieldCheck} tone="emerald" label="Audit-Score" value={`${auditScore.percent}%`} delay={0} />
+            <StatCard icon={FileCheck} tone="brand" label="Dokumente" value={DEMO_DOCUMENTS.length} delay={60} />
+            <StatCard icon={ClipboardCheck} tone="amber" label="Offene Maßnahmen" value={openMeasures} delay={120} />
+            <StatCard icon={ShieldAlert} tone="red" label="Risiken erfasst" value={DEMO_RISKS.length} delay={180} />
           </div>
           {auditScore.percent === 100 && (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">

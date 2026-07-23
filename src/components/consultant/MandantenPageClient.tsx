@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Check, Plus } from "lucide-react";
 import type { Company } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -167,7 +168,16 @@ export function MandantenPageClient({
         {mandanten.map((mandant) => {
           const isActive = activeCompanyId === mandant.id;
           return (
-            <Card key={mandant.id} className={isActive ? "border-brand-300 ring-1 ring-brand-200" : undefined}>
+            <Card
+              key={mandant.id}
+              interactive
+              className={cn(
+                "border-t-2",
+                isActive
+                  ? "border-t-brand-400 border-brand-300 ring-1 ring-brand-200 hover:shadow-brand-500/15"
+                  : "border-t-slate-200 hover:shadow-brand-500/10"
+              )}
+            >
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <div>

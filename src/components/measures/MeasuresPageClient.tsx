@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Plus } from "lucide-react";
+import { StatCard } from "@/components/ui/StatCard";
+import { Plus, Circle, Loader2 as LoaderIcon, CheckCircle2 } from "lucide-react";
 import { ActivityTimeline } from "@/components/activity/ActivityTimeline";
 import { resolveObligationStatus } from "@/lib/compliance/obligations";
 import { OBLIGATION_STATUS_LABELS } from "@/lib/compliance/types";
@@ -21,6 +22,12 @@ const STATUS_LABELS: Record<MeasureStatus, string> = {
   open: "Offen",
   in_progress: "In Bearbeitung",
   completed: "Umgesetzt",
+};
+
+const STATUS_STAT_META: Record<MeasureStatus, { icon: typeof Circle; tone: "amber" | "brand" | "emerald" }> = {
+  open: { icon: Circle, tone: "amber" },
+  in_progress: { icon: LoaderIcon, tone: "brand" },
+  completed: { icon: CheckCircle2, tone: "emerald" },
 };
 
 const PRIORITY_LABELS: Record<MeasurePriority, string> = {
@@ -195,17 +202,15 @@ export function MeasuresPageClient({
       )}
       <div className="grid gap-4 sm:grid-cols-3">
         {(["open", "in_progress", "completed"] as MeasureStatus[]).map(
-          (status) => (
-            <Card key={status}>
-              <CardContent className="pt-6">
-                <p className="text-sm text-slate-500">
-                  {STATUS_LABELS[status]}
-                </p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {stats[status]}
-                </p>
-              </CardContent>
-            </Card>
+          (status, i) => (
+            <StatCard
+              key={status}
+              icon={STATUS_STAT_META[status].icon}
+              tone={STATUS_STAT_META[status].tone}
+              label={STATUS_LABELS[status]}
+              value={stats[status]}
+              delay={i * 60}
+            />
           )
         )}
       </div>

@@ -43,10 +43,11 @@ import {
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { StatCard } from "@/components/ui/StatCard";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Badge } from "@/components/ui/Badge";
-import { Loader2, Plus, FileDown, ClipboardCheck, Truck, Trash2, Save } from "lucide-react";
+import { Loader2, Plus, FileDown, ClipboardCheck, Truck, Trash2, Save, ShieldAlert, FileWarning, CalendarClock } from "lucide-react";
 
 interface VendorsPageClientProps {
   companyId: string;
@@ -446,30 +447,10 @@ export function VendorsPageClient({
       {!vendorsNotApplicable && (
         <>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Lieferanten</p>
-            <p className="text-2xl font-bold">{stats.totalVendors}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Kritische Lieferanten</p>
-            <p className="text-2xl font-bold text-orange-700">{stats.criticalVendors}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Fehlende Nachweise</p>
-            <p className="text-2xl font-bold text-red-700">{stats.missingEvidenceCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Bewertungen fällig</p>
-            <p className="text-2xl font-bold text-amber-700">{stats.reviewsDueCount}</p>
-          </CardContent>
-        </Card>
+        <StatCard icon={Truck} tone="brand" label="Lieferanten" value={stats.totalVendors} delay={0} />
+        <StatCard icon={ShieldAlert} tone="amber" label="Kritische Lieferanten" value={stats.criticalVendors} delay={60} />
+        <StatCard icon={FileWarning} tone="red" label="Fehlende Nachweise" value={stats.missingEvidenceCount} delay={120} />
+        <StatCard icon={CalendarClock} tone="amber" label="Bewertungen fällig" value={stats.reviewsDueCount} delay={180} />
       </div>
 
       <div className="flex flex-wrap gap-3">

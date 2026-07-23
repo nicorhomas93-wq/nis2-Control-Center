@@ -35,6 +35,7 @@ import { getNis2StatusLabel, getNis2StatusColor } from "@/lib/nis2/betroffenheit
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { StatCard } from "@/components/ui/StatCard";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Badge } from "@/components/ui/Badge";
@@ -58,6 +59,12 @@ import {
   Link2,
   Clock,
   History,
+  CheckCircle2,
+  FileWarning,
+  CalendarClock,
+  AlertTriangle,
+  FileText,
+  ShieldCheck,
 } from "lucide-react";
 
 type ModuleSection =
@@ -458,8 +465,7 @@ export function ComplianceEvidencePageClient({
     return ids.map((id) => options.find((o) => o.id === id)?.label ?? id);
   }
 
-  const missingEvidenceClass =
-    scope === "mandatory" ? "text-red-700" : "text-slate-700";
+  const missingEvidenceTone = scope === "mandatory" ? "red" : "slate";
 
   return (
     <div className="space-y-6">
@@ -519,48 +525,25 @@ export function ComplianceEvidencePageClient({
 
       {(activeSection === "overview" || activeSection === "export") && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-slate-500">Einträge gesamt</p>
-              <p className="text-2xl font-bold">{stats.totalEntries}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-slate-500">Vollständig</p>
-              <p className="text-2xl font-bold text-emerald-700">{stats.completeEntries}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-slate-500">Fehlende Nachweise</p>
-              <p className={`text-2xl font-bold ${missingEvidenceClass}`}>{stats.missingEvidence}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-slate-500">Reviews fällig</p>
-              <p className="text-2xl font-bold text-amber-700">{stats.reviewsDue}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-slate-500">Abgelaufen</p>
-              <p className="text-2xl font-bold text-orange-700">{stats.expiredEntries}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-slate-500">Freiwillig dokumentiert</p>
-              <p className="text-2xl font-bold text-slate-700">{stats.voluntaryDocumented}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-slate-500">Pflichtrelevant</p>
-              <p className="text-2xl font-bold text-brand-700">{stats.mandatoryRelevant}</p>
-            </CardContent>
-          </Card>
+          <StatCard icon={FileStack} tone="brand" label="Einträge gesamt" value={stats.totalEntries} delay={0} />
+          <StatCard icon={CheckCircle2} tone="emerald" label="Vollständig" value={stats.completeEntries} delay={40} />
+          <StatCard
+            icon={FileWarning}
+            tone={missingEvidenceTone}
+            label="Fehlende Nachweise"
+            value={stats.missingEvidence}
+            delay={80}
+          />
+          <StatCard icon={CalendarClock} tone="amber" label="Reviews fällig" value={stats.reviewsDue} delay={120} />
+          <StatCard icon={AlertTriangle} tone="amber" label="Abgelaufen" value={stats.expiredEntries} delay={160} />
+          <StatCard
+            icon={FileText}
+            tone="slate"
+            label="Freiwillig dokumentiert"
+            value={stats.voluntaryDocumented}
+            delay={200}
+          />
+          <StatCard icon={ShieldCheck} tone="brand" label="Pflichtrelevant" value={stats.mandatoryRelevant} delay={240} />
         </div>
       )}
 
