@@ -16,6 +16,7 @@ import { AUDIT_STATUS_LABELS } from "@/lib/audit/audit-folder-quality";
 import { buildStructuredAuditSummary, buildAuditSummaryReportData } from "@/lib/audit/audit-summary";
 import { buildComplianceSnapshot } from "@/lib/compliance/snapshot";
 import { syncCompanySecurityScore } from "@/lib/compliance/sync";
+import { activeOnly } from "@/lib/supabase/soft-delete";
 import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -52,15 +53,17 @@ export async function POST(request: Request) {
     { data: risks },
     { data: incidents },
   ] = await Promise.all([
-    supabase
-      .from("nis2_assessments")
-      .select("*")
-      .eq("company_id", companyId)
-      .order("created_at", { ascending: false }),
-    supabase.from("documents").select("*").eq("company_id", companyId),
-    supabase.from("measures").select("*").eq("company_id", companyId),
-    supabase.from("risks").select("*").eq("company_id", companyId),
-    supabase.from("incidents").select("*").eq("company_id", companyId),
+    activeOnly(
+      supabase
+        .from("nis2_assessments")
+        .select("*")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false })
+    ),
+    activeOnly(supabase.from("documents").select("*").eq("company_id", companyId)),
+    activeOnly(supabase.from("measures").select("*").eq("company_id", companyId)),
+    activeOnly(supabase.from("risks").select("*").eq("company_id", companyId)),
+    activeOnly(supabase.from("incidents").select("*").eq("company_id", companyId)),
   ]);
 
   const docs = (documents ?? []) as Document[];

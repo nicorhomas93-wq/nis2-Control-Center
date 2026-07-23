@@ -36,10 +36,12 @@ export async function loadOnboardingData(
       .select("id", { count: "exact", head: true })
       .eq("company_id", companyId)
       .is("deleted_at", null),
-    supabase
-      .from("nis2_assessments")
-      .select("id", { count: "exact", head: true })
-      .eq("company_id", companyId),
+    activeOnly(
+      supabase
+        .from("nis2_assessments")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", companyId)
+    ),
     supabase
       .from("audit_exports")
       .select("id", { count: "exact", head: true })

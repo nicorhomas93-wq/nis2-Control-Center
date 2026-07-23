@@ -7,6 +7,7 @@ import type { CompanyAsset } from "@/lib/assets/types";
 import { loadOnboardingData } from "@/lib/onboarding/resolve";
 import { loadComplianceEvidenceEntries } from "@/lib/compliance-evidence/service";
 import type { ComplianceEvidenceEntryWithFiles } from "@/lib/compliance-evidence/types";
+import { activeOnly } from "@/lib/supabase/soft-delete";
 import type { Company, Document, Incident, Measure, Risk } from "@/lib/types";
 
 export async function loadCompanyComplianceData(
@@ -117,12 +118,14 @@ export async function loadSecurityScoreHistory(
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const { data } = await supabase
-    .from("security_score_snapshots")
-    .select("recorded_at, score, level")
-    .eq("company_id", companyId)
-    .gte("recorded_at", since.toISOString().slice(0, 10))
-    .order("recorded_at", { ascending: true });
+  const { data } = await activeOnly(
+    supabase
+      .from("security_score_snapshots")
+      .select("recorded_at, score, level")
+      .eq("company_id", companyId)
+      .gte("recorded_at", since.toISOString().slice(0, 10))
+      .order("recorded_at", { ascending: true })
+  );
 
   return (data ?? []) as SecurityScoreSnapshot[];
 }
