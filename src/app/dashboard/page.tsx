@@ -2,6 +2,7 @@ import { DashboardShell } from "@/components/layout/DashboardShell";
 import { DashboardActions } from "@/components/dashboard/DashboardActions";
 import { NextStepsCardClient } from "@/components/dashboard/NextStepsCardClient";
 import { ComplianceWarningsBanner } from "@/components/dashboard/ComplianceWarningsBanner";
+import { CriticalStatusBanner, type CriticalItem } from "@/components/dashboard/CriticalStatusBanner";
 import { SecurityStatusCardClient } from "@/components/dashboard/SecurityStatusCardClient";
 import { SupabaseSetupBanner } from "@/components/ui/SupabaseSetupBanner";
 import { BillingStatusBanner } from "@/components/billing/BillingStatusBanner";
@@ -31,8 +32,10 @@ import {
   CalendarClock,
   ClipboardCheck,
   FileCheck,
+  FileWarning,
   ShieldAlert,
   ShieldCheck,
+  Truck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -78,6 +81,14 @@ function buildRecentActivity(
   return items
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5);
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mb-3 mt-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+      {children}
+    </p>
+  );
 }
 
 export default async function DashboardPage({
@@ -219,12 +230,52 @@ export default async function DashboardPage({
     ),
   ];
 
+  const criticalItems: CriticalItem[] = [];
+  if (securityStatus.level === "critical") {
+    criticalItems.push({
+      id: "security-status",
+      label: "Sicherheitsstatus: Kritisch",
+      detail: securityStatus.summary,
+      href: "/audit",
+    });
+  }
+  for (const warning of complianceWarnings) {
+    criticalItems.push({
+      id: warning.id,
+      label: warning.title,
+      detail: warning.detail,
+      href: warning.href,
+    });
+  }
+  if (teamCritical.length > 0) {
+    criticalItems.push({
+      id: "team-critical-tasks",
+      label:
+        teamCritical.length === 1
+          ? "1 kritische Team-Aufgabe offen"
+          : `${teamCritical.length} kritische Team-Aufgaben offen`,
+      detail: teamCritical.slice(0, 2).map((t) => t.title).join(", "),
+      href: "/aufgaben",
+    });
+  }
+  if (myCounts.overdue > 0) {
+    criticalItems.push({
+      id: "my-overdue-tasks",
+      label:
+        myCounts.overdue === 1
+          ? "1 eigene Aufgabe überfällig"
+          : `${myCounts.overdue} eigene Aufgaben überfällig`,
+      detail: "Frist bereits verstrichen",
+      href: "/aufgaben?filter=mine",
+    });
+  }
+
   return (
     <DashboardShell>
       {missingTable && <SupabaseSetupBanner />}
       {isViewingMandant && <ActiveMandantBanner companyName={company?.company_name ?? null} />}
 
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
         <p className="mt-1 text-slate-500">
           Willkommen im TKND NIS2 Control Center
@@ -232,63 +283,62 @@ export default async function DashboardPage({
         </p>
       </div>
 
+      {company && <CriticalStatusBanner items={criticalItems} />}
+
       <BillingStatusBanner company={company} platformOwner={platformOwner} />
 
       {company && (
-        <div className="mb-6">
-          <OnboardingChecklist companyId={company.id} />
-        </div>
-      )}
-
-      {company && (
-        <SecurityStatusCardClient
-          companyId={company.id}
-          score={securityStatus.score}
-          level={securityStatus.level}
-          summary={securityStatus.summary}
-          drivers={securityStatus.drivers}
-          auditReadiness={securityStatus.auditReadiness}
-          history={securityHistory}
-        />
-      )}
-
-      {company && (
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Datenqualität</p>
-            <p className="mt-1 text-3xl font-bold text-slate-900">
-              {complianceSnapshot.dataQuality.percent}%
-            </p>
-            {complianceSnapshot.dataQuality.hints.length > 0 ? (
-              <ul className="mt-2 space-y-1 text-sm text-slate-600">
-                {complianceSnapshot.dataQuality.hints.map((h: string) => (
-                  <li key={h}>· {h}</li>
-                ))}
-              </ul>
-            ) : null}
-          </CardContent>
-        </Card>
-      )}
-
-      {company && <ComplianceWarningsBanner warnings={complianceWarnings} />}
-
-      {company && (
-        <NextStepsCardClient companyId={company.id} initialSteps={nextSteps} />
-      )}
-
-      {company && (
-        <div className="mb-8">
-          <TaskDashboardCards
-            myTasks={myTasks}
-            teamCritical={teamCritical}
-            missingEvidenceCount={missingEvidence.length}
-            auditAreas={auditAreas}
-            dataQualityPercent={complianceSnapshot.dataQuality.percent}
-            dataQualityHints={complianceSnapshot.dataQuality.hints}
-            myOpenCount={myCounts.open}
-            myOverdueCount={myCounts.overdue}
+        <>
+          <SecurityStatusCardClient
+            companyId={company.id}
+            score={securityStatus.score}
+            level={securityStatus.level}
+            summary={securityStatus.summary}
+            drivers={securityStatus.drivers}
+            auditReadiness={securityStatus.auditReadiness}
+            history={securityHistory}
           />
-        </div>
+
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <p className="text-sm text-slate-500">Datenqualität</p>
+              <p className="mt-1 text-3xl font-bold text-slate-900">
+                {complianceSnapshot.dataQuality.percent}%
+              </p>
+              {complianceSnapshot.dataQuality.hints.length > 0 ? (
+                <ul className="mt-2 space-y-1 text-sm text-slate-600">
+                  {complianceSnapshot.dataQuality.hints.map((h: string) => (
+                    <li key={h}>· {h}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <ComplianceWarningsBanner warnings={complianceWarnings} />
+        </>
+      )}
+
+      {company && (
+        <>
+          <SectionLabel>Aufgaben & Onboarding</SectionLabel>
+          <div className="mb-6">
+            <OnboardingChecklist companyId={company.id} />
+          </div>
+          <NextStepsCardClient companyId={company.id} initialSteps={nextSteps} />
+          <div className="mb-8 mt-6">
+            <TaskDashboardCards
+              myTasks={myTasks}
+              teamCritical={teamCritical}
+              missingEvidenceCount={missingEvidence.length}
+              auditAreas={auditAreas}
+              dataQualityPercent={complianceSnapshot.dataQuality.percent}
+              dataQualityHints={complianceSnapshot.dataQuality.hints}
+              myOpenCount={myCounts.open}
+              myOverdueCount={myCounts.overdue}
+            />
+          </div>
+        </>
       )}
 
       {showFunnelWelcome && company && (
@@ -333,6 +383,7 @@ export default async function DashboardPage({
         />
       )}
 
+      <SectionLabel>Kennzahlen</SectionLabel>
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           icon={ShieldCheck}
@@ -398,22 +449,10 @@ export default async function DashboardPage({
               </p>
             ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <p className="text-sm text-slate-500">Lieferanten gesamt</p>
-                <p className="text-2xl font-bold">{vendorStats.totalVendors}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Kritische Lieferanten</p>
-                <p className="text-2xl font-bold text-orange-700">{vendorStats.criticalVendors}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Fehlende Nachweise</p>
-                <p className="text-2xl font-bold text-red-700">{vendorStats.missingEvidenceCount}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Bewertungen fällig</p>
-                <p className="text-2xl font-bold text-amber-700">{vendorStats.reviewsDueCount}</p>
-              </div>
+              <StatCard icon={Truck} tone="brand" label="Lieferanten gesamt" value={vendorStats.totalVendors} delay={0} />
+              <StatCard icon={ShieldAlert} tone="amber" label="Kritische Lieferanten" value={vendorStats.criticalVendors} delay={40} />
+              <StatCard icon={FileWarning} tone="red" label="Fehlende Nachweise" value={vendorStats.missingEvidenceCount} delay={80} />
+              <StatCard icon={CalendarClock} tone="amber" label="Bewertungen fällig" value={vendorStats.reviewsDueCount} delay={120} />
             </div>
             )}
           </CardContent>
@@ -436,6 +475,7 @@ export default async function DashboardPage({
         </Card>
       </div>
 
+      <SectionLabel>Aktivität</SectionLabel>
       <Card>
         <CardHeader>
           <CardTitle>Letzte Aktivität</CardTitle>

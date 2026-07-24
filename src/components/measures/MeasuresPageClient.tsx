@@ -392,9 +392,15 @@ export function MeasuresPageClient({
                         : obligation === "overdue"
                           ? "bg-amber-100 text-amber-800"
                           : "bg-slate-100 text-slate-700";
+                    const rowAccentClass =
+                      obligation === "critically_overdue"
+                        ? "border-l-4 border-l-red-500 bg-red-50/40"
+                        : obligation === "overdue"
+                          ? "border-l-4 border-l-amber-500"
+                          : "";
 
                     return (
-                    <tr key={m.id}>
+                    <tr key={m.id} className={rowAccentClass}>
                       <td className="px-6 py-4">
                         <p className="font-medium text-slate-900">{m.title}</p>
                         {m.description && (

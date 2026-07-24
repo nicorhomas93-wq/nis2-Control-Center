@@ -20,9 +20,10 @@ import {
 } from "@/lib/audit/audit-summary";
 import { generateAuditSummaryPdfFileName } from "@/lib/fileNaming";
 import { useBranding } from "@/components/layout/BrandingProvider";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { ProgressRing } from "@/components/ui/ProgressRing";
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
 import {
   AlertTriangle,
@@ -332,25 +333,27 @@ export function AuditPageClient({
               unvollständig · {auditScore.missing} fehlend (von {auditScore.total} Bereichen)
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="mb-4 h-3 overflow-hidden rounded-full bg-slate-200">
-              <div
-                className="h-full rounded-full bg-brand-600 transition-all"
-                style={{ width: `${auditScore.percent}%` }}
-              />
+          <CardContent className="flex flex-col gap-5 sm:flex-row sm:items-center">
+            <ProgressRing
+              value={auditScore.percent}
+              size={88}
+              strokeWidth={8}
+              colorClassName={auditScore.percent >= 100 ? "text-emerald-600" : "text-brand-600"}
+            />
+            <div>
+              <p className="text-2xl font-bold text-slate-900">{auditScore.percent} %</p>
+              {auditScore.percent < 100 && (
+                <p className="mt-2 text-sm text-amber-800">
+                  Es bestehen noch offene Punkte, die vor einer Prüfung bearbeitet werden sollten.
+                </p>
+              )}
+              {auditScore.percent >= 100 && (
+                <p className="mt-2 text-sm text-emerald-800">
+                  Der aktuelle Stand spricht für eine gute interne Vorbereitung. Eine externe Prüfung
+                  oder Rechtsberatung wird dadurch nicht ersetzt.
+                </p>
+              )}
             </div>
-            <p className="text-2xl font-bold text-slate-900">{auditScore.percent} %</p>
-            {auditScore.percent < 100 && (
-              <p className="mt-2 text-sm text-amber-800">
-                Es bestehen noch offene Punkte, die vor einer Prüfung bearbeitet werden sollten.
-              </p>
-            )}
-            {auditScore.percent >= 100 && (
-              <p className="mt-2 text-sm text-emerald-800">
-                Der aktuelle Stand spricht für eine gute interne Vorbereitung. Eine externe Prüfung
-                oder Rechtsberatung wird dadurch nicht ersetzt.
-              </p>
-            )}
           </CardContent>
         </Card>
 
@@ -402,7 +405,13 @@ export function AuditPageClient({
             {folderStatuses.map((item) => (
               <div
                 key={item.folderName}
-                className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+                className={cn(
+                  "flex flex-col gap-3 rounded-lg border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between",
+                  (item.displayStatus === "missing" || item.displayStatus === "outdated") &&
+                    "border-l-4 border-l-red-500 bg-red-50/40",
+                  (item.displayStatus === "review_due" || item.displayStatus === "evidence_missing") &&
+                    "border-l-4 border-l-amber-500"
+                )}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">

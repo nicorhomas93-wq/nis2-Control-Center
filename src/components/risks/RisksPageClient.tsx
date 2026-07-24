@@ -182,11 +182,17 @@ export function RisksPageClient({
                       : obligation === "overdue"
                         ? "bg-amber-100 text-amber-800"
                         : "bg-slate-100 text-slate-700";
+                  const rowAccentClass =
+                    obligation === "critically_overdue"
+                      ? "border-l-4 border-l-red-500 bg-red-50/40"
+                      : obligation === "overdue"
+                        ? "border-l-4 border-l-amber-500"
+                        : "";
 
                     const resolvedAsset = resolveRiskAsset(r, assets);
 
                     return (
-                    <tr key={r.id} className="align-top">
+                    <tr key={r.id} className={`align-top ${rowAccentClass}`}>
                       <td className="px-4 py-4 font-medium text-slate-900">
                         {resolvedAsset.name}
                       </td>

@@ -216,7 +216,8 @@ export function TasksClient({ companyId, initialTaskId }: TasksClientProps) {
                   onClick={() => setSelected(task)}
                   className={cn(
                     "w-full rounded-lg border p-4 text-left transition-colors hover:border-brand-300",
-                    selected?.id === task.id ? "border-brand-500 bg-brand-50/50" : "border-slate-200 bg-white"
+                    selected?.id === task.id ? "border-brand-500 bg-brand-50/50" : "border-slate-200 bg-white",
+                    task.priority === "critical" && "border-l-4 border-l-red-500"
                   )}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
