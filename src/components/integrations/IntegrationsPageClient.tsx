@@ -280,6 +280,27 @@ export function IntegrationsPageClient({
     }, ...syncRuns]);
   }
 
+  async function triggerRealMicrosoftSync(
+    connectionId: string,
+    action: "test_connection" | "import_users" | "import_departments" | "check_sharepoint"
+  ) {
+    const data = await callApi("/api/integrations/microsoft365/sync", "POST", { connectionId, action });
+    if (!data) {
+      // callApi already surfaced the error message; refresh the connection
+      // list so its status (set to "error" server-side) is reflected.
+      router.refresh();
+      return;
+    }
+    if (data.run) setSyncRuns([data.run, ...syncRuns]);
+    setConnections(
+      connections.map((c) =>
+        String(c.id) === connectionId
+          ? { ...c, status: "active", last_sync_at: new Date().toISOString(), last_error: null }
+          : c
+      )
+    );
+  }
+
   async function triggerSync(connectionId: string, syncType = "manual_trigger", label?: string) {
     const data = await callApi("/api/integrations/sync-runs", "POST", {
       tenantId,
@@ -314,17 +335,33 @@ export function IntegrationsPageClient({
 
     switch (action) {
       case "test_connection":
-        void triggerSync(connectionId, "connection_test", "Verbindung prüfen");
+        if (providerKey === "microsoft365") {
+          void triggerRealMicrosoftSync(connectionId, "test_connection");
+        } else {
+          void triggerSync(connectionId, "connection_test", "Verbindung prüfen");
+        }
         break;
       case "sync":
       case "import_users":
-        void triggerSync(connectionId, action === "import_users" ? "import_users" : "manual_sync", action === "import_users" ? "Benutzer importieren" : "Synchronisieren");
+        if (providerKey === "microsoft365" && action === "import_users") {
+          void triggerRealMicrosoftSync(connectionId, "import_users");
+        } else {
+          void triggerSync(connectionId, action === "import_users" ? "import_users" : "manual_sync", action === "import_users" ? "Benutzer importieren" : "Synchronisieren");
+        }
         break;
       case "import_departments":
-        void triggerSync(connectionId, "import_departments", "Abteilungen importieren");
+        if (providerKey === "microsoft365") {
+          void triggerRealMicrosoftSync(connectionId, "import_departments");
+        } else {
+          void triggerSync(connectionId, "import_departments", "Abteilungen importieren");
+        }
         break;
       case "check_sharepoint":
-        void triggerSync(connectionId, "check_sharepoint", "SharePoint prüfen");
+        if (providerKey === "microsoft365") {
+          void triggerRealMicrosoftSync(connectionId, "check_sharepoint");
+        } else {
+          void triggerSync(connectionId, "check_sharepoint", "SharePoint prüfen");
+        }
         break;
       case "create_test_ticket":
         void triggerSync(connectionId, "jira_test_ticket", "Test-Ticket erstellen");
@@ -365,7 +402,7 @@ export function IntegrationsPageClient({
         break;
       case "start_microsoft_signin":
         if (providerKey === "microsoft365") {
-          setActiveTab("Integrationsassistent");
+          window.location.href = `/api/integrations/microsoft365/authorize?connectionId=${encodeURIComponent(connectionId)}`;
         } else {
           void triggerSync(connectionId, "microsoft_signin", "Microsoft-Anmeldung");
         }

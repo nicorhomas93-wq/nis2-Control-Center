@@ -294,19 +294,8 @@ export function IntegrationWizard({
 
     const config: Record<string, unknown> = {
       goals: selectedGoals,
-      permissions: [
-        "User.Read.All",
-        "Group.Read.All",
-        "Sites.Read.All",
-        "Mail.Send",
-        "ChannelMessage.Send",
-      ],
+      permissions: ["openid", "profile", "email", "offline_access", "User.Read.All", "Sites.Read.All"],
       sharepointSiteUrl: m365Form.sharepointSiteUrl || null,
-      discovery: {
-        users: selectedGoals.includes("users") ? 128 : 0,
-        departments: selectedGoals.includes("departments") ? 14 : 0,
-        sharepoint: selectedGoals.includes("sharepoint") ? 3 : 0,
-      },
     };
 
     if (mode === "manual") {
@@ -318,35 +307,33 @@ export function IntegrationWizard({
       tenantId,
       providerId,
       name: m365Form.name,
-      authType: mode === "oauth" ? "oauth2" : "oauth2",
+      authType: "oauth2",
       baseUrl: "https://graph.microsoft.com",
+      status: "prepared",
       clientId: mode === "manual" ? m365Form.clientId : undefined,
       clientSecret: mode === "manual" ? m365Form.clientSecret : undefined,
       config,
     }, (connection) => {
       onConnectionCreated(connection);
 
-      const discovery = {
-        users: selectedGoals.includes("users") ? 128 : 0,
-        departments: selectedGoals.includes("departments") ? 14 : 0,
-        sharepoint: selectedGoals.includes("sharepoint") ? 3 : 0,
-      };
+      if (mode === "oauth") {
+        // Real Microsoft login/consent — no numbers are known until the
+        // customer actually signs in and TKND reads their real tenant data.
+        window.location.href = `/api/integrations/microsoft365/authorize?connectionId=${encodeURIComponent(
+          String(connection.id)
+        )}`;
+        return;
+      }
 
       setResult({
         kind: "connected",
-        title: "Microsoft 365 wurde verbunden.",
-        summary: mode === "oauth"
-          ? "Die Anmeldung wurde vorbereitet. TKND kann nun die ausgewählten Daten übernehmen."
-          : "Die Verbindung wurde für Ihre IT manuell vorbereitet.",
-        stats: [
-          ...(discovery.users ? [{ label: "Benutzer erkannt", value: discovery.users }] : []),
-          ...(discovery.departments ? [{ label: "Abteilungen erkannt", value: discovery.departments }] : []),
-          ...(discovery.sharepoint ? [{ label: "SharePoint-Bibliotheken verfügbar", value: discovery.sharepoint }] : []),
-        ],
+        title: "Microsoft-365-Verbindung angelegt.",
+        summary:
+          "Die Verbindung wurde mit den von Ihrer IT bereitgestellten Zugangsdaten angelegt. Der erste Verbindungstest zeigt, ob sie funktioniert.",
+        stats: [],
         nextSteps: [
-          "Erste Synchronisation im Tab „Verbundene Systeme“ starten",
+          "Verbindung im Tab „Verbundene Systeme“ testen",
           "Datenzuordnung bei Bedarf anpassen",
-          "Benachrichtigungen in Teams oder Outlook aktivieren",
         ],
       });
       setWizardStep(4);
