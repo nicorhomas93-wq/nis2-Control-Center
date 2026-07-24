@@ -1,0 +1,15 @@
+---
+description: Premium UI/UX and motion design when editing frontend surfaces
+globs: src/**/*.{tsx,ts,css}, app/**/*.{tsx,ts,css}, components/**/*.{tsx,ts,css}
+alwaysApply: false
+---
+
+# Project UI / Motion
+
+For UI and design work in this repo:
+
+- Apply personal skill **aaa-frontend-motion** (templates, references, snippets).
+- Match existing brand tokens and layout primitives when extending this product.
+- Prefer Motion (`motion/react`) for UI; add GSAP/R3F only when the surface needs cinema or 3D.
+- Do not regress into generic dashboard card grids on marketing pages.
+- Keep motion subtle on dense compliance/ops screens; invest craft on marketing, onboarding, Jarvis, and hero surfaces.
