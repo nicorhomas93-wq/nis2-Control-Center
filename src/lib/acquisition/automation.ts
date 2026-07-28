@@ -208,32 +208,62 @@ export async function processCheckCompleted(options: {
     "250+": "250+ MA",
   };
 
-  const { data: lead, error } = await admin
+  // Core fields that have existed since the very first acquisition_leads
+  // migration. Anything added later (lifecycle_status, sequence_id,
+  // strong_cta, ...) is optional and attempted first, but if that insert
+  // fails — e.g. app code deployed slightly before its own migration ran —
+  // we fall back to just these so a lead is never silently lost outright.
+  const coreLeadFields = {
+    visitor_id: options.visitorId,
+    email: options.email ?? null,
+    industry: industryMap[options.funnelResult.answers.industry] ?? null,
+    company_size: sizeMap[options.funnelResult.answers.companySize] ?? null,
+    funnel_result: options.funnelResult as unknown as Record<string, unknown>,
+    acquisition_score: scoreResult.score,
+    funnel_score: options.funnelResult.score,
+    source: "nis2_check",
+    utm_source: options.utm?.utm_source ?? null,
+    utm_medium: options.utm?.utm_medium ?? null,
+    utm_campaign: options.utm?.utm_campaign ?? null,
+    status: options.email ? "nurturing" : "new",
+    strong_offer_eligible: scoreResult.strongOfferEligible,
+  };
+
+  let { data: lead, error } = await admin
     .from("acquisition_leads")
     .insert({
-      visitor_id: options.visitorId,
-      email: options.email ?? null,
-      industry: industryMap[options.funnelResult.answers.industry] ?? null,
-      company_size: sizeMap[options.funnelResult.answers.companySize] ?? null,
-      funnel_result: options.funnelResult as unknown as Record<string, unknown>,
-      acquisition_score: scoreResult.score,
-      funnel_score: options.funnelResult.score,
-      source: "nis2_check",
-      utm_source: options.utm?.utm_source ?? null,
-      utm_medium: options.utm?.utm_medium ?? null,
-      utm_campaign: options.utm?.utm_campaign ?? null,
-      status: options.email ? "nurturing" : "new",
+      ...coreLeadFields,
       lifecycle_status: options.email ? "nurturing" : "check_complete",
       sequence_id: "standard_nurture",
-      strong_offer_eligible: scoreResult.strongOfferEligible,
       strong_cta: scoreResult.strongOfferEligible,
       email_sequence_step: 0,
     })
     .select()
     .single();
 
+  if (error) {
+    console.error("[Acquisition] Full lead insert failed, retrying with core fields only:", error.message);
+    const fallback = await admin.from("acquisition_leads").insert(coreLeadFields).select().single();
+    lead = fallback.data;
+    error = fallback.error;
+  }
+
   if (error || !lead) {
-    console.error("[Acquisition] Lead insert failed:", error?.message);
+    console.error("[Acquisition] Lead insert failed entirely:", error?.message);
+    // Never let this vanish into serverless logs alone — record it as an
+    // event so a lost high-intent visitor (real email, high score) is at
+    // least queryable and recoverable later, instead of disappearing.
+    await trackAcquisitionEvent({
+      visitorId: options.visitorId,
+      eventType: "lead_insert_failed",
+      pagePath: "/check",
+      metadata: {
+        error: error?.message ?? "unknown",
+        email: options.email ?? null,
+        funnelScore: options.funnelResult.score,
+        acquisitionScore: scoreResult.score,
+      },
+    });
     return { leadId: null, score: scoreResult.score, strongOffer: scoreResult.strongOfferEligible };
   }
 

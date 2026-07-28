@@ -11,7 +11,8 @@ export type AcquisitionEventType =
   | "upgrade_click"
   | "site_return"
   | "retargeting_triggered"
-  | "converted";
+  | "converted"
+  | "lead_insert_failed";
 
 export type AcquisitionLeadStatus = "new" | "nurturing" | "converted" | "lost" | "high_intent";
 
