@@ -33,7 +33,10 @@ export async function getAcquisitionOverview() {
       .from("acquisition_events")
       .select("id", { count: "exact", head: true })
       .eq("event_type", "check_completed"),
-    admin.from("acquisition_leads").select("id", { count: "exact", head: true }),
+    admin
+      .from("acquisition_leads")
+      .select("id", { count: "exact", head: true })
+      .neq("source", "internal_test"),
     admin
       .from("acquisition_visitors")
       .select("id", { count: "exact", head: true })
@@ -49,6 +52,7 @@ export async function getAcquisitionOverview() {
     admin
       .from("acquisition_leads")
       .select("*")
+      .neq("source", "internal_test")
       .order("created_at", { ascending: false })
       .limit(10),
     admin
@@ -60,7 +64,8 @@ export async function getAcquisitionOverview() {
 
   const { data: scoreRows } = await admin
     .from("acquisition_leads")
-    .select("acquisition_score");
+    .select("acquisition_score")
+    .neq("source", "internal_test");
 
   const scores = (scoreRows ?? []).map((r) => r.acquisition_score);
   const avgScore =
@@ -69,7 +74,8 @@ export async function getAcquisitionOverview() {
   const { count: nurturing } = await admin
     .from("acquisition_leads")
     .select("id", { count: "exact", head: true })
-    .eq("status", "nurturing");
+    .eq("status", "nurturing")
+    .neq("source", "internal_test");
 
   return {
     visitors: visitorsRes.count ?? 0,
