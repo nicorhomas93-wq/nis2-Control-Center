@@ -45,6 +45,39 @@ export function AcquisitionDashboard({ overview }: { overview: Overview }) {
         ))}
       </div>
 
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <h3 className="font-semibold text-slate-900">Letzte Leads</h3>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-slate-500">
+                <th className="pb-2 pr-4">E-Mail</th>
+                <th className="pb-2 pr-4">Score</th>
+                <th className="pb-2 pr-4">Funnel</th>
+                <th className="pb-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {overview.recentLeads.map((lead) => (
+                <tr key={lead.id} className="border-b border-slate-50">
+                  <td className="py-2 pr-4">{lead.email ?? "— (noch keine E-Mail erfasst)"}</td>
+                  <td className="py-2 pr-4">{lead.acquisition_score}</td>
+                  <td className="py-2 pr-4">{lead.funnel_score ?? "—"}</td>
+                  <td className="py-2">{lead.status}</td>
+                </tr>
+              ))}
+              {overview.recentLeads.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="py-4 text-slate-400">
+                    Noch keine Acquisition-Leads
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <PaidAdsPlaybook />
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -101,39 +134,6 @@ export function AcquisitionDashboard({ overview }: { overview: Overview }) {
           </ol>
         </section>
       </div>
-
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h3 className="font-semibold text-slate-900">Letzte Leads</h3>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-slate-500">
-                <th className="pb-2 pr-4">E-Mail</th>
-                <th className="pb-2 pr-4">Score</th>
-                <th className="pb-2 pr-4">Funnel</th>
-                <th className="pb-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {overview.recentLeads.map((lead) => (
-                <tr key={lead.id} className="border-b border-slate-50">
-                  <td className="py-2 pr-4">{lead.email ?? "—"}</td>
-                  <td className="py-2 pr-4">{lead.acquisition_score}</td>
-                  <td className="py-2 pr-4">{lead.funnel_score ?? "—"}</td>
-                  <td className="py-2">{lead.status}</td>
-                </tr>
-              ))}
-              {overview.recentLeads.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="py-4 text-slate-400">
-                    Noch keine Acquisition-Leads
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <h3 className="font-semibold text-slate-900">Content Engine — Kalender</h3>

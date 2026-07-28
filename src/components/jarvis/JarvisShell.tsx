@@ -24,7 +24,7 @@ import { JARVIS_DISCLAIMER } from "@/lib/jarvis/constants";
 
 const jarvisTabs = [
   { href: "/jarvis", label: "Übersicht", icon: LayoutDashboard, exact: true },
-  { href: "/jarvis/leads", label: "Leads", icon: Users },
+  { href: "/jarvis/leads", label: "Vertriebs-Leads", icon: Users },
   { href: "/jarvis/lead-research", label: "Lead Research", icon: Radar },
   { href: "/jarvis/pilot-requests", label: "Pilotanfragen", icon: Inbox },
   { href: "/jarvis/drafts", label: "E-Mail-Entwürfe", icon: Mail },
