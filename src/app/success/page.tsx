@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { FunnelSuccessClient } from "@/components/funnel/FunnelSuccessClient";
 
 export const metadata = {
-  title: "Setup abgeschlossen | TKND NIS2 Control Center",
+  title: "Setup abgeschlossen",
+  robots: { index: false, follow: false },
 };
 
 export default async function SuccessPage() {

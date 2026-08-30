@@ -3,9 +3,11 @@ import type { Metadata } from "next";
 import { PricingPageClient } from "@/components/marketing/PricingPageClient";
 
 export const metadata: Metadata = {
-  title: "Preise | TKND NIS2 Control Center",
+  title: "Preise",
   description:
-    "Steuern Sie Ihre NIS2-Compliance aktiv: Live Sicherheitsstatus, klare nächste Schritte und Audit-Bereitschaft.",
+    "NIS2-Compliance-Software zum planbaren Preis: Live-Sicherheitsstatus, automatische Risikoanalyse, Audit-Nachweise und Pflichtdokumente. Jetzt Preise vergleichen.",
+  keywords: ["NIS2 Software Preis", "NIS2 Tool kaufen", "NIS2 Compliance Kosten"],
+  alternates: { canonical: "/pricing" },
 };
 
 export default function PricingPage() {

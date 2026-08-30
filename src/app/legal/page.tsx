@@ -1,6 +1,14 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { MarketingHeader } from "@/components/layout/MarketingHeader";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
+
+export const metadata: Metadata = {
+  title: "Rechtliche Hinweise",
+  description:
+    "Rechtliche Hinweise zu TKND NIS2 Control Center: Umfang der Unterstützung, KI-generierte Inhalte und erforderliche qualifizierte Bewertung.",
+  alternates: { canonical: "/legal" },
+};
 
 const sections = [
   {
