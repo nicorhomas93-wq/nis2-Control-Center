@@ -12,6 +12,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
   Upload,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
@@ -66,6 +67,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
     () => initialLeads.length > 0 && filterLeadFinderLeads(initialLeads).length === 0
   );
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState({
     company_name: "",
     industry: "",
@@ -247,6 +249,24 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
           <Button
             size="sm"
             disabled={!!loading}
+            title="Echte Firmen aus der Explorium-Datenbank: IT-Dienstleister, MSP, Security (DE, 11–500 MA)"
+            onClick={async () => {
+              setNotice(null);
+              const data = await apiCall("/api/jarvis/outreach/leads/discover-explorium", "POST", {
+                limit: 10,
+              });
+              if (data?.message) setNotice(data.message);
+            }}
+          >
+            <Sparkles className="h-4 w-4" />
+            {loading === "/api/jarvis/outreach/leads/discover-explorium"
+              ? "Suche neue Kunden…"
+              : "Neue Kunden finden (Explorium)"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!!loading}
             onClick={() =>
               apiCall("/api/jarvis/outreach/leads/discover-germany", "POST", { limit: 15 })
             }
@@ -327,6 +347,12 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
+        </div>
+      )}
+
+      {notice && !error && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {notice}
         </div>
       )}
 

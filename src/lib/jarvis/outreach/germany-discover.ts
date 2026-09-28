@@ -27,15 +27,23 @@ export interface DiscoverGermanyResult {
 
 export async function discoverGermanyLeads(
   supabase: SupabaseClient,
-  options: { limit?: number; previewOnly?: boolean; pool?: QualifiedLeadInput[] } = {}
+  options: {
+    limit?: number;
+    previewOnly?: boolean;
+    pool?: QualifiedLeadInput[];
+    source?: string;
+    region?: string;
+    scoreLabel?: string;
+  } = {}
 ): Promise<DiscoverGermanyResult> {
   const limit = options.limit ?? QUALIFIED_DEFAULT_LEADS_PER_RUN;
   const pool = options.pool ?? GERMANY_LEAD_POOL;
-  const ranked = rankQualifiedLeads(pool, limit, { scoreLabel: "DE-Score" });
+  const scoreLabel = options.scoreLabel ?? "DE-Score";
+  const ranked = rankQualifiedLeads(pool, limit, { scoreLabel });
 
   const allScored = pool.map((lead) => ({
     ...lead,
-    ...scoreQualifiedLead(lead, { scoreLabel: "DE-Score" }),
+    ...scoreQualifiedLead(lead, { scoreLabel }),
   }));
   const rejected = allScored.filter((l) => !l.passed).length;
   let rejectedTotal = rejected;
@@ -72,7 +80,7 @@ export async function discoverGermanyLeads(
       continue;
     }
 
-    const scored = scoreQualifiedLead(lead, { scoreLabel: "DE-Score" });
+    const scored = scoreQualifiedLead(lead, { scoreLabel });
     const payload = buildQualifiedLeadInsert(lead, scored);
     if (!payload) {
       rejectedTotal += 1;
@@ -81,8 +89,8 @@ export async function discoverGermanyLeads(
 
     const { error } = await supabase.from("b2b_outreach_leads").insert({
       ...payload,
-      region: "Deutschland",
-      source: "germany_discover",
+      region: options.region ?? "Deutschland",
+      source: options.source ?? "germany_discover",
     });
 
     if (error) skipped += 1;
