@@ -52,15 +52,18 @@ export async function fetchExploriumBusinesses(
     throw new Error("EXPLORIUM_API_KEY fehlt in .env.local");
   }
 
-  const pageSize = Math.min(Math.max(options.pageSize ?? 50, 1), 100);
+  const pageSize = Math.min(Math.max(options.pageSize ?? 25, 1), 100);
   const filters: Record<string, unknown> = {
+    // "country_code" aus der Doku wird von der API stillschweigend ignoriert (lieferte weltweite Treffer);
+    // "company_country_code" ist der Key, den auch der Explorium-Connector nutzt — beide senden, unbekannte Keys werden ignoriert
+    company_country_code: { values: ["DE"] },
     country_code: { values: ["de"] },
     company_size: { values: options.companySizes ?? EXPLORIUM_DEFAULT_COMPANY_SIZES },
     linkedin_category: { values: options.categories ?? EXPLORIUM_PARTNER_CATEGORIES },
     has_website: { value: true },
   };
   if (options.regionCodes?.length) {
-    filters.region_country_code = { values: options.regionCodes.map((c) => c.toLowerCase()) };
+    filters.company_region_country_code = { values: options.regionCodes.map((c) => c.toUpperCase()) };
   }
 
   const res = await fetch(EXPLORIUM_API_URL, {
@@ -78,12 +81,20 @@ export async function fetchExploriumBusinesses(
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
+    if (res.status === 403 && /credit/i.test(detail)) {
+      throw new Error(
+        "Explorium-Guthaben aufgebraucht — im Explorium-Konto (admin.explorium.ai) Credits aufladen, dann erneut versuchen."
+      );
+    }
     throw new Error(`Explorium-Fehler HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
   }
 
   const json = (await res.json()) as { data?: ExploriumBusiness[]; total_pages?: number };
   return {
-    businesses: (json.data ?? []).filter((b) => b?.name?.trim()),
+    // Harte Absicherung: nur Firmen mit Sitz in Deutschland, egal was der Filter liefert
+    businesses: (json.data ?? []).filter(
+      (b) => b?.name?.trim() && /^(germany|deutschland)$/i.test(b.country_name?.trim() ?? "")
+    ),
     totalPages: json.total_pages ?? 1,
   };
 }

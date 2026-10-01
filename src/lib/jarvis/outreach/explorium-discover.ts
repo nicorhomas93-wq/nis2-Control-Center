@@ -10,7 +10,8 @@ import type { QualifiedLeadInput } from "@/lib/jarvis/outreach/qualified-lead-ty
 import { fetchWebsiteSnapshot } from "@/lib/jarvis/outreach/website-snapshot";
 import { enrichContactFromContent } from "@/lib/jarvis/outreach/contact-enrichment";
 
-const MAX_PAGES_PER_RUN = 3;
+/** Explorium berechnet Credits pro abgerufener Firma — 2 Seiten à 25 halten einen Lauf bei max. 50 Credits */
+const MAX_PAGES_PER_RUN = 2;
 const ENRICH_CONCURRENCY = 8;
 /** Website-Abrufe pro Lauf begrenzen (je max. 8 s) — hält die Route unter maxDuration */
 const MAX_ENRICH_PER_RUN = 24;
@@ -50,15 +51,42 @@ const INDUSTRY_LABELS: Record<string, string> = {
   "it system operations and maintenance": "IT-Service / Managed Services",
   "it system training and support": "IT-Support / IT-Dienstleister",
   "computer networking": "IT-Dienstleister / Netzwerke",
+  // NAICS-Beschreibungen (Explorium liefert die LinkedIn-Kategorie nicht im Ergebnis mit)
+  "computer systems design and related services": "IT-Dienstleister / IT-Service",
+  "custom computer programming services": "IT-Dienstleister / Softwareentwicklung",
+  "computer facilities management services": "IT-Service / Managed Services",
+  "other computer related services": "IT-Dienstleister / IT-Service",
 };
 
+/** "düsseldorf" → "Düsseldorf", "nordrhein-westfalen" → "Nordrhein-Westfalen" */
+function titleCase(value: string): string {
+  return value.replace(/(^|[\s-])(\p{L})/gu, (_, sep: string, ch: string) => sep + ch.toUpperCase());
+}
+
+/** Website-Parser greift auf manchen Seiten Zahlenfolgen ab ("00000026", "0 0 100 100") — nur echte DE-Nummern übernehmen */
+function plausibleGermanPhone(phone: string | null | undefined): string | undefined {
+  if (!phone) return undefined;
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, "");
+  const national = /^(\+|00)49/.test(trimmed) ? `0${digits.replace(/^(00)?49/, "")}` : digits;
+  // Vorwahl 0[1-9], 9–15 Stellen (filtert Bereiche wie "0168-0169" und Daten), keine Ziffernketten wie 000000
+  if (!/^0[1-9]\d{7,13}$/.test(national) || /(\d)\1{5,}/.test(national)) return undefined;
+  return trimmed;
+}
+
+function plausibleEmail(email: string | null | undefined): string | undefined {
+  if (!email) return undefined;
+  return /@(example|test|domain|email)\.(com|de|org)$/i.test(email) ? undefined : email;
+}
+
 function toQualifiedLead(b: ExploriumBusiness): QualifiedLeadInput {
-  const category = b.linkedin_industry_category?.trim().toLowerCase() ?? "";
+  const category = (b.linkedin_industry_category ?? b.naics_description ?? "").trim().toLowerCase();
   const website = b.website?.trim() || (b.domain ? `https://${b.domain}` : undefined);
+  const city = b.city_name?.trim() || b.region?.trim();
   return {
     company_name: b.name.trim(),
-    city: b.city_name?.trim() || b.region?.trim() || "Deutschland",
-    industry: INDUSTRY_LABELS[category] ?? b.linkedin_industry_category ?? b.naics_description ?? "IT-Dienstleister",
+    city: city ? titleCase(city) : "Deutschland",
+    industry: INDUSTRY_LABELS[category] ?? b.naics_description ?? "IT-Dienstleister",
     employee_count: employeeRangeToCount(b.number_of_employees_range),
     website,
     linkedin_url: b.linkedin_profile?.trim() || undefined,
@@ -86,8 +114,8 @@ async function enrichFromWebsite(leads: QualifiedLeadInput[]): Promise<Qualified
         const signals = WEBSITE_SIGNALS.filter((kw) => siteText.includes(kw));
         return {
           ...lead,
-          contact_email: lead.contact_email ?? contact.contact_email ?? undefined,
-          contact_phone: lead.contact_phone ?? contact.contact_phone ?? undefined,
+          contact_email: lead.contact_email ?? plausibleEmail(contact.contact_email),
+          contact_phone: lead.contact_phone ?? plausibleGermanPhone(contact.contact_phone),
           has_contact_form: lead.has_contact_form || contact.has_contact_form,
           linkedin_url: lead.linkedin_url ?? contact.linkedin_url ?? undefined,
           hints: signals.length ? `${lead.hints} — Website: ${signals.join(", ")}` : lead.hints,
