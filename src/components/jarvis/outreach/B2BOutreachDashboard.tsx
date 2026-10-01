@@ -68,6 +68,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
   );
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showExplorium, setShowExplorium] = useState(false);
   const [form, setForm] = useState({
     company_name: "",
     industry: "",
@@ -89,13 +90,19 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
     initialLeads.length > 0 &&
     (qualifiedLeads.length === 0 || finderStats.contactable < initialLeads.length);
 
-  const leads = (showPipeline ? allEnriched : qualifiedLeads)
+  const exploriumLeads = allEnriched.filter((l) => l.source === "explorium");
+
+  const leads = (showExplorium ? exploriumLeads : showPipeline ? allEnriched : qualifiedLeads)
     .filter((l) => filter === "all" || l.status === filter)
     .filter((l) => {
       if (priorityFilter === "all") return true;
       return l.resolved_outreach_priority === priorityFilter;
     })
     .sort((a, b) => {
+      // Explorium-Ansicht: neueste Funde zuerst
+      if (showExplorium) {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
       const scoreA = a.resolved_quality_score ?? 0;
       const scoreB = b.resolved_quality_score ?? 0;
       if (scoreB !== scoreA) return scoreB - scoreA;
@@ -238,7 +245,11 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
         <div className="flex flex-wrap gap-2 text-sm text-slate-600">
           <span>
             Angezeigt: <strong>{leads.length}</strong>
-            {showPipeline ? ` von ${initialLeads.length} (Pipeline)` : ` qualifiziert von ${initialLeads.length}`}
+            {showExplorium
+              ? ` Explorium-Funde`
+              : showPipeline
+                ? ` von ${initialLeads.length} (Pipeline)`
+                : ` qualifiziert von ${initialLeads.length}`}
           </span>
           <span className="text-slate-300">|</span>
           <span>
@@ -256,6 +267,7 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                 limit: 10,
               });
               if (data?.message) setNotice(data.message);
+              if (data?.inserted) setShowExplorium(true);
             }}
           >
             <Sparkles className="h-4 w-4" />
@@ -384,9 +396,24 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
         <span className="self-center text-xs font-medium text-slate-500">Ansicht:</span>
         <button
           type="button"
-          onClick={() => setShowPipeline(false)}
+          onClick={() => setShowExplorium(true)}
+          className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
+            showExplorium
+              ? "bg-emerald-600 text-white"
+              : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+          }`}
+        >
+          <Sparkles className="h-3 w-3" />
+          Explorium-Funde ({exploriumLeads.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setShowExplorium(false);
+            setShowPipeline(false);
+          }}
           className={`rounded-full px-3 py-1 text-xs font-medium ${
-            !showPipeline
+            !showExplorium && !showPipeline
               ? "bg-red-600 text-white"
               : "bg-slate-100 text-slate-600 hover:bg-slate-200"
           }`}
@@ -395,9 +422,12 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
         </button>
         <button
           type="button"
-          onClick={() => setShowPipeline(true)}
+          onClick={() => {
+            setShowExplorium(false);
+            setShowPipeline(true);
+          }}
           className={`rounded-full px-3 py-1 text-xs font-medium ${
-            showPipeline
+            !showExplorium && showPipeline
               ? "bg-slate-700 text-white"
               : "bg-slate-100 text-slate-600 hover:bg-slate-200"
           }`}
@@ -514,7 +544,9 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
         <p className="text-sm text-slate-500">
           {initialLeads.length === 0
             ? "Keine Leads in der Pipeline. „DE Top-Leads“ starten — nur kontaktierbare Partner ab 70 Punkten werden gespeichert."
-            : showPipeline
+            : showExplorium
+              ? "Noch keine Explorium-Funde — „Neue Kunden finden (Explorium)“ starten."
+              : showPipeline
               ? `Keine Leads für den aktuellen Filter (${initialLeads.length} in Pipeline).`
               : `Keine qualifizierten Leads (≥ ${LEAD_FINDER_MIN_SCORE} Punkte, kontaktierbar). „DE Top-Leads“ laden oder Batch analysieren.`}
         </p>
@@ -618,6 +650,11 @@ export function B2BOutreachDashboard({ leads: initialLeads, quota }: B2BOutreach
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {lead.source === "explorium" && (
+                    <Badge className="bg-emerald-100 text-emerald-800">
+                      Explorium · {formatDate(lead.created_at)}
+                    </Badge>
+                  )}
                   {!isQualified && (
                     <Badge className="bg-amber-100 text-amber-800">Noch nicht qualifiziert</Badge>
                   )}
