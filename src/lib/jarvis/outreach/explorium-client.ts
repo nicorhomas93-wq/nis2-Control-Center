@@ -54,33 +54,43 @@ export async function fetchExploriumBusinesses(
 
   const pageSize = Math.min(Math.max(options.pageSize ?? 25, 1), 100);
   const filters: Record<string, unknown> = {
-    // "country_code" aus der Doku wird von der API stillschweigend ignoriert (lieferte weltweite Treffer);
-    // "company_country_code" ist der Key, den auch der Explorium-Connector nutzt — beide senden, unbekannte Keys werden ignoriert
-    company_country_code: { values: ["DE"] },
     country_code: { values: ["de"] },
+    // Ohne das zählen auch Firmen mit bloßer Niederlassung in DE (lieferte Treffer aus Indien, USA, Türkei …)
+    include_operating_locations: { value: false },
     company_size: { values: options.companySizes ?? EXPLORIUM_DEFAULT_COMPANY_SIZES },
     linkedin_category: { values: options.categories ?? EXPLORIUM_PARTNER_CATEGORIES },
     has_website: { value: true },
   };
   if (options.regionCodes?.length) {
-    filters.company_region_country_code = { values: options.regionCodes.map((c) => c.toUpperCase()) };
+    filters.region_country_code = { values: options.regionCodes.map((c) => c.toLowerCase()) };
   }
 
-  const res = await fetch(EXPLORIUM_API_URL, {
-    method: "POST",
-    headers: { API_KEY: apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      mode: "full",
-      size: pageSize * 10,
-      page_size: pageSize,
-      page: options.page ?? 1,
-      filters,
-    }),
-    signal: AbortSignal.timeout(30000),
-  });
+  const request = () =>
+    fetch(EXPLORIUM_API_URL, {
+      method: "POST",
+      headers: { API_KEY: apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "full",
+        size: pageSize * 10,
+        page_size: pageSize,
+        page: options.page ?? 1,
+        filters,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+  let res = await request();
+  let detail = res.ok ? "" : await res.text().catch(() => "");
+
+  // API validiert Filter-Keys strikt (422 "extra fields not permitted") — falls dieser Key abgelehnt wird,
+  // ohne ihn erneut anfragen; die country_name-Prüfung unten sortiert Auslandsfirmen trotzdem aus
+  if (res.status === 422 && detail.includes("include_operating_locations")) {
+    delete filters.include_operating_locations;
+    res = await request();
+    detail = res.ok ? "" : await res.text().catch(() => "");
+  }
 
   if (!res.ok) {
-    const detail = await res.text().catch(() => "");
     if (res.status === 403 && /credit/i.test(detail)) {
       throw new Error(
         "Explorium-Guthaben aufgebraucht — im Explorium-Konto (admin.explorium.ai) Credits aufladen, dann erneut versuchen."
